@@ -25,6 +25,7 @@ export class NoteField {
   private readonly pressed = [false, false, false, false];
   private first = 0;
   private readonly dim: boolean;
+  private readonly shade: Phaser.GameObjects.Rectangle;
 
   /** `dim` draws the field slightly faded, used for the rival's side. */
   constructor(scene: Phaser.Scene, lanes: number[], notes: PlayNote[], dim = false) {
@@ -43,6 +44,8 @@ export class NoteField {
     const left = lanes[0] - 55;
     const width = lanes[3] - lanes[0] + 110;
     scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, dim ? 0.22 : 0.34).setOrigin(0).setDepth(Depth.lanes);
+    // Drawn over the notes to push the whole field back while it is the other dancer's turn.
+    this.shade = scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, 1).setOrigin(0).setDepth(Depth.effects + 1).setAlpha(0);
 
     this.holdGfx = scene.add.graphics().setDepth(Depth.holds);
     lanes.forEach((x, lane) => {
@@ -72,6 +75,12 @@ export class NoteField {
         emitting: false,
       })
       .setDepth(Depth.effects);
+  }
+
+  /** Fade the field back (it stays readable) or bring it forward again. */
+  setDimmed(dimmed: boolean): void {
+    this.scene.tweens.killTweensOf(this.shade);
+    this.scene.tweens.add({ targets: this.shade, alpha: dimmed ? 0.34 : 0, duration: 220 });
   }
 
   /** Show a lane's receptor as held down or released. */

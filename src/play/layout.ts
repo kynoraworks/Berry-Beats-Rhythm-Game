@@ -13,6 +13,8 @@ export const PLAYER_LANES = [0, 1, 2, 3].map((i) => FIRST_LANE_X + i * LANE_SPAC
 export const RIVAL_LANES = [3, 2, 1, 0].map((i) => GAME_W - FIRST_LANE_X - i * LANE_SPACING);
 export const LANE_FIELD_WIDTH = FIRST_LANE_X * 2 + LANE_SPACING * 3;
 export const PLAYER_FIELD_CENTER = (PLAYER_LANES[0] + PLAYER_LANES[3]) / 2;
+/** Widest a centred call-out may be without covering either lane field. */
+export const CENTER_GAP = GAME_W - LANE_FIELD_WIDTH * 2 - 20;
 
 /** Where the dancers' feet rest on the stage. */
 export const FLOOR_Y = 138 * PX;

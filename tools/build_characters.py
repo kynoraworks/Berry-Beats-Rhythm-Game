@@ -3,8 +3,8 @@
 
 Run from the repo root:  python3 tools/build_characters.py
 
-Both characters share one frame layout (51 frames, 64x64 cells, 9 per row) so
-the game can drive them with the same code:
+Blackberry, Raspberry and the Coach share one frame layout (51 frames, 64x64
+cells, 9 per row) so the game can drive them with the same code:
 
    0-2   idle
    3-4   left        5-6   right       7-8   up          9-10  down
@@ -20,11 +20,21 @@ the game can drive them with the same code:
 Directions are named by where the pose points on screen. (The Unity project
 labelled 11-12 "down right" and 13-14 "down left", the other way round.)
 
-Blackberry's frames 0-20 are the original 2021 sprites. His frames 21-50 and
-all of Raspberry's frames were generated with an image model from the original
-art, then converted to real pixel art by tools/pixelize_sprites.py. Those
-converted sheets live in archive/generated-sprites and can be edited by hand;
-rerun this script afterwards.
+Blackberry's frames 0-20 are the original 2021 sprites. His frames 21-50, all
+of Raspberry's frames and all of the Coach's frames were generated with an
+image model from the original art, then converted to real pixel art by
+tools/pixelize_sprites.py. Those converted sheets live in
+archive/generated-sprites and can be edited by hand; rerun this script
+afterwards.
+
+The Coach (instructor.png) is the tutorial's instructor redrawn in the berry
+characters' proportions. The 2021 art of her (dancer.png, 160x160 frames) is a
+different scale and style and is kept only as a fallback. She had no small
+sprite to take colours from, so her palette (palette_instructor.png) was
+derived from her first generated sheet with tools/derive_palette.py, and each
+of her sheets was converted with an explicit pixel size so her head stays the
+same size from sheet to sheet:
+  a 12.15  b 12.2  c 12.47  d 18.5  e 12.08  f 10.85  g 11.66  h 10.76  i 12.24
 """
 from pathlib import Path
 
@@ -61,13 +71,23 @@ RASPBERRY |= {33 + i: ("raspberry_g", i) for i in range(6)}
 RASPBERRY |= {39 + i: ("raspberry_h", i) for i in range(6)}
 RASPBERRY |= {45 + i: ("raspberry_i", i) for i in range(6)}
 
+INSTRUCTOR = {i: ("instructor_a", i) for i in range(6)}
+INSTRUCTOR |= {6 + i: ("instructor_b", i) for i in range(6)}  # ends with a down-left lunge (frame 11)
+INSTRUCTOR |= {12 + i: ("instructor_c", i) for i in range(6)}
+INSTRUCTOR |= {18: ("instructor_d", 0), 19: ("instructor_d", 1), 20: ("instructor_d", 2)}
+INSTRUCTOR |= {21 + i: ("instructor_e", i) for i in range(6)}
+INSTRUCTOR |= {27 + i: ("instructor_f", i) for i in range(6)}
+INSTRUCTOR |= {33 + i: ("instructor_g", i) for i in range(6)}
+INSTRUCTOR |= {39 + i: ("instructor_h", i) for i in range(6)}
+INSTRUCTOR |= {45 + i: ("instructor_i", i) for i in range(6)}
+
 # Frames where the character is in the air: how many pixels the feet are off the floor.
 LIFT = {29: 8, 32: 3, 38: 7}
 # Frames that are centred on the feet rather than kept where the model drew them.
 # The idle loops need this: the body sways but the feet must not slide.
 FEET_ANCHORED = {0, 1, 2, 45, 46, 47, 48, 49, 50}
 # Per-frame horizontal nudges, in pixels, where the generated pose sat off-centre.
-NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}}
+NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}, "instructor": {}}
 
 
 def cell_of(sheet: Image.Image, index: int) -> Image.Image:
@@ -117,3 +137,4 @@ def build(name: str, mapping: dict[int, tuple[str, int]], original: Image.Image 
 if __name__ == "__main__":
     build("blackberry", BLACKBERRY, Image.open(ORIGINAL_BLACKBERRY).convert("RGBA"))
     build("raspberry", RASPBERRY, None)
+    build("instructor", INSTRUCTOR, None)

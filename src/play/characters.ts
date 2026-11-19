@@ -242,8 +242,11 @@ export class Dancer {
   }
 }
 
-/** Blackberry and Raspberry frames are 64x64 with the feet on row 62. */
-const BERRY_ORIGIN_Y = 63 / 64;
+/** Berry-layout frames are 64x64 with the feet on row 62. */
+export const BERRY_ORIGIN_Y = 63 / 64;
+
+/** Frames in the shared berry layout that other screens use directly. */
+export const BerryFrame = { victory: [29, 30], defeat: 31, fingerGuns: 42, dab: 41 } as const;
 
 export function createPlayer(scene: Phaser.Scene, x: number, y: number): Dancer {
   return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
@@ -252,8 +255,18 @@ export function createPlayer(scene: Phaser.Scene, x: number, y: number): Dancer 
 export function createRival(scene: Phaser.Scene, kind: RivalKind, x: number, y: number): Dancer | null {
   if (kind === 'none') return null;
   if (kind === 'dancer') {
-    // Her frames are 160x160 with the feet at y=137 and the body centred near x=84.
+    if (scene.textures.exists(Tex.instructor)) {
+      return new Dancer(scene, x, y, Tex.instructor, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
+    }
+    // The original art: frames are 160x160 with the feet at y=137 and the body centred near x=84.
     return new Dancer(scene, x, y, Tex.dancer, INSTRUCTOR, 3, 84 / 160, 137 / 160);
   }
   return new Dancer(scene, x, y, Tex.raspberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
+}
+
+/** Sprite sheet of a rival in the shared berry layout, or null if she has none loaded. */
+export function rivalTexture(scene: Phaser.Scene, kind: RivalKind): string | null {
+  if (kind === 'raspberry') return Tex.raspberry;
+  if (kind === 'dancer' && scene.textures.exists(Tex.instructor)) return Tex.instructor;
+  return null;
 }
