@@ -3,8 +3,10 @@ import { PX, Tex, type Lane } from '../core/config';
 import type { RivalKind } from '../core/chart';
 import { Depth } from './layout';
 
-/** How long a dance pose is held before returning to idle, in seconds. */
-const POSE_HOLD = 0.55;
+/** Shortest time a dance pose is held, in seconds. It then ends on the next half beat. */
+const POSE_HOLD = 0.3;
+/** A pose never outstays this, however slow the song. */
+const POSE_MAX = 0.75;
 const POSE_FRAME_TIME = 0.11;
 /** Hitting the same lane again within this time switches to the alternate move. */
 const REPEAT_WINDOW = 1.2;
@@ -14,7 +16,13 @@ const SPIN_FINISH_TIME = 0.4;
 const FINISHER_TIME = 0.6;
 
 interface FrameSet {
+  /** Standing idle, used before the music starts. */
   idle: number[];
+  /**
+   * Idle dance: one frame per half beat, looped while the music plays. Poses
+   * drop back into it on the beat, wherever the loop has got to.
+   */
+  groove?: number[];
   /** One pose per lane: left, up, down, right. */
   lanes: number[][];
   /** A second move per lane, used when the same lane is hit twice in a row. */
@@ -37,6 +45,8 @@ interface FrameSet {
 // Shared by Blackberry and Raspberry. Frame layout is documented in tools/build_characters.py.
 const BERRY: FrameSet = {
   idle: [0, 1, 2],
+  // centre, left, left accent, left, centre, right, right accent, right
+  groove: [45, 46, 47, 46, 48, 49, 50, 49],
   lanes: [
     [3, 4],
     [7, 8],
@@ -89,24 +99,26 @@ export class Dancer {
   private readonly scene: Phaser.Scene;
   private readonly frames: FrameSet;
   private readonly baseY: number;
+  private readonly baseScale: number;
   private mode: Mode = 'idle';
   private sequence: number[] = [];
   private frameTime = POSE_FRAME_TIME;
   private duration = 0;
   private elapsed = 0;
-  private idleStep = 0;
   private lastHalfBeat = -Infinity;
   private lastLane = -1;
   private sinceDance = Infinity;
   private useAlt = false;
   private holding = false;
   private hype = false;
+  private grooving = false;
   private specialCount = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string, frames: FrameSet, scale: number, originX: number, originY: number) {
     this.scene = scene;
     this.frames = frames;
     this.baseY = y;
+    this.baseScale = scale;
     this.sprite = scene.add.sprite(x, y, texture, frames.idle[0]).setOrigin(originX, originY).setScale(scale).setDepth(Depth.characters);
   }
 
@@ -127,12 +139,18 @@ export class Dancer {
     }
     this.lastLane = lane;
     this.sinceDance = 0;
-    this.start('pose', frames, POSE_FRAME_TIME, POSE_HOLD);
+    this.start('pose', frames, POSE_FRAME_TIME, POSE_MAX);
+    this.pop();
   }
 
   /** Groove in place while a hold note is being held. */
   setHolding(holding: boolean): void {
     this.holding = holding;
+  }
+
+  /** Switch from the standing idle to the idle dance once the music is playing. */
+  setGrooving(grooving: boolean): void {
+    this.grooving = grooving;
   }
 
   /** Bounce harder while the score multiplier is at its maximum. */
@@ -159,7 +177,7 @@ export class Dancer {
       this.start('special', [f.finishers![pick - 1]], FINISHER_TIME, FINISHER_TIME);
     }
     this.scene.tweens.killTweensOf(this.sprite);
-    this.sprite.setY(this.baseY);
+    this.sprite.setY(this.baseY).setScale(this.baseScale);
     this.scene.tweens.add({ targets: this.sprite, y: this.baseY - 4 * PX, duration: 130, yoyo: true, ease: 'Quad.easeOut' });
   }
 
@@ -180,24 +198,38 @@ export class Dancer {
       this.sprite.setFrame(this.sequence[Math.floor(this.elapsed / this.frameTime) % this.sequence.length]);
       return;
     }
+    const halfBeat = Math.floor(beat * 2);
     if (this.mode !== 'idle') {
-      if (this.elapsed < this.duration) {
+      // A lane pose is released on the first half beat after its minimum hold, so the
+      // return to the idle dance lands on the music instead of at an arbitrary moment.
+      const onBeat = this.mode === 'pose' && this.elapsed >= POSE_HOLD && halfBeat !== this.lastHalfBeat;
+      if (this.elapsed < this.duration && !onBeat) {
         this.sprite.setFrame(this.sequence[Math.min(this.sequence.length - 1, Math.floor(this.elapsed / this.frameTime))]);
+        this.lastHalfBeat = halfBeat;
         return;
       }
       this.mode = 'idle';
       this.lastHalfBeat = -Infinity;
     }
-    // Idle and hold grooves step once per half beat so the bounce follows the music.
-    const halfBeat = Math.floor(beat * 2);
     if (halfBeat === this.lastHalfBeat) return;
     this.lastHalfBeat = halfBeat;
-    this.idleStep++;
     const f = this.frames;
     let loop = f.idle;
     if (this.holding && f.hold) loop = f.hold;
-    else if (this.hype && f.hype !== undefined) loop = [f.hype, f.idle[1]];
-    this.sprite.setFrame(loop[this.idleStep % loop.length]);
+    else if (this.grooving && f.groove) loop = f.groove;
+    // Index from the beat itself, so the loop keeps its place through poses and pauses.
+    const step = Phaser.Math.Wrap(halfBeat, 0, loop.length);
+    const frame = this.hype && f.hype !== undefined && !this.holding && step % 4 === 0 ? f.hype : loop[step];
+    this.sprite.setFrame(frame);
+  }
+
+  /** A quick squash that makes a change of pose read as a deliberate hit. */
+  private pop(): void {
+    const s = this.sprite;
+    const scale = this.baseScale;
+    this.scene.tweens.killTweensOf(s);
+    s.setY(this.baseY).setScale(scale * 1.05, scale * 0.93);
+    this.scene.tweens.add({ targets: s, scaleX: scale, scaleY: scale, duration: 110, ease: 'Quad.easeOut' });
   }
 
   private start(mode: Mode, sequence: number[], frameTime: number, duration: number): void {

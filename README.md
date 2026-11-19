@@ -106,7 +106,7 @@ For GitHub Pages: enable Pages with "GitHub Actions" as the source under Setting
 - Notes are timed from the audio clock instead of frame time, with a calibration offset.
 - Beat maps are JSON measured in beats, instead of binary files tied to the Unity build. The six original test levels are preserved as JSON in `archive/legacy-charts`.
 - Hold notes are single long notes rather than runs of small ones.
-- Raspberry, who only existed as one concept sprite, is the Level 1 rival with a full 45-frame move set. Blackberry gained 24 new frames: alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged.
+- Raspberry, who only existed as one concept sprite, is the Level 1 rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged.
 - The story levels have new charts for Nicole Yazmin's tracks. The old test levels were timed to a placeholder song that is not part of the game.
 - The menu's "Online" entry, which was never built, is replaced by Beat Maps.
 

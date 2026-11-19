@@ -82,6 +82,31 @@ def snap_to_palette(sprite, palette):
     return px.reshape(sprite.shape).astype(np.uint8)
 
 
+def drop_specks(sprite, min_size=12):
+    """Remove stray blobs that are not part of the character (8-connected, smaller than min_size)."""
+    solid = sprite[..., 3] > 0
+    seen = np.zeros_like(solid)
+    h, w = solid.shape
+    for y0, x0 in zip(*np.nonzero(solid)):
+        if seen[y0, x0]:
+            continue
+        stack, blob = [(y0, x0)], []
+        seen[y0, x0] = True
+        while stack:
+            y, x = stack.pop()
+            blob.append((y, x))
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < h and 0 <= nx < w and solid[ny, nx] and not seen[ny, nx]:
+                        seen[ny, nx] = True
+                        stack.append((ny, nx))
+        if len(blob) < min_size:
+            for y, x in blob:
+                sprite[y, x] = 0
+    return sprite
+
+
 def palette_of(path):
     px = np.array(Image.open(path).convert("RGBA")).reshape(-1, 4)
     return np.unique(px[px[:, 3] > 0][:, :3], axis=0).astype(np.int32)
@@ -99,7 +124,7 @@ def pixelize(path, cols, rows, palette):
     for n, cell in enumerate(cells):
         _, phase_x = best_grid(edge_profile(cell, 0), [p])
         _, phase_y = best_grid(edge_profile(cell, 1), [p])
-        sprite = snap_to_palette(sample(cell, p, phase_x, phase_y), palette)
+        sprite = drop_specks(snap_to_palette(sample(cell, p, phase_x, phase_y), palette))
         ys, xs = np.nonzero(sprite[..., 3])
         sprite = sprite[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
         # Where the sprite sat in the source cell, in art pixels from the cell's centre and bottom.

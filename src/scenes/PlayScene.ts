@@ -405,6 +405,8 @@ export class PlayScene extends Phaser.Scene {
       if (this.state === 'playing') {
         this.player.setHolding(([0, 1, 2, 3] as Lane[]).some((lane) => this.engine.heldNote(lane) !== null));
         this.player.setHype(this.engine.stats.multiplier >= 4);
+        this.player.setGrooving(time >= 0);
+        this.rival?.setGrooving(time >= 0);
       }
       this.player.update(dt, beat);
       this.rival?.update(dt, beat);

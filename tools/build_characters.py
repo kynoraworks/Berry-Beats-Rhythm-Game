@@ -3,7 +3,7 @@
 
 Run from the repo root:  python3 tools/build_characters.py
 
-Both characters share one frame layout (45 frames, 64x64 cells, 9 per row) so
+Both characters share one frame layout (51 frames, 64x64 cells, 9 per row) so
 the game can drive them with the same code:
 
    0-2   idle
@@ -15,11 +15,12 @@ the game can drive them with the same code:
   29-30  victory     31 defeat         32 hype bounce
   33-34  left (alt)  35-36 right (alt) 37-38 up (alt)    39-40 down (alt)
   41 dab  42 finger guns  43 high kick  44 freeze
+  45-50  idle dance: centre low, left, left accent, centre high, right, right accent
 
 Directions are named by where the pose points on screen. (The Unity project
 labelled 11-12 "down right" and 13-14 "down left", the other way round.)
 
-Blackberry's frames 0-20 are the original 2021 sprites. His frames 21-44 and
+Blackberry's frames 0-20 are the original 2021 sprites. His frames 21-50 and
 all of Raspberry's frames were generated with an image model from the original
 art, then converted to real pixel art by tools/pixelize_sprites.py. Those
 converted sheets live in archive/generated-sprites and can be edited by hand;
@@ -37,7 +38,7 @@ OUT = ROOT / "public" / "assets" / "img"
 
 CELL = 64
 COLUMNS = 9
-FRAMES = 45
+FRAMES = 51
 CENTER_X = 32
 BASELINE = 62  # y of the lowest pixel row of a character standing on the floor
 
@@ -46,6 +47,7 @@ BLACKBERRY = {21 + i: ("blackberry_e", i) for i in range(6)}
 BLACKBERRY |= {27 + i: ("blackberry_f", i) for i in range(6)}
 BLACKBERRY |= {33 + i: ("blackberry_g", i) for i in range(6)}
 BLACKBERRY |= {39 + i: ("blackberry_h", i) for i in range(6)}
+BLACKBERRY |= {45 + i: ("blackberry_i", i) for i in range(6)}
 
 RASPBERRY = {i: ("raspberry_a", i) for i in range(6)}
 RASPBERRY |= {6: ("raspberry_b", 0), 7: ("raspberry_b", 1), 8: ("raspberry_b", 2), 9: ("raspberry_b", 3), 10: ("raspberry_b", 4)}
@@ -57,9 +59,13 @@ RASPBERRY |= {21 + i: ("raspberry_e", i) for i in range(6)}
 RASPBERRY |= {27 + i: ("raspberry_f", i) for i in range(6)}
 RASPBERRY |= {33 + i: ("raspberry_g", i) for i in range(6)}
 RASPBERRY |= {39 + i: ("raspberry_h", i) for i in range(6)}
+RASPBERRY |= {45 + i: ("raspberry_i", i) for i in range(6)}
 
 # Frames where the character is in the air: how many pixels the feet are off the floor.
 LIFT = {29: 8, 32: 3, 38: 7}
+# Frames that are centred on the feet rather than kept where the model drew them.
+# The idle loops need this: the body sways but the feet must not slide.
+FEET_ANCHORED = {0, 1, 2, 45, 46, 47, 48, 49, 50}
 # Per-frame horizontal nudges, in pixels, where the generated pose sat off-centre.
 NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}}
 
@@ -76,7 +82,12 @@ def place(frame_index: int, cell: Image.Image, nudge: int) -> Image.Image:
     ys, xs = np.nonzero(alpha)
     sprite = cell.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
     out = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
-    x = min(max(int(xs.min()) + nudge, 0), CELL - sprite.width)
+    if frame_index in FEET_ANCHORED:
+        feet = np.nonzero(alpha[ys.max() - 2:ys.max() + 1].any(axis=0))[0]
+        x = CENTER_X - int(round((feet.min() + feet.max() + 1) / 2)) + int(xs.min()) + nudge
+    else:
+        x = int(xs.min()) + nudge
+    x = min(max(x, 0), CELL - sprite.width)
     y = BASELINE + 1 - LIFT.get(frame_index, 0) - sprite.height
     out.alpha_composite(sprite, (x, max(y, 0)))
     return out
