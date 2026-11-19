@@ -101,6 +101,13 @@ python3 tools/prepare_assets.py     # backgrounds, HUD, music, font
 python3 tools/build_characters.py   # Blackberry and Raspberry sprite sheets
 ```
 
+Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat, places notes on detected onsets and validates the result:
+
+```bash
+pip install numpy scipy
+python3 tools/analyze_audio.py
+```
+
 The generated dance frames live in `archive/generated-sprites` as small, hand-editable sheets. `tools/pixelize_sprites.py` is the converter that turned the raw image-model output into those sheets.
 
 ## Deploy

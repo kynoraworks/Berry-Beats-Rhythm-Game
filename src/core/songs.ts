@@ -9,18 +9,18 @@ export interface SongDef {
   title: string;
   artist: string;
   url: string;
-  /** Tempo and first-beat offset in seconds, used as defaults when composing. */
+  /** Tempo and first-beat offset in seconds (measured by tools/analyze_audio.py), used as defaults when composing. */
   bpm: number;
   offset: number;
 }
 
 export const SONGS: SongDef[] = [
-  { key: 'tutorial', title: 'Tutorial', artist: 'Nicole Yazmin', url: 'assets/audio/tutorial.mp3', bpm: 120, offset: 0 },
-  { key: 'level1', title: 'Level 1', artist: 'Nicole Yazmin', url: 'assets/audio/level1.mp3', bpm: 120, offset: 0 },
-  { key: 'title', title: 'Title Screen', artist: 'Nicole Yazmin', url: 'assets/audio/title.mp3', bpm: 120, offset: 0 },
-  { key: 'menu', title: 'Main Menu', artist: 'Nicole Yazmin', url: 'assets/audio/menu.mp3', bpm: 120, offset: 0 },
-  { key: 'level_select', title: 'Character Select', artist: 'Nicole Yazmin', url: 'assets/audio/level_select.mp3', bpm: 120, offset: 0 },
-  { key: 'pause', title: 'Pause Screen', artist: 'Nicole Yazmin', url: 'assets/audio/pause.mp3', bpm: 120, offset: 0 },
+  { key: 'tutorial', title: 'Tutorial', artist: 'Nicole Yazmin', url: 'assets/audio/tutorial.mp3', bpm: 77, offset: 0.024 },
+  { key: 'level1', title: 'Level 1', artist: 'Nicole Yazmin', url: 'assets/audio/level1.mp3', bpm: 77, offset: 0.024 },
+  { key: 'title', title: 'Title Screen', artist: 'Nicole Yazmin', url: 'assets/audio/title.mp3', bpm: 77, offset: 0.024 },
+  { key: 'menu', title: 'Main Menu', artist: 'Nicole Yazmin', url: 'assets/audio/menu.mp3', bpm: 77, offset: 0.024 },
+  { key: 'level_select', title: 'Character Select', artist: 'Nicole Yazmin', url: 'assets/audio/level_select.mp3', bpm: 77, offset: 0 },
+  { key: 'pause', title: 'Pause Screen', artist: 'Nicole Yazmin', url: 'assets/audio/pause.mp3', bpm: 77, offset: 0 },
 ];
 
 export const CUSTOM_PREFIX = 'custom:';
