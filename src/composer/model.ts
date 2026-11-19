@@ -214,7 +214,7 @@ export class EditorDoc {
   }
 
   /** Move a group of notes in time together. All move or none do. */
-  shift(ids: Iterable<number>, deltaBeats: number, minBeat = -Infinity, maxBeat = Infinity): boolean {
+  shift(ids: Iterable<number>, deltaBeats: number, minBeat = -Infinity, maxBeat = Infinity, preview = false): boolean {
     const moving = new Set(ids);
     if (moving.size === 0 || deltaBeats === 0) return false;
     const staying = this.working.notes.filter((n) => !moving.has(n.id));
@@ -226,7 +226,7 @@ export class EditorDoc {
       if (conflict(staying, next)) return false;
       moved.push(next);
     }
-    this.apply([...staying, ...moved].sort(order), false);
+    this.apply([...staying, ...moved].sort(order), preview);
     return true;
   }
 

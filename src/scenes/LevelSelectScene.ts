@@ -149,7 +149,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.difficultyLabel.setAlpha(chart ? 1 : 0.4);
     this.pips.forEach((pip, i) => {
       const on = i < difficulty;
-      pip.setAlpha(on ? 1 : 0.3).setTint(on ? 0xffffff : 0x40304c);
+      pip.setAlpha(on ? 1 : 0.45).setTint(on ? 0xffffff : 0x6a5a86);
     });
     if (chart) this.infoText.setText(`${chart.notes.length} notes   ${Math.round(chart.bpm)} bpm`);
     else this.infoText.setText(chart === null ? 'chart not available' : 'loading...');

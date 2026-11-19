@@ -30,7 +30,6 @@ export class OffsetTest {
   private oscillators: OscillatorNode[] = [];
   private tickTimes: number[] = [];
   private errors: (number | undefined)[] = [];
-  private finishTimer?: Phaser.Time.TimerEvent;
   private phase: 'running' | 'result' = 'running';
   private result: number | null = null;
 
@@ -42,7 +41,7 @@ export class OffsetTest {
     const dim = addDim(scene, 0.8).setInteractive();
     dim.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => this.tap(pointer.event.timeStamp));
     const cx = GAME_W / 2;
-    const panel = addPanel(scene, cx - 430, 150, 860, 500);
+    const panel = addPanel(scene, cx - 430, 150, 860, 500, COLORS.night, 1);
     const title = addText(scene, cx, 206, 'offset test', 48, { color: CSS.yellow });
     const help = addText(scene, cx, 282, 'listen to the clicks and tap any key\n(or the screen) on every one', 24, { color: CSS.lilac });
     this.pulse = scene.add.circle(cx, 392, 34, COLORS.purple).setStrokeStyle(6, COLORS.ink);
@@ -50,11 +49,12 @@ export class OffsetTest {
     this.progress = addText(scene, cx, 472, '', 24);
     this.note = addText(scene, cx, 520, '', 24, { color: CSS.lilac, wrapWidth: 800 });
     this.buttons = [
-      addButton(scene, cx - 250, 600, 'use it', 32, () => this.finish(true)),
-      addButton(scene, cx, 600, 'retry', 32, () => this.start()),
-      addButton(scene, cx + 250, 600, 'cancel', 32, () => this.finish(false)),
+      addButton(scene, cx - 270, 600, 'enter: use it', 32, () => this.finish(true)),
+      addButton(scene, cx + 10, 600, 'r: retry', 32, () => this.start()),
+      addButton(scene, cx + 270, 600, 'esc: cancel', 32, () => this.finish(false)),
     ];
     this.root = scene.add.container(0, 0, [dim, panel, title, help, this.pulse, this.readout, this.progress, this.note, ...this.buttons]).setDepth(200);
+    scene.events.on(Phaser.Scenes.Events.UPDATE, this.update, this);
     this.start();
   }
 
@@ -74,19 +74,23 @@ export class OffsetTest {
 
   destroy(): void {
     this.stopAudio();
-    this.finishTimer?.remove();
+    this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.update, this);
     this.root.destroy(true);
+  }
+
+  /** The test ends on the audio clock, which keeps running true even if frames are slow. */
+  private update(): void {
+    if (this.phase === 'running' && this.ctx.currentTime > this.tickTimes[TICKS - 1] + 0.45) this.showResult();
   }
 
   private start(): void {
     this.stopAudio();
-    this.finishTimer?.remove();
     this.phase = 'running';
     this.result = null;
     this.errors = [];
     this.readout.setText('').setColor(CSS.cream);
     this.pulse.setVisible(true);
-    this.note.setText('esc: cancel');
+    this.note.setText('');
     this.buttons.forEach((button, i) => button.setVisible(i === 2));
     if (this.ctx.state === 'suspended') void this.ctx.resume();
 
@@ -105,7 +109,6 @@ export class OffsetTest {
       this.oscillators.push(osc);
     }
     this.showProgress();
-    this.finishTimer = this.scene.time.delayedCall((1 + (TICKS - 1) * INTERVAL + 0.45) * 1000, () => this.showResult());
   }
 
   private stopAudio(): void {
@@ -147,7 +150,7 @@ export class OffsetTest {
       this.result = null;
       this.readout.setText('not enough taps').setColor(CSS.miss);
       this.progress.setText('');
-      this.note.setText('r: retry   esc: cancel');
+      this.note.setText('tap on at least six clicks');
       this.buttons.forEach((button, i) => button.setVisible(i !== 0));
       return;
     }

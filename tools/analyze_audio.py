@@ -1,0 +1,1063 @@
+#!/usr/bin/env python3
+"""Tempo analysis and auto-charting for the Berry Beats story levels.
+
+What it does
+  1. Decodes each song in public/assets/audio with ffmpeg (mono, 44.1 kHz float),
+     which is the same decode path browsers use for these files.
+  2. Measures tempo, drift and the first-beat offset of all six tracks.
+  3. Builds the four story beat maps (public/charts/*.json) from the detected
+     onsets, following a hand-written section plan per level (who plays when,
+     how dense, which lanes). Note positions and lanes come from the audio.
+  4. Validates every chart and prints a report. Exits non-zero on a violation.
+
+Run from the repo root:
+    python3 tools/analyze_audio.py                 # analyse, write charts, report
+    python3 tools/analyze_audio.py --clicks DIR    # also write click-track wavs to DIR
+    python3 tools/analyze_audio.py --no-write      # report only
+    python3 tools/analyze_audio.py --show level1   # print an ASCII view of a chart
+
+Needs: Python 3.10+, numpy, scipy, and ffmpeg on the PATH.
+The output is deterministic: the same audio always gives the same charts.
+
+After a tempo/offset change, copy the printed bpm/offset values into SONGS in
+src/core/songs.ts.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import wave
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import numpy as np
+from scipy import signal
+
+ROOT = Path(__file__).resolve().parent.parent
+AUDIO_DIR = ROOT / "public" / "assets" / "audio"
+CHART_DIR = ROOT / "public" / "charts"
+
+SR = 44100
+TRACKS = ["tutorial", "level1", "title", "menu", "level_select", "pause"]
+# These two were exported as loops that start exactly on beat 1 at sample 0
+# (their length is a whole number of beats), so they calibrate the detector.
+LOOP_TRACKS = ("level_select", "pause")
+
+# All six tracks pulse at 154 per minute, but the drum pattern repeats every 8
+# pulses and the snare falls on pulses 3 and 7. Read in 4/4 that is a 77 BPM
+# beat with the snare on 2 and 4, so charts use 77 (154 is the double-time reading).
+BEATS_PER_BAR = 4
+SLOTS_PER_BEAT = 4  # charts are quantised to quarter beats (sixteenth notes)
+BAR_SLOTS = BEATS_PER_BAR * SLOTS_PER_BEAT
+
+ONSET_TOLERANCE = 0.035  # a note must sit this close to a detected onset peak
+FIRST_NOTE_MIN = 2.0  # seconds into the audio before the player's first note
+LAST_NOTE_MARGIN = 1.5  # seconds of audio left after the last note or hold tail
+
+
+# ---------------------------------------------------------------------------
+# Audio features
+# ---------------------------------------------------------------------------
+
+def decode(path: Path) -> np.ndarray:
+    raw = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1", "-ar", str(SR), "-f", "f32le", "-"],
+        capture_output=True,
+        check=True,
+    ).stdout
+    return np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+
+
+def stft_mag(x: np.ndarray, nfft: int, hop: int, fmax: float) -> tuple[np.ndarray, np.ndarray]:
+    """Magnitude spectrogram up to fmax, computed in chunks to keep memory low.
+
+    Frame k is centred on sample k * hop + nfft / 2.
+    """
+    window = np.hanning(nfft)
+    freqs = np.fft.rfftfreq(nfft, 1 / SR)
+    keep = freqs <= fmax
+    frames = 1 + (len(x) - nfft) // hop
+    out = np.empty((int(keep.sum()), frames), dtype=np.float32)
+    chunk = 1024
+    for start in range(0, frames, chunk):
+        idx = np.arange(start, min(frames, start + chunk))
+        seg = x[idx[:, None] * hop + np.arange(nfft)[None, :]] * window
+        out[:, idx] = np.abs(np.fft.rfft(seg, axis=1)).T[keep]
+    return freqs[keep], out
+
+
+def spectral_flux(freqs: np.ndarray, mag: np.ndarray, lo: float, hi: float) -> np.ndarray:
+    sel = (freqs >= lo) & (freqs < hi)
+    logmag = np.log1p(200 * mag[sel] / mag.max())
+    diff = np.diff(logmag, axis=1, prepend=logmag[:, :1])
+    diff[diff < 0] = 0
+    return diff.sum(axis=0)
+
+
+def pick_peaks(env: np.ndarray, fps: float, t0: float, rel: float) -> np.ndarray:
+    """Onset peaks as rows of (time, strength). Strength 1.0 is the 99th percentile of the envelope."""
+    width = int(0.25 * fps) | 1
+    floor = signal.medfilt(env, width)
+    top = np.percentile(env, 99)
+    idx, _ = signal.find_peaks(env - floor, height=rel * top, distance=max(1, int(0.06 * fps)))
+    rows = []
+    for p in idx:
+        shift = 0.0
+        if 0 < p < len(env) - 1:
+            a, b, c = env[p - 1], env[p], env[p + 1]
+            den = a - 2 * b + c
+            if den != 0:
+                shift = 0.5 * (a - c) / den
+        rows.append((t0 + (p + shift) / fps, env[p] / top))
+    return np.array(rows) if rows else np.zeros((0, 2))
+
+
+BANDS = {"low": (30, 200), "mid": (200, 2500), "high": (2500, 12000)}
+FAST = (1024, 128)  # window, hop for mid and high: about 3 ms steps
+SLOW = (4096, 256)  # for bass, pitch and sustain: finer frequency resolution
+
+
+class Track:
+    """Decoded audio plus onset envelopes and peaks in three bands."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.x = decode(AUDIO_DIR / f"{name}.mp3")
+        self.duration = len(self.x) / SR
+        nfft, hop = FAST
+        freqs, mag = stft_mag(self.x, nfft, hop, 12000)
+        self.fast_fps = SR / hop
+        self.fast_t0 = nfft / 2 / SR
+        self.env = {
+            "mid": spectral_flux(freqs, mag, *BANDS["mid"]),
+            "high": spectral_flux(freqs, mag, *BANDS["high"]),
+        }
+        nfft, hop = SLOW
+        self.slow_freqs, self.slow_mag = stft_mag(self.x, nfft, hop, 8000)
+        self.slow_fps = SR / hop
+        self.slow_t0 = nfft / 2 / SR
+        self.env["low"] = spectral_flux(self.slow_freqs, self.slow_mag, *BANDS["low"])
+        self.raw_peaks = {
+            "mid": pick_peaks(self.env["mid"], self.fast_fps, self.fast_t0, 0.30),
+            "high": pick_peaks(self.env["high"], self.fast_fps, self.fast_t0, 0.30),
+            "low": pick_peaks(self.env["low"], self.slow_fps, self.slow_t0, 0.35),
+        }
+        peak = np.abs(self.x).max()
+        self.first_transient = float(np.argmax(np.abs(self.x) > 0.1 * peak)) / SR
+
+    def band_timing(self, band: str) -> tuple[float, float]:
+        return (self.slow_fps, self.slow_t0) if band == "low" else (self.fast_fps, self.fast_t0)
+
+
+# ---------------------------------------------------------------------------
+# Tempo and beat grid
+# ---------------------------------------------------------------------------
+
+@dataclass
+class Tempo:
+    name: str
+    pulse_bpm: float  # the raw pulse, 100..200
+    bpm: float  # charting tempo (pulse / 2, see the note at the top)
+    grid_phase: float  # phase of the sixteenth grid from flux peaks, seconds
+    drift_ms: float  # grid drift from the first to the last onset
+    jitter_ms: float  # spread of on-grid onsets around the grid
+    on_grid: float  # share of mid/high onsets within 20 ms of the sixteenth grid
+    bar_period: float  # how much stronger the 8-pulse repeat is than the 4-pulse one
+    offset: float = 0.0
+    confidence: str = ""
+
+
+def coarse_pulse(track: Track) -> float:
+    """Best pulse in 100..200 BPM by folding the onset envelope over candidate periods."""
+    env = track.env["mid"] / np.percentile(track.env["mid"], 99) + track.env["high"] / np.percentile(track.env["high"], 99)
+    fps = track.fast_fps
+    width = int(0.5 * fps)
+    env = env - np.convolve(env, np.ones(width) / width, mode="same")
+    env[env < 0] = 0
+    idx = np.arange(len(env))
+    best = (0.0, 0.0)
+    bins = 64
+    for bpm in np.arange(100, 200, 0.02):
+        phase = ((idx / (60 / bpm * fps)) % 1 * bins).astype(int) % bins
+        hist = np.bincount(phase, weights=env, minlength=bins) / np.maximum(np.bincount(phase, minlength=bins), 1)
+        score = hist.max() / (hist.mean() + 1e-9)
+        if score > best[0]:
+            best = (score, bpm)
+    return best[1]
+
+
+def measure_tempo(track: Track) -> Tempo:
+    pulse = coarse_pulse(track)
+    peaks = np.concatenate([track.raw_peaks["mid"], track.raw_peaks["high"]])
+    times, weights = peaks[:, 0], peaks[:, 1]
+    # Fit a straight line through onset time against sixteenth-grid index. Two passes.
+    period = 60 / pulse / 2
+    phase = 0.0
+    for _ in range(3):
+        # phase from the circular mean, then keep onsets close to the grid
+        angle = np.angle(np.sum(weights * np.exp(2j * np.pi * times / period)))
+        phase = angle / (2 * np.pi) * period
+        k = np.round((times - phase) / period)
+        err = times - (phase + k * period)
+        keep = np.abs(err) < 0.02
+        slope, intercept = np.polyfit(k[keep], times[keep], 1, w=weights[keep])
+        period, phase = slope, intercept
+    k = np.round((times - phase) / period)
+    err = times - (phase + k * period)
+    keep = np.abs(err) < 0.02
+    pulse_bpm = 60 / period / 2
+    snapped = round(pulse_bpm) if abs(pulse_bpm - round(pulse_bpm)) < 0.01 else round(pulse_bpm, 3)
+    # Drift if we use the snapped tempo instead of the fitted one.
+    span = times[keep].max() - times[keep].min()
+    drift = (60 / snapped / 2 - period) * (span / period)
+    period = 60 / snapped / 2
+    angle = np.angle(np.sum(weights[keep] * np.exp(2j * np.pi * times[keep] / period)))
+    phase = (angle / (2 * np.pi) * period) % period
+    err = (times - phase + period / 2) % period - period / 2
+    keep = np.abs(err) < 0.02
+
+    # Does the rhythm repeat every 4 pulses or every 8? Compare the autocorrelation
+    # of eighth-pulse onset strengths at both lags.
+    steps = int((track.duration - 0.2) / period)
+    strength = np.zeros(steps)
+    for band in ("low", "mid"):
+        fps, t0 = track.band_timing(band)
+        env = track.env[band] / np.percentile(track.env[band], 99)
+        for i in range(steps):
+            a = max(0, int((phase + i * period - 0.03 - t0) * fps))
+            b = max(a + 1, int((phase + i * period + 0.03 - t0) * fps))
+            strength[i] += env[a:b].max() if a < len(env) else 0
+    strength -= strength.mean()
+
+    def autocorr(lag: int) -> float:
+        return float(np.dot(strength[:-lag], strength[lag:]) / np.dot(strength, strength))
+
+    bar_period = autocorr(16) / max(autocorr(8), 1e-6)
+
+    return Tempo(
+        name=track.name,
+        pulse_bpm=float(snapped),
+        bpm=float(snapped) / 2,
+        grid_phase=float(phase),
+        drift_ms=float(abs(drift) * 1000),
+        jitter_ms=float(np.std(err[keep]) * 1000),
+        on_grid=float(keep.mean()),
+        bar_period=bar_period,
+    )
+
+
+def wrap(value: float, period: float) -> float:
+    """Wrap to the range -period/2 .. period/2."""
+    return (value + period / 2) % period - period / 2
+
+
+def settle_offsets(tracks: dict[str, Track], tempos: dict[str, Tempo]) -> float:
+    """Turn grid phases into first-beat offsets. Returns the detector lead in seconds.
+
+    Spectral flux peaks slightly before the true attack. The loop tracks start
+    exactly on the grid at 0, so their measured phase is that lead.
+    """
+    period = 60 / tempos[LOOP_TRACKS[0]].pulse_bpm / 2
+    lead = -float(np.mean([wrap(tempos[n].grid_phase, period) for n in LOOP_TRACKS]))
+    for name, tempo in tempos.items():
+        track = tracks[name]
+        period = 60 / tempo.pulse_bpm / 2
+        if name in LOOP_TRACKS:
+            tempo.offset = 0.0
+            tempo.confidence = "high (loop cut on the grid)"
+            continue
+        # The music starts on beat 1: the first beat is the grid line at the first transient.
+        grid = tempo.grid_phase + lead
+        k = round((track.first_transient - grid) / period)
+        tempo.offset = round(grid + k * period, 3)
+        gap = abs(track.first_transient - tempo.offset) * 1000
+        solid = tempo.on_grid > 0.6 and tempo.drift_ms < 10 and gap < 8
+        tempo.confidence = "high" if solid else "medium"
+    return lead
+
+
+# ---------------------------------------------------------------------------
+# Per-slot features on the sixteenth grid
+# ---------------------------------------------------------------------------
+
+class Grid:
+    """Onset strength, pitch and sustain for every sixteenth slot of a track."""
+
+    def __init__(self, track: Track, tempo: Tempo, lead: dict[str, float]):
+        self.track = track
+        self.bpm = tempo.bpm
+        self.offset = tempo.offset
+        self.slot_dur = 60 / tempo.bpm / SLOTS_PER_BEAT
+        self.count = int((track.duration - self.offset) / self.slot_dur)
+        self.times = self.offset + np.arange(self.count) * self.slot_dur
+        self.bars = self.count // BAR_SLOTS
+
+        # Onset peaks, corrected for the detector lead, tagged with their band.
+        self.peaks = {band: rows[:, 0] + lead[band] for band, rows in track.raw_peaks.items()}
+        self.all_peaks = np.sort(np.concatenate(list(self.peaks.values())))
+
+        self.strength: dict[str, np.ndarray] = {}
+        for band in BANDS:
+            fps, t0 = track.band_timing(band)
+            env = track.env[band]
+            out = np.zeros(self.count)
+            for s in range(self.count):
+                centre = self.times[s] - lead[band]
+                a = max(0, int(round((centre - 0.03 - t0) * fps)))
+                b = int(round((centre + 0.03 - t0) * fps))
+                if b > a and a < len(env):
+                    out[s] = env[a:b].max()
+            self.strength[band] = np.minimum(out / np.percentile(out, 97), 1.5)
+
+        # Distance from each slot to the nearest detected onset peak (any band).
+        pos = np.searchsorted(self.all_peaks, self.times)
+        left = self.all_peaks[np.clip(pos - 1, 0, len(self.all_peaks) - 1)]
+        right = self.all_peaks[np.clip(pos, 0, len(self.all_peaks) - 1)]
+        self.peak_error = np.where(np.abs(left - self.times) < np.abs(right - self.times), left - self.times, right - self.times)
+        self.eligible = np.abs(self.peak_error) <= 0.030
+
+        self._pitch_and_sustain()
+
+    def time(self, slot: float) -> float:
+        return self.offset + slot * self.slot_dur
+
+    def _pitch_and_sustain(self) -> None:
+        """Pitch of whatever starts at each slot (in semitones) and how long it rings (in beats)."""
+        track = self.track
+        freqs, mag = track.slow_freqs, track.slow_mag
+        fps, t0 = track.slow_fps, track.slow_t0
+        tonal = np.where((freqs >= 100) & (freqs < 5000))[0]
+        wide = np.where((freqs >= 60) & (freqs < 8000))[0]
+        top = mag[tonal].max()
+        self.pitch = np.full(self.count, np.nan)
+        self.tonal = np.zeros(self.count)  # how clearly a pitched note starts here
+        self.sustain = np.zeros(self.count)
+        self.brightness = np.full(self.count, np.nan)
+        beat_frames = 60 / self.bpm * fps
+        for s in range(self.count):
+            k = int(round((self.times[s] - t0) * fps))
+            if k < 7 or k + 8 >= mag.shape[1]:
+                continue
+            before_t = mag[tonal, k - 6 : k - 2].mean(axis=1)
+            after_t = mag[tonal, k + 3 : k + 7].mean(axis=1)
+            new = np.maximum(after_t - before_t, 0)
+            i = int(np.argmax(new))
+            self.tonal[s] = new[i] / top
+            self.pitch[s] = 69 + 12 * np.log2(freqs[tonal[i]] / 440)
+            new_w = np.maximum(mag[wide, k + 3 : k + 7].mean(axis=1) - mag[wide, k - 6 : k - 2].mean(axis=1), 0)
+            if new_w.sum() > 0:
+                centroid = np.exp(np.sum(np.log(freqs[wide]) * new_w) / new_w.sum())
+                self.brightness[s] = 69 + 12 * np.log2(centroid / 440)
+            b = tonal[i]
+            trace = mag[max(b - 1, 0) : b + 2, k:].sum(axis=0)
+            if len(trace) > 8:
+                ref = trace[3:7].mean()
+                below = np.where(trace[5:] < 0.4 * ref)[0]
+                frames = below[0] + 5 if len(below) else len(trace)
+                self.sustain[s] = frames / beat_frames
+
+    def contour(self, slot: int) -> float:
+        """A value that rises with pitch: the new note's pitch when one is clear, else the onset's brightness."""
+        if self.tonal[slot] >= 0.10 and not np.isnan(self.pitch[slot]):
+            return float(self.pitch[slot])
+        if not np.isnan(self.brightness[slot]):
+            return float(self.brightness[slot])
+        return 60.0
+
+    def bar_groups(self) -> list[int]:
+        """Group bars whose rhythm and notes match, so repeated music can get the same pattern."""
+        feats = []
+        for bar in range(self.bars):
+            sl = slice(bar * BAR_SLOTS, (bar + 1) * BAR_SLOTS)
+            vec = np.concatenate([self.strength["low"][sl], self.strength["mid"][sl]])
+            feats.append(vec / (np.linalg.norm(vec) + 1e-9))
+        groups: list[int] = []
+        heads: list[int] = []
+        for bar in range(self.bars):
+            match = -1
+            for g, head in enumerate(heads):
+                if float(feats[bar] @ feats[head]) < 0.86:
+                    continue
+                a = slice(bar * BAR_SLOTS, (bar + 1) * BAR_SLOTS)
+                b = slice(head * BAR_SLOTS, (head + 1) * BAR_SLOTS)
+                both = (self.tonal[a] >= 0.10) & (self.tonal[b] >= 0.10)
+                if both.sum() >= 3 and np.mean(np.abs(self.pitch[a][both] - self.pitch[b][both]) <= 1.0) < 0.6:
+                    continue
+                match = g
+                break
+            if match < 0:
+                heads.append(bar)
+                match = len(heads) - 1
+            groups.append(match)
+        return groups
+
+
+# ---------------------------------------------------------------------------
+# Chart generation
+# ---------------------------------------------------------------------------
+
+# How much each band counts when choosing which onsets become notes.
+# The player follows the melody and snare; the rival leans on kick and bass.
+WEIGHTS = {
+    "lead": {"mid": 1.0, "low": 0.6, "high": 0.30},
+    "bass": {"low": 1.0, "high": 0.45, "mid": 0.35},
+}
+METRIC_PRIOR = {0: 0.20, 4: 0.12, 8: 0.10, 12: 0.12}
+
+
+@dataclass
+class Section:
+    """A run of bars with one arrangement.
+
+    mode:
+      echo   the rival plays `unit` bars, then the player repeats the same pattern
+      trade  the rival plays `unit` bars of its own pattern, then the player does
+      both   both sides play together with different patterns
+      rival / player   only that side plays
+      rest   nobody plays
+    grid: allowed spacing in slots (4 = quarter notes, 2 = eighths)
+    notes: target notes per bar for the player; rival_notes for the rival
+    bursts: extra sixteenth notes allowed per bar, only on strong odd slots
+    doubles: two-lane accents allowed per bar; holds: holds allowed in the section
+    lanes: lanes the pattern may use
+    """
+
+    start: int
+    end: int  # exclusive
+    mode: str
+    grid: int = 4
+    notes: int = 3
+    rival_notes: int | None = None
+    unit: int = 1
+    bursts: int = 0
+    doubles: float = 0
+    holds: int = 0
+    max_hold: float = 2.0
+    lanes: tuple[int, ...] = (0, 1, 2, 3)
+    floor: float = 0.30
+
+
+@dataclass
+class Plan:
+    chart_id: str
+    song: str
+    title: str
+    rival: str
+    difficulty: int
+    max_nps: int  # most notes allowed in any one-second window
+    solo_holds: bool  # True: nothing else for that side while it holds a note
+    sections: list[Section] = field(default_factory=list)
+
+
+PLANS = [
+    Plan(
+        "tutorial", "tutorial", "Tutorial", "dancer", 1, max_nps=3, solo_holds=True,
+        sections=[
+            # One lane at a time, the instructor shows a bar and the player repeats it.
+            Section(0, 2, "echo", grid=4, notes=3, lanes=(0,)),
+            Section(2, 4, "echo", grid=4, notes=3, lanes=(1,)),
+            Section(4, 6, "echo", grid=4, notes=3, lanes=(2,)),
+            Section(6, 8, "echo", grid=4, notes=3, lanes=(3,)),
+            # Two lanes, then all four, still quarter notes.
+            Section(8, 10, "echo", grid=4, notes=3, lanes=(0, 1)),
+            Section(10, 12, "echo", grid=4, notes=3, lanes=(2, 3)),
+            Section(12, 16, "echo", grid=4, notes=4),
+            # Eighth notes and the first holds, in two-bar phrases.
+            Section(16, 20, "echo", grid=2, notes=4, unit=2, holds=1),
+            Section(20, 24, "echo", grid=2, notes=4, holds=2),
+        ],
+    ),
+    Plan(
+        "level1", "level1", "Level 1", "raspberry", 2, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 4, "trade", grid=4, notes=4, rival_notes=4, unit=2),
+            Section(4, 12, "trade", grid=2, notes=5, rival_notes=5, unit=2, holds=2),
+            Section(12, 20, "both", grid=2, notes=6, rival_notes=5, doubles=0.5, holds=3),
+            Section(20, 24, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=1),
+            Section(24, 29, "both", grid=2, notes=7, rival_notes=5, doubles=0.5, holds=2),
+        ],
+    ),
+    Plan(
+        "bonus-title", "title", "Bonus 1: Title Theme", "raspberry", 3, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 8, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, holds=3),
+            Section(8, 12, "both", grid=2, notes=8, rival_notes=6, bursts=1, doubles=1, holds=2),
+            Section(12, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, bursts=1, doubles=1, holds=1),
+            Section(16, 24, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=3),
+        ],
+    ),
+    Plan(
+        "bonus-menu", "menu", "Bonus 2: Main Menu", "raspberry", 4, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 4, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=1, holds=1),
+            Section(4, 12, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=3),
+            Section(12, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, bursts=2, doubles=1, holds=1),
+            Section(16, 24, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=4),
+        ],
+    ),
+]
+
+
+@dataclass
+class Note:
+    slot: int  # sixteenth index from beat 0
+    lane: int = -1
+    length: int = 0  # hold length in slots, 0 for a tap
+    score: float = 0.0
+    partner: bool = False  # second note of a double
+
+
+class Charter:
+    def __init__(self, plan: Plan, grid: Grid):
+        self.plan = plan
+        self.grid = grid
+        self.groups = grid.bar_groups()
+        self.salience = {
+            voice: sum(w * grid.strength[band] for band, w in weights.items()) / sum(weights.values())
+            for voice, weights in WEIGHTS.items()
+        }
+        # The same salience averaged over bars that match, so repeats give the same picks.
+        self.template = {voice: self._template(values) for voice, values in self.salience.items()}
+        self.first_slot = int(np.ceil((FIRST_NOTE_MIN - grid.offset) / grid.slot_dur))
+        self.last_slot = int(np.floor((grid.track.duration - LAST_NOTE_MARGIN - grid.offset) / grid.slot_dur))
+
+    def _template(self, values: np.ndarray) -> np.ndarray:
+        out = values.copy()
+        for g in set(self.groups):
+            bars = [b for b, gg in enumerate(self.groups) if gg == g]
+            mean = np.mean([values[b * BAR_SLOTS : (b + 1) * BAR_SLOTS] for b in bars], axis=0)
+            for b in bars:
+                out[b * BAR_SLOTS : (b + 1) * BAR_SLOTS] = mean
+        return out
+
+    # -- rhythm ------------------------------------------------------------
+
+    def pick(self, bar: int, section: Section, voice: str, count: int, also_bar: int | None = None) -> list[tuple[int, float]]:
+        """Choose slots in a bar. With `also_bar`, a slot must have an onset in both bars (echo)."""
+        g = self.grid
+        base = bar * BAR_SLOTS
+        if base + BAR_SLOTS > g.count:
+            return []
+        score = self.template[voice][base : base + BAR_SLOTS].copy()
+        ok = g.eligible[base : base + BAR_SLOTS].copy()
+        if also_bar is not None:
+            other = also_bar * BAR_SLOTS
+            if other + BAR_SLOTS > g.count:
+                return []
+            score = np.minimum(score, self.template[voice][other : other + BAR_SLOTS])
+            ok &= g.eligible[other : other + BAR_SLOTS]
+        candidates = []
+        for s in range(BAR_SLOTS):
+            if not ok[s] or score[s] < section.floor or s % section.grid != 0:
+                continue
+            candidates.append((score[s] + METRIC_PRIOR.get(s, 0.04 if s % 2 == 0 else 0.0), s))
+        candidates.sort(key=lambda c: (-c[0], c[1]))
+        chosen = {s: sc for sc, s in candidates[:count]}
+        if section.bursts:
+            # Sixteenth notes only where the music clearly has one between two chosen eighths.
+            odd = [(score[s], s) for s in range(1, BAR_SLOTS, 2) if ok[s] and score[s] >= 0.62 and (s - 1) in chosen and (s + 1) % BAR_SLOTS in chosen | {0}]
+            odd.sort(key=lambda c: (-c[0], c[1]))
+            taken: list[int] = []
+            for sc, s in odd:
+                if len(taken) >= section.bursts:
+                    break
+                if all(abs(s - t) > 4 for t in taken):
+                    taken.append(s)
+                    chosen[s] = sc
+        return sorted(chosen.items())
+
+    # -- building ----------------------------------------------------------
+
+    def build(self) -> tuple[list[Note], list[Note]]:
+        player: list[Note] = []
+        rival: list[Note] = []
+        for section in self.plan.sections:
+            p, r = self._section(section)
+            player += p
+            rival += r
+        player = self._finish(player, is_player=True)
+        rival = self._finish(rival, is_player=False)
+        return player, rival
+
+    def _section(self, sec: Section) -> tuple[list[Note], list[Note]]:
+        player: list[Note] = []
+        rival: list[Note] = []
+        rival_count = sec.rival_notes if sec.rival_notes is not None else sec.notes
+        if sec.mode == "echo":
+            for start in range(sec.start, sec.end, sec.unit * 2):
+                pattern: list[Note] = []  # slots relative to the start of the call
+                for u in range(sec.unit):
+                    call, answer = start + u, start + sec.unit + u
+                    for s, sc in self.pick(answer, sec, "lead", sec.notes, also_bar=call):
+                        pattern.append(Note(u * BAR_SLOTS + s, score=sc))
+                answer_base = (start + sec.unit) * BAR_SLOTS
+                pattern = self._add_holds(pattern, sec, answer_base, limit=1 if sec.holds else 0, span_end=sec.unit * BAR_SLOTS)
+                self._lanes(pattern, sec.lanes, answer_base)
+                for n in pattern:
+                    rival.append(Note(start * BAR_SLOTS + n.slot, n.lane, n.length, n.score))
+                    player.append(Note(answer_base + n.slot, n.lane, n.length, n.score))
+            return player, rival
+
+        if sec.mode == "trade":
+            for start in range(sec.start, sec.end, sec.unit * 2):
+                for u in range(sec.unit):
+                    if start + u < sec.end:
+                        rival += [Note((start + u) * BAR_SLOTS + s, score=sc) for s, sc in self.pick(start + u, sec, "lead", rival_count)]
+                    if start + sec.unit + u < sec.end:
+                        b = start + sec.unit + u
+                        player += [Note(b * BAR_SLOTS + s, score=sc) for s, sc in self.pick(b, sec, "lead", sec.notes)]
+        else:
+            for bar in range(sec.start, sec.end):
+                if sec.mode in ("both", "player"):
+                    player += [Note(bar * BAR_SLOTS + s, score=sc) for s, sc in self.pick(bar, sec, "lead", sec.notes)]
+                if sec.mode in ("both", "rival"):
+                    voice = "bass" if sec.mode == "both" else "lead"
+                    plain = Section(sec.start, sec.end, sec.mode, grid=sec.grid, floor=sec.floor)
+                    rival += [Note(bar * BAR_SLOTS + s, score=sc) for s, sc in self.pick(bar, plain, voice, rival_count)]
+
+        span_end = sec.end * BAR_SLOTS
+        player = self._add_holds(player, sec, 0, limit=sec.holds, span_end=span_end)
+        rival = self._add_holds(rival, sec, 0, limit=max(0, sec.holds - 1), span_end=span_end)
+        player = self._add_doubles(player, sec)
+        self._lanes(player, sec.lanes, 0)
+        self._lanes(rival, sec.lanes, 0, mirror=True)
+        return player, rival
+
+    def _add_holds(self, notes: list[Note], sec: Section, base: int, limit: int, span_end: int) -> list[Note]:
+        """Turn notes that start a long ringing sound into holds. `base` maps note slots to grid slots."""
+        if limit <= 0:
+            return notes
+        g = self.grid
+        notes = sorted(notes, key=lambda n: n.slot)
+        options = []
+        for i, n in enumerate(notes):
+            s = base + n.slot
+            if s >= g.count or g.tonal[s] < 0.10 or g.sustain[s] < 1.0:
+                continue
+            beats = min(sec.max_hold, np.floor(g.sustain[s] * 2) / 2)
+            length = int(beats * SLOTS_PER_BEAT)
+            if n.slot + length > span_end - 2:
+                length = (span_end - 2 - n.slot) // 2 * 2
+            if length < SLOTS_PER_BEAT:
+                continue
+            options.append((g.sustain[s] * g.tonal[s], i, length))
+        options.sort(key=lambda o: (-o[0], o[1]))
+        held: list[tuple[int, int]] = []
+        for _, i, length in options:
+            if len(held) >= limit:
+                break
+            start = notes[i].slot
+            if any(abs(start - h) < 2 * BAR_SLOTS for h, _ in held):
+                continue
+            notes[i].length = length
+            held.append((start, length))
+        if self.plan.solo_holds:
+            # Easy charts: nothing else to press while holding, and a short breath after.
+            notes = [n for n in notes if n.length or not any(h < n.slot < h + ln + 2 for h, ln in held)]
+        return notes
+
+    def _add_doubles(self, notes: list[Note], sec: Section) -> list[Note]:
+        if sec.doubles <= 0:
+            return notes
+        g = self.grid
+        out = list(notes)
+        bars = sorted({n.slot // BAR_SLOTS for n in notes})
+        budget = 0.0
+        for bar in bars:
+            budget += sec.doubles
+            options = []
+            for n in notes:
+                if n.slot // BAR_SLOTS != bar or n.length or n.slot % 4 != 0:
+                    continue
+                accent = g.strength["low"][n.slot] + g.strength["mid"][n.slot]
+                if accent >= 1.5:
+                    options.append((accent, n))
+            options.sort(key=lambda o: (-o[0], o[1].slot))
+            for accent, n in options:
+                if budget < 1:
+                    break
+                out.append(Note(n.slot, score=n.score + 1, partner=True))
+                budget -= 1
+        return out
+
+    # -- lanes -------------------------------------------------------------
+
+    def _lanes(self, notes: list[Note], allowed: tuple[int, ...], base: int, mirror: bool = False) -> None:
+        """Give every note a lane that follows the pitch contour and stays playable."""
+        if not notes:
+            return
+        g = self.grid
+        notes.sort(key=lambda n: (n.slot, n.partner))
+        mains = [n for n in notes if not n.partner]
+        values = [g.contour(min(base + n.slot, g.count - 1)) for n in mains]
+        if len(allowed) == 1:
+            for n in notes:
+                n.lane = allowed[0]
+            return
+        lo, hi = np.percentile(self.song_values, [10, 90]) if len(self.song_values) > 3 else (min(values), max(values) + 1)
+        span = max(hi - lo, 1.0)
+        k = len(allowed)
+
+        def bin_of(v: float) -> int:
+            b = int(np.clip((v - lo) / span, 0, 0.999) * k)
+            return k - 1 - b if mirror else b
+
+        idx = [bin_of(v) for v in values]
+        sign = -1 if mirror else 1
+        # Runs of 3+ notes moving in one direction become stair patterns across the lanes.
+        i = 0
+        while i < len(mains):
+            j = i
+            direction = 0
+            while j + 1 < len(mains) and mains[j + 1].slot - mains[j].slot <= 2:
+                step = values[j + 1] - values[j]
+                d = 1 if step > 0.5 else -1 if step < -0.5 else 0
+                if d == 0 or (direction and d != direction):
+                    break
+                direction = d
+                j += 1
+            run = j - i + 1
+            if run >= 3 and direction:
+                for part in range(i, j + 1, k):
+                    n_part = min(k, j + 1 - part)
+                    d = direction * sign
+                    start = int(np.clip(idx[part], 0, k - n_part)) if d > 0 else int(np.clip(idx[part], n_part - 1, k - 1))
+                    for q in range(n_part):
+                        idx[part + q] = start + d * q
+                i = j + 1
+            else:
+                i += 1
+
+        # Playability: no same-lane repeat a sixteenth apart, at most two in a row at eighth speed.
+        # A lane that holds a long note stays free until half a beat after it ends.
+        busy_until = {lane: -1 for lane in range(k)}
+        prev: list[tuple[int, int]] = []  # (slot, lane index) of earlier notes, newest last
+        for pos, n in enumerate(mains):
+            want = idx[pos]
+            rising = pos > 0 and values[pos] >= values[pos - 1]
+            order = sorted(range(k), key=lambda c: (abs(c - want), -c if (rising != mirror) else c))
+
+            def fine(c: int) -> bool:
+                if busy_until[c] >= n.slot:
+                    return False
+                if prev:
+                    last_slot, last_lane = prev[-1]
+                    gap = n.slot - last_slot
+                    if gap <= 1 and c == last_lane:
+                        return False
+                    if gap <= 2 and c == last_lane and len(prev) > 1 and prev[-2][1] == c and last_slot - prev[-2][0] <= 2:
+                        return False
+                return True
+
+            choice = next((c for c in order if fine(c)), None)
+            if choice is None:
+                choice = next(c for c in order if busy_until[c] < n.slot)
+            idx[pos] = choice
+            n.lane = allowed[choice]
+            prev.append((n.slot, choice))
+            if n.length:
+                busy_until[choice] = n.slot + n.length + 2
+        # Doubles: pair each accent with the mirror lane when it is free.
+        by_slot = {n.slot: n for n in mains}
+        hold_spans = [(n.slot, n.slot + n.length + 2, n.lane) for n in mains if n.length]
+        for n in notes:
+            if not n.partner:
+                continue
+            main = by_slot[n.slot]
+            taken = {lane for a, b, lane in hold_spans if a <= n.slot <= b} | {main.lane}
+            before = [m.lane for m in mains if 0 < n.slot - m.slot <= 1]
+            options = [3 - main.lane] + [c for c in allowed if abs(c - main.lane) >= 2] + list(allowed)
+            n.lane = next((c for c in options if c in allowed and c not in taken and c not in before), -1)
+        notes[:] = [n for n in notes if n.lane >= 0]
+
+    # -- clean-up ----------------------------------------------------------
+
+    def _finish(self, notes: list[Note], is_player: bool) -> list[Note]:
+        g = self.grid
+        notes = [n for n in notes if n.slot + n.length <= self.last_slot and (not is_player or n.slot >= self.first_slot)]
+        notes.sort(key=lambda n: (n.slot, n.lane))
+        # Density cap: thin the weakest taps out of any one-second window that is too full.
+        window = 1.0 / g.slot_dur
+        while True:
+            slots = np.array([n.slot for n in notes])
+            worst = None
+            for i in range(len(notes)):
+                inside = np.where((slots >= slots[i]) & (slots < slots[i] + window))[0]
+                if len(inside) > self.plan.max_nps:
+                    taps = [j for j in inside if not notes[j].length]
+                    drop = min(taps, key=lambda j: (not notes[j].partner, notes[j].score, -notes[j].slot))
+                    worst = drop
+                    break
+            if worst is None:
+                break
+            del notes[worst]
+        return notes
+
+    @property
+    def song_values(self) -> np.ndarray:
+        """Contour values of every clear onset in the song, for a stable pitch-to-lane mapping."""
+        if not hasattr(self, "_song_values"):
+            g = self.grid
+            strong = np.where(g.eligible & (self.salience["lead"] >= 0.3))[0]
+            self._song_values = np.array([g.contour(int(s)) for s in strong])
+        return self._song_values
+
+
+def to_chart(plan: Plan, grid: Grid, player: list[Note], rival: list[Note]) -> dict:
+    def pack(notes: list[Note]) -> list[dict]:
+        out = []
+        for n in sorted(notes, key=lambda n: (n.slot, n.lane)):
+            item = {"b": n.slot / SLOTS_PER_BEAT, "l": n.lane}
+            if n.length:
+                item["d"] = n.length / SLOTS_PER_BEAT
+            out.append(item)
+        return out
+
+    return {
+        "format": 1,
+        "id": plan.chart_id,
+        "title": plan.title,
+        "artist": "Nicole Yazmin",
+        "song": plan.song,
+        "bpm": grid.bpm,
+        "offset": grid.offset,
+        "notes": pack(player),
+        "rival": pack(rival),
+        "rivalCharacter": plan.rival,
+        "difficulty": plan.difficulty,
+        "charter": "Berry Beats auto-charter",
+    }
+
+
+# ---------------------------------------------------------------------------
+# Validation and reporting
+# ---------------------------------------------------------------------------
+
+def validate(chart: dict, grid: Grid, plan: Plan) -> tuple[list[str], dict]:
+    """Check a chart against the rules. Returns (violations, stats)."""
+    problems: list[str] = []
+    beat = 60 / chart["bpm"]
+    duration = grid.track.duration
+    stats: dict = {}
+    for side in ("notes", "rival"):
+        notes = chart[side]
+        times = np.array([chart["offset"] + n["b"] * beat for n in notes])
+        ends = np.array([chart["offset"] + (n["b"] + n.get("d", 0)) * beat for n in notes])
+        if len(notes) == 0:
+            problems.append(f"{side}: empty")
+            continue
+        if any(abs(n["b"] * 4 - round(n["b"] * 4)) > 1e-9 for n in notes):
+            problems.append(f"{side}: note off the quarter-beat grid")
+        errors = np.array([np.min(np.abs(grid.all_peaks - t)) for t in times])
+        if errors.max() > ONSET_TOLERANCE:
+            problems.append(f"{side}: {int((errors > ONSET_TOLERANCE).sum())} notes further than 35 ms from an onset")
+        if side == "notes" and times.min() < FIRST_NOTE_MIN:
+            problems.append("notes: first note earlier than 2.0 s")
+        if ends.max() > duration - LAST_NOTE_MARGIN + 1e-6:
+            problems.append(f"{side}: last note ends less than 1.5 s before the audio does")
+        by_time: dict[float, list[int]] = {}
+        for n in notes:
+            by_time.setdefault(n["b"], []).append(n["l"])
+        doubles = sum(1 for lanes in by_time.values() if len(lanes) == 2)
+        if any(len(lanes) > 2 for lanes in by_time.values()):
+            problems.append(f"{side}: three or more notes at once")
+        if any(len(set(lanes)) != len(lanes) for lanes in by_time.values()):
+            problems.append(f"{side}: two notes in the same lane at the same time")
+        if doubles and plan.chart_id == "tutorial":
+            problems.append(f"{side}: doubles in the tutorial")
+        for lane in range(4):
+            lane_notes = sorted((n for n in notes if n["l"] == lane), key=lambda n: n["b"])
+            for a, b in zip(lane_notes, lane_notes[1:]):
+                gap = b["b"] - (a["b"] + a.get("d", 0))
+                if a.get("d", 0) and gap < 0.5 - 1e-9:
+                    problems.append(f"{side}: lane {lane} note at beat {b['b']} too soon after a hold")
+                elif b["b"] - a["b"] < 0.25 - 1e-9:
+                    problems.append(f"{side}: lane {lane} notes closer than a quarter beat at beat {b['b']}")
+        if any(0 < n.get("d", 0) < 1 for n in notes):
+            problems.append(f"{side}: hold shorter than one beat")
+        # Runs of the same lane at eighth speed or faster.
+        order = sorted(notes, key=lambda n: n["b"])
+        run = 1
+        longest = 1
+        for a, b in zip(order, order[1:]):
+            if b["l"] == a["l"] and 0 < b["b"] - a["b"] <= 0.5:
+                run += 1
+                longest = max(longest, run)
+            elif b["b"] != a["b"]:
+                run = 1
+        if longest > 2 and len({n["l"] for n in notes}) > 1:
+            problems.append(f"{side}: {longest} notes in a row in one lane at eighth speed")
+        counts = [int(((times >= t) & (times < t + 1.0)).sum()) for t in times]
+        bar_len = beat * BEATS_PER_BAR
+        active_bars = {int(n["b"] // BEATS_PER_BAR) for n in notes} | {int((n["b"] + n.get("d", 0) - 1e-6) // BEATS_PER_BAR) for n in notes}
+        per_section = []
+        for start in range(0, grid.bars + 1, 8):
+            inside = [n for n in notes if start * BEATS_PER_BAR <= n["b"] < (start + 8) * BEATS_PER_BAR]
+            per_section.append(round(len(inside) / (8 * bar_len), 2))
+        if max(counts) > plan.max_nps:
+            problems.append(f"{side}: {max(counts)} notes in one second (limit {plan.max_nps})")
+        stats[side] = {
+            "notes": len(notes),
+            "taps": sum(1 for n in notes if not n.get("d")),
+            "holds": sum(1 for n in notes if n.get("d")),
+            "doubles": doubles,
+            "lanes": [sum(1 for n in notes if n["l"] == lane) for lane in range(4)],
+            "onset_error_median_ms": round(float(np.median(errors)) * 1000, 1),
+            "onset_error_p95_ms": round(float(np.percentile(errors, 95)) * 1000, 1),
+            "onset_error_max_ms": round(float(errors.max()) * 1000, 1),
+            "max_nps": max(counts),
+            "avg_nps_active": round(len(notes) / (len(active_bars) * bar_len), 2),
+            "density_per_8_bars": per_section,
+            "first_s": round(float(times.min()), 2),
+            "last_s": round(float(ends.max()), 2),
+        }
+    return problems, stats
+
+
+def time_domain_onsets(x: np.ndarray) -> tuple[np.ndarray, float]:
+    """An onset envelope made a different way (band-passed amplitude, 1.45 ms steps) for the sync check."""
+    step = 64
+    sos = signal.butter(4, [150, 10000], btype="band", fs=SR, output="sos")
+    env = np.abs(signal.sosfiltfilt(sos, x))
+    w = int(SR * 0.004)
+    kernel = np.hanning(2 * w + 1)
+    env = np.convolve(env, kernel / kernel.sum(), mode="same")[::step]
+    level = np.log(env + 1e-4 * env.max())
+    lag = max(1, int(round(0.010 * SR / step)))
+    diff = np.zeros_like(level)
+    diff[lag:] = level[lag:] - level[:-lag]
+    diff[diff < 0] = 0
+    return diff * np.sqrt(env / env.max()), SR / step
+
+
+def sync_lag(chart: dict, track: Track) -> float:
+    """Lag in ms (within +/-100 ms) at which the chart's note times best line up with the audio's onsets."""
+    env, fps = time_domain_onsets(track.x)
+    beat = 60 / chart["bpm"]
+    times = np.array(sorted({chart["offset"] + n["b"] * beat for side in ("notes", "rival") for n in chart[side]}))
+    lags = np.arange(-0.100, 0.1001, 0.001)
+    # The 10 ms difference used for the envelope peaks about 5 ms after the attack starts.
+    scores = [env[np.clip(np.round((times + lag + 0.005) * fps).astype(int), 0, len(env) - 1)].sum() for lag in lags]
+    smooth = np.convolve(scores, np.ones(5) / 5, mode="same")
+    return float(lags[int(np.argmax(smooth))] * 1000)
+
+
+def write_clicks(chart: dict, track: Track, path: Path) -> None:
+    beat = 60 / chart["bpm"]
+    out = track.x * 0.6
+    click = np.sin(2 * np.pi * 1760 * np.arange(int(0.012 * SR)) / SR) * np.hanning(int(0.012 * SR)) * 0.5
+    for n in chart["notes"]:
+        start = int(round((chart["offset"] + n["b"] * beat) * SR))
+        if start + len(click) < len(out):
+            out[start : start + len(click)] += click
+    data = (np.clip(out, -1, 1) * 32767).astype(np.int16)
+    with wave.open(str(path), "wb") as f:
+        f.setnchannels(1)
+        f.setsampwidth(2)
+        f.setframerate(SR)
+        f.writeframes(data.tobytes())
+
+
+def show(chart: dict, bars: int) -> None:
+    """ASCII view: one row per bar, player lanes then rival lanes, sixteen slots each."""
+    glyph = "<^v>"
+    for bar in range(bars):
+        row = []
+        for side in ("notes", "rival"):
+            cells = ["."] * BAR_SLOTS
+            for n in chart[side]:
+                s = int(round(n["b"] * SLOTS_PER_BEAT)) - bar * BAR_SLOTS
+                if 0 <= s < BAR_SLOTS:
+                    mark = glyph[n["l"]].upper() if n.get("d") else glyph[n["l"]]
+                    if n.get("d"):
+                        mark = "LUDR"[n["l"]]
+                    cells[s] = "2" if cells[s] != "." else mark
+                    for q in range(1, int(round(n.get("d", 0) * SLOTS_PER_BEAT))):
+                        if s + q < BAR_SLOTS and cells[s + q] == ".":
+                            cells[s + q] = "-"
+            row.append("".join(cells))
+        print(f"  {bar:2d} |{row[0]}|   |{row[1]}|")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--clicks", type=Path, help="write click-track wavs for every chart to this folder")
+    parser.add_argument("--no-write", action="store_true", help="do not write chart files")
+    parser.add_argument("--show", action="append", default=[], help="print an ASCII view of this chart id (repeatable, or 'all')")
+    parser.add_argument("--stats", type=Path, help="write the report numbers to this JSON file")
+    args = parser.parse_args()
+
+    tracks = {name: Track(name) for name in TRACKS}
+    tempos = {name: measure_tempo(tracks[name]) for name in TRACKS}
+    lead_fast = settle_offsets(tracks, tempos)
+
+    # Detector lead per band, measured on the loop tracks (true grid phase 0).
+    lead = {"mid": lead_fast, "high": lead_fast}
+    low_errs = []
+    for name in LOOP_TRACKS:
+        period = 60 / tempos[name].pulse_bpm / 2
+        t = tracks[name].raw_peaks["low"][:, 0]
+        e = (t + period / 2) % period - period / 2
+        low_errs.append(np.median(e[np.abs(e) < 0.03]))
+    lead["low"] = -float(np.mean(low_errs))
+
+    print("Tempo and beat grid")
+    print("  track         bpm   (pulse)  offset   drift   jitter  on-grid  8/4-pulse  first sound  confidence")
+    for name in TRACKS:
+        t = tempos[name]
+        print(
+            f"  {name:12s} {t.bpm:6.2f} ({t.pulse_bpm:6.2f})  {t.offset:5.3f}s  {t.drift_ms:4.1f}ms  {t.jitter_ms:4.1f}ms"
+            f"   {t.on_grid * 100:4.0f}%    {t.bar_period:5.2f}     {tracks[name].first_transient * 1000:5.1f}ms     {t.confidence}"
+        )
+    print(f"  detector lead: mid/high {lead_fast * 1000:.1f} ms, low {lead['low'] * 1000:.1f} ms")
+
+    report = {"tempo": {n: {"bpm": t.bpm, "offset": t.offset, "duration": round(tracks[n].duration, 3)} for n, t in tempos.items()}, "charts": {}}
+    failed = False
+    for plan in PLANS:
+        track = tracks[plan.song]
+        grid = Grid(track, tempos[plan.song], lead)
+        player, rival = Charter(plan, grid).build()
+        chart = to_chart(plan, grid, player, rival)
+        problems, stats = validate(chart, grid, plan)
+        lag = sync_lag(chart, track)
+        if abs(lag) > 10:
+            problems.append(f"sync lag {lag:.0f} ms")
+        stats["sync_lag_ms"] = lag
+        stats["duration"] = round(track.duration, 3)
+        report["charts"][plan.chart_id] = stats
+        print(f"\n{plan.chart_id}: {plan.title} ({plan.song}, {track.duration:.2f} s, {grid.bars} bars)")
+        for side, label in (("notes", "player"), ("rival", "rival ")):
+            s = stats.get(side)
+            if not s:
+                continue
+            print(
+                f"  {label}: {s['notes']} notes ({s['taps']} taps, {s['holds']} holds, {s['doubles']} doubles), lanes {s['lanes']},"
+                f" {s['first_s']}s to {s['last_s']}s"
+            )
+            print(
+                f"          onset error median {s['onset_error_median_ms']} ms, p95 {s['onset_error_p95_ms']} ms, max {s['onset_error_max_ms']} ms;"
+                f" max {s['max_nps']} notes/s, average {s['avg_nps_active']} while active; per 8 bars {s['density_per_8_bars']}"
+            )
+        print(f"  sync lag {lag:+.0f} ms; violations: {len(problems)}")
+        for p in problems:
+            print(f"    ! {p}")
+        failed |= bool(problems)
+        if plan.chart_id in args.show or "all" in args.show:
+            show(chart, grid.bars)
+        if not args.no_write:
+            CHART_DIR.mkdir(parents=True, exist_ok=True)
+            (CHART_DIR / f"{plan.chart_id}.json").write_text(json.dumps(chart, separators=(",", ":")) + "\n")
+        if args.clicks:
+            args.clicks.mkdir(parents=True, exist_ok=True)
+            write_clicks(chart, track, args.clicks / f"{plan.chart_id}-clicks.wav")
+    if args.stats:
+        args.stats.write_text(json.dumps(report, indent=2))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

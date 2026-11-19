@@ -155,13 +155,13 @@ export class BeatMapsScene extends Phaser.Scene {
       bg,
       title: addText(this, 64, y - 14, '', 24, { origin: [0, 0.5] }),
       info: addText(this, 64, y + 18, '', 16, { origin: [0, 0.5], color: CSS.grey }),
-      best: addText(this, 800, y, '', 24, { origin: [1, 0.5], color: CSS.lilac }),
+      best: addText(this, 776, y, '', 24, { origin: [1, 0.5], color: CSS.lilac }),
       actions: [],
       index: slot,
     };
     this.makeClickable(bg, () => this.selectRow(row.index), undefined);
     ROW_ACTIONS.forEach((label, action) => {
-      const button = addText(this, 880 + action * 110, y, label, 24);
+      const button = addText(this, 850 + action * 106, y, label, 24);
       this.makeClickable(button, () => {
         this.selectRow(row.index);
         if (this.actionIndex !== action) {
