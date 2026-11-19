@@ -9,7 +9,7 @@ import { playSfx } from '../core/sfx';
 import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getSong, listCustomAudio, loadSongBuffer, saveCustomAudio } from '../core/songs';
 import { hint } from '../core/mobile';
 import { addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { baseName, disposePicker, downloadText, pickFile, safeFileName } from '../composer/files';
+import { MAX_AUDIO_BYTES, baseName, disposePicker, downloadText, pickFile, safeFileName } from '../composer/files';
 import { Modal, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
 
 interface BeatMapsData {
@@ -33,7 +33,6 @@ const LIST_Y = 132;
 const VISIBLE_ROWS = 7;
 const ROW_FILL = 0x241640;
 const ROW_FILL_SELECTED = 0x3a2670;
-const MAX_AUDIO_BYTES = 80 * 1024 * 1024;
 const MAX_CHART_BYTES = 5 * 1024 * 1024;
 
 /** The player's own beat maps: create, play, edit, import, export and delete. */
@@ -375,6 +374,7 @@ export class BeatMapsScene extends Phaser.Scene {
     // Imported audio is only worth keeping while a map still uses it.
     if (chart.song.startsWith(CUSTOM_PREFIX) && !listCustomCharts().some((c) => c.song === chart.song)) {
       void deleteCustomAudio(chart.song).catch(() => undefined);
+      this.audioNames.delete(chart.song);
     }
     this.reload();
     showToast(this, 'Beat map deleted');
@@ -478,8 +478,9 @@ export class BeatMapsScene extends Phaser.Scene {
       return;
     }
     if (!this.scene.isActive()) return;
-    if (listCustomCharts().some((c) => c.id === chart.id)) {
-      // Same map already here: keep both, and make the copy tell-apart.
+    // Scores are keyed by chart id, so an import must never share an id with a story
+    // level (it would overwrite story progress) or with a map that is already here.
+    if (LEVELS.some((level) => level.id === chart.id) || listCustomCharts().some((c) => c.id === chart.id)) {
       chart.id = newChart(chart.song, chart.bpm, chart.offset).id;
       chart.title = `${(chart.title || 'Untitled').slice(0, 70)} (copy)`;
     }

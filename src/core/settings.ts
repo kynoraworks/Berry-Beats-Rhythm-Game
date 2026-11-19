@@ -71,7 +71,7 @@ export function getSettings(): Settings {
   if (!current) {
     let raw: Partial<Settings> = {};
     try {
-      raw = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings>;
+      raw = (JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as Partial<Settings> | null) ?? {};
     } catch {
       raw = {};
     }

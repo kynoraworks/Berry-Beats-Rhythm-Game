@@ -21,6 +21,8 @@ let master: GainNode | null = null;
 let current: Track | null = null;
 /** The track that should be playing; guards against a slow load finishing after a newer request. */
 let wanted: MusicKey | null = null;
+/** Bumped by every play and stop, so a load that was overtaken never starts its track. */
+let request = 0;
 
 function output(ctx: AudioContext): GainNode {
   if (!master) {
@@ -59,13 +61,14 @@ export const music = {
   play(key: MusicKey, fadeMs = 600): void {
     if (!game || wanted === key) return;
     wanted = key;
+    const mine = ++request;
     const ctx = getAudioContext(game);
     const previous = current;
     current = null;
     if (previous) fadeOut(previous, ctx, Math.max(fadeMs, 50) / 1000);
     loadSongBuffer(game, key).then(
       (buffer) => {
-        if (wanted !== key) return;
+        if (request !== mine) return;
         const gain = ctx.createGain();
         const source = ctx.createBufferSource();
         source.buffer = buffer;
@@ -78,7 +81,7 @@ export const music = {
         current = { key, gain, source };
       },
       () => {
-        if (wanted === key) wanted = null;
+        if (request === mine) wanted = null;
       },
     );
   },
@@ -86,6 +89,7 @@ export const music = {
   /** Fade out whatever is playing. */
   stop(fadeMs = 400): void {
     wanted = null;
+    request++;
     if (!game || !current) return;
     fadeOut(current, getAudioContext(game), Math.max(fadeMs, 20) / 1000);
     current = null;

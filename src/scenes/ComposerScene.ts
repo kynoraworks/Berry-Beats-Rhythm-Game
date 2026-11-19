@@ -4,13 +4,13 @@ import { beatToSec, newChart, secToBeat, type Chart, type RivalKind } from '../c
 import { Conductor } from '../core/conductor';
 import type { ComposerData, PlayData } from '../core/flow';
 import { music } from '../core/music';
-import { saveCustomChart } from '../core/saves';
+import { listCustomCharts, saveCustomChart } from '../core/saves';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { SONGS, getAudioContext, getSong, loadSongBuffer, saveCustomAudio, songTitle } from '../core/songs';
+import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getAudioContext, getSong, loadSongBuffer, saveCustomAudio, songTitle } from '../core/songs';
 import { addDim, addPanel, addText, fadeIn, goTo, isLeaving } from '../core/ui';
 import { scheduleClick } from '../composer/clicks';
-import { baseName, disposePicker, pickFile } from '../composer/files';
+import { MAX_AUDIO_BYTES, baseName, disposePicker, pickFile } from '../composer/files';
 import { BEATS_PER_MEASURE, SNAPS, ZOOMS, clamp, formatBeat, formatTime, snapBeat, snapLabel, tapTempo } from '../composer/grid';
 import {
   GROUP_W,
@@ -63,6 +63,25 @@ const MIN_HOLD_BEATS = 0.5;
 /** Index into ZOOMS the editor opens at (160 px per second: about four beats of a slow song on screen). */
 const DEFAULT_ZOOM = 2;
 const HEAD_HIT = 9 * NOTE_SCALE + 2;
+
+/** The editing session set aside while its map is being test played. */
+interface StashedSession {
+  doc: EditorDoc;
+  zoomIndex: number;
+  snap: number;
+  rateIndex: number;
+  tool: Tool;
+  recordSide: Side;
+  ticksOn: boolean;
+  metronomeOn: boolean;
+  selection: Set<number>;
+}
+
+/**
+ * Test play leaves this scene and comes back, which rebuilds it. The session is
+ * parked here in between so undo history and editor settings survive the trip.
+ */
+let stashed: StashedSession | null = null;
 
 const MODAL_CODES: Record<string, ModalKey> = {
   ArrowUp: 'up',
@@ -146,7 +165,10 @@ export class ComposerScene extends Phaser.Scene {
   init(data: ComposerData): void {
     const fallback = SONGS[0];
     const source: Chart = data?.chart ?? { ...newChart(fallback.key, fallback.bpm, fallback.offset), artist: fallback.artist };
-    this.doc = new EditorDoc(source, data?.dirty === true);
+    // Only a return from test play of this same map picks the parked session back up.
+    const resumed = data?.position !== undefined && stashed?.doc.meta.id === source.id ? stashed : null;
+    stashed = null;
+    this.doc = resumed?.doc ?? new EditorDoc(source, data?.dirty === true);
     this.startPosition = Math.max(0, data?.position ?? 0);
     this.conductor = null;
     this.duration = 0;
@@ -154,15 +176,15 @@ export class ComposerScene extends Phaser.Scene {
     this.loadToken++;
     this.pos = 0;
     this.playing = false;
-    this.zoomIndex = DEFAULT_ZOOM;
-    this.snap = 4;
-    this.rateIndex = 2;
-    this.tool = 'draw';
-    this.recordSide = 0;
-    this.ticksOn = true;
-    this.metronomeOn = false;
+    this.zoomIndex = resumed?.zoomIndex ?? DEFAULT_ZOOM;
+    this.snap = resumed?.snap ?? 4;
+    this.rateIndex = resumed?.rateIndex ?? 2;
+    this.tool = resumed?.tool ?? 'draw';
+    this.recordSide = resumed?.recordSide ?? 0;
+    this.ticksOn = resumed?.ticksOn ?? true;
+    this.metronomeOn = resumed?.metronomeOn ?? false;
     this.clickCursor = 0;
-    this.selection = new Set();
+    this.selection = resumed?.selection ?? new Set();
     this.drag = null;
     this.box = null;
     this.recordings = [null, null, null, null];
@@ -270,21 +292,32 @@ export class ComposerScene extends Phaser.Scene {
     const token = this.loadToken;
     const file = await pickFile('audio/*,.mp3,.ogg,.wav,.m4a,.flac');
     if (token !== this.loadToken) return;
-    if (!file) {
-      void this.loadAudio(this.doc.meta.song);
-      return;
+    let problem = '';
+    if (file && file.size > MAX_AUDIO_BYTES) problem = 'That file is too large (80 MB at most)';
+    else if (file) {
+      let key: string | null = null;
+      try {
+        key = await saveCustomAudio(file, baseName(file.name));
+        // Decode before switching, so the map never points at audio that cannot be played.
+        await loadSongBuffer(this.game, key);
+      } catch (error) {
+        if (key) await deleteCustomAudio(key).catch(() => undefined);
+        key = null;
+        const reason = error instanceof Error && error.message ? error.message : 'unknown error';
+        problem = `Could not use that file: ${reason}`;
+      }
+      if (token !== this.loadToken) {
+        // The editor was closed meanwhile: nothing will ever refer to this audio.
+        if (key) void deleteCustomAudio(key).catch(() => undefined);
+        return;
+      }
+      if (key) {
+        this.doc.replaceSong(key);
+        this.songName = baseName(file.name);
+      }
     }
-    try {
-      const key = await saveCustomAudio(file, baseName(file.name));
-      if (token !== this.loadToken) return;
-      this.doc.setMeta({ song: key });
-      this.songName = baseName(file.name);
-      await this.loadAudio(key);
-    } catch {
-      if (token !== this.loadToken) return;
-      showToast(this, 'That file could not be stored', CSS.miss, 4000);
-      void this.loadAudio(this.doc.meta.song);
-    }
+    if (problem) showToast(this, problem, CSS.miss, 5000);
+    void this.loadAudio(this.doc.meta.song);
   }
 
   /** Delay between the audio clock and what the player hears, in seconds. */
@@ -1067,6 +1100,17 @@ export class ComposerScene extends Phaser.Scene {
       startAt: this.pos,
       returnTo: { scene: SceneKeys.Composer, data: { chart, position: this.pos, dirty: this.doc.dirty } satisfies ComposerData },
     };
+    stashed = {
+      doc: this.doc,
+      zoomIndex: this.zoomIndex,
+      snap: this.snap,
+      rateIndex: this.rateIndex,
+      tool: this.tool,
+      recordSide: this.recordSide,
+      ticksOn: this.ticksOn,
+      metronomeOn: this.metronomeOn,
+      selection: new Set(this.selection),
+    };
     playSfx(this.game, 'select');
     goTo(this, SceneKeys.Play, data);
   }
@@ -1093,6 +1137,13 @@ export class ComposerScene extends Phaser.Scene {
   private leave(): void {
     playSfx(this.game, 'back');
     this.conductor?.pause();
+    stashed = null;
+    // Imported audio is only worth keeping while a saved map uses it, so audio added
+    // for a map that was never saved (or whose change was discarded) goes with it.
+    const song = this.doc.meta.song;
+    if (song.startsWith(CUSTOM_PREFIX) && !listCustomCharts().some((chart) => chart.song === song)) {
+      void deleteCustomAudio(song).catch(() => undefined);
+    }
     goTo(this, SceneKeys.BeatMaps, { select: this.doc.meta.id });
   }
 

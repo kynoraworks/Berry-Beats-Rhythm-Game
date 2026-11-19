@@ -186,6 +186,29 @@ describe('EditorDoc', () => {
     expect(doc.canUndo).toBe(false);
   });
 
+  it('replaces the audio without leaving an undo step behind', () => {
+    const doc = new EditorDoc({ ...blank(), song: 'custom:missing' });
+    doc.add(0, 1, 4);
+    doc.markSaved();
+    doc.add(0, 2, 8);
+    doc.replaceSong('custom:new');
+    expect(doc.meta.song).toBe('custom:new');
+    expect(doc.notes).toHaveLength(2);
+    expect(doc.dirty).toBe(true);
+    // Nothing before the replacement can be undone, so the old key cannot come back.
+    expect(doc.canUndo).toBe(false);
+    expect(doc.undo()).toBe(false);
+    expect(doc.meta.song).toBe('custom:new');
+    // Edits made afterwards undo normally and keep the new audio.
+    doc.add(1, 0, 2);
+    expect(doc.undo()).toBe(true);
+    expect(doc.notes).toHaveLength(2);
+    expect(doc.meta.song).toBe('custom:new');
+    expect(doc.toChart().song).toBe('custom:new');
+    doc.markSaved();
+    expect(doc.dirty).toBe(false);
+  });
+
   it('round-trips through the chart format', () => {
     const source: Chart = {
       ...blank(),

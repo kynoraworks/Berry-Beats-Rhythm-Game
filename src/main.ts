@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, GAME_H, GAME_W } from './core/config';
+import { COLORS, GAME_H, GAME_W, SceneKeys } from './core/config';
 import { music } from './core/music';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
@@ -57,6 +57,17 @@ function registerServiceWorker(): void {
     );
   });
   // A worker from a new deploy has taken over while this page was loading with the
-  // old one's cache: reload once so nothing stale is shown.
-  if (hadWorker) sw.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+  // old one's cache: reload once so nothing stale is shown. Only in the first seconds
+  // and never during a song or in the editor, where a reload would lose the player's place.
+  if (hadWorker) {
+    const loadedAt = performance.now();
+    sw.addEventListener(
+      'controllerchange',
+      () => {
+        const busy = game.scene.isActive(SceneKeys.Play) || game.scene.isActive(SceneKeys.Composer);
+        if (!busy && performance.now() - loadedAt < 30000) window.location.reload();
+      },
+      { once: true },
+    );
+  }
 }

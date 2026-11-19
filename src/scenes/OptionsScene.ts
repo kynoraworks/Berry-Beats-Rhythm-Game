@@ -40,7 +40,7 @@ const SLOT_X = [1010, 1140];
 const SLOT_W = 116;
 const SLOT_H = 52;
 /** Keys the menus and the pause screen rely on. */
-const RESERVED = new Set(['Escape', 'Enter', 'NumpadEnter', 'Tab', 'Backspace']);
+const RESERVED = new Set(['Escape', 'Enter', 'NumpadEnter', 'Tab', 'Backspace', 'KeyP']);
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 /** Move a value one step and snap it to the step grid, without floating point crumbs. */

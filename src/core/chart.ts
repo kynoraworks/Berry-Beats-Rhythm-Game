@@ -82,17 +82,22 @@ export function newChart(song: string, bpm: number, offset: number, title = 'Unt
   };
 }
 
+/** Limits for untrusted files: far beyond any real song, small enough to stay responsive. */
+const MAX_NOTES = 20000;
+const MAX_BEAT = 100000;
+
 function isNote(value: unknown): value is ChartNote {
   if (typeof value !== 'object' || value === null) return false;
   const n = value as Record<string, unknown>;
   const laneOk = n.l === 0 || n.l === 1 || n.l === 2 || n.l === 3;
-  const beatOk = typeof n.b === 'number' && Number.isFinite(n.b);
-  const lenOk = n.d === undefined || (typeof n.d === 'number' && Number.isFinite(n.d) && n.d >= 0);
+  const beatOk = typeof n.b === 'number' && Number.isFinite(n.b) && Math.abs(n.b) <= MAX_BEAT;
+  const lenOk = n.d === undefined || (typeof n.d === 'number' && Number.isFinite(n.d) && n.d >= 0 && n.d <= MAX_BEAT);
   return laneOk && beatOk && lenOk;
 }
 
 function cleanNotes(value: unknown, field: string): ChartNote[] {
   if (!Array.isArray(value)) throw new Error(`"${field}" must be a list of notes`);
+  if (value.length > MAX_NOTES) throw new Error(`"${field}" has too many notes`);
   const out: ChartNote[] = [];
   for (const raw of value) {
     if (!isNote(raw)) throw new Error(`"${field}" contains an invalid note`);

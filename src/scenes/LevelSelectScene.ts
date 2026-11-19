@@ -133,6 +133,7 @@ export class LevelSelectScene extends Phaser.Scene {
     addText(this, GAME_W - 28, GAME_H - 28, hint('left/right: choose   enter: play   esc: menu', 'swipe or tap the arrows, then tap play'), 24, { origin: [1, 0.5] });
     const toMenu = () => {
       if (this.busy) return;
+      this.preview?.remove();
       playSfx(this.game, 'back');
       music.play('menu');
       goTo(this, SceneKeys.Menu);

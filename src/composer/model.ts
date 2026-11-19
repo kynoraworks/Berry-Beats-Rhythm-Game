@@ -262,6 +262,18 @@ export class EditorDoc {
     this.history.push(this.working);
   }
 
+  /**
+   * Point the map at different audio. This is not an undo step: the history is
+   * cleared, so undo can never bring back a song key whose audio is no longer
+   * the one loaded in the editor. The map counts as unsaved afterwards.
+   */
+  replaceSong(song: string): void {
+    this.cancel();
+    if (song === this.working.meta.song) return;
+    this.working = { notes: this.working.notes, meta: { ...this.working.meta, song } };
+    this.history = new History(this.working);
+  }
+
   toChart(): Chart {
     const meta = this.working.meta;
     const pack = (side: Side): ChartNote[] =>

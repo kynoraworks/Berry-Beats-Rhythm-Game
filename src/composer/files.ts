@@ -1,5 +1,8 @@
 /** Browser file helpers shared by the beat map hub and the composer. */
 
+/** Largest audio file a map may import. Bigger files risk filling the browser's storage. */
+export const MAX_AUDIO_BYTES = 80 * 1024 * 1024;
+
 let picker: HTMLInputElement | null = null;
 
 /** Open the system file dialog. Resolves with null if the player cancels. */

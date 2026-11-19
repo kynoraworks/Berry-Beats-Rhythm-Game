@@ -61,7 +61,11 @@ export class ResultsScene extends Phaser.Scene {
 
     // Losing the battle without failing still clears the level, so the score counts.
     let newBest = false;
-    if (!failed && !play.practice && !play.autoplay && stats.judged > 0) {
+    // A run that scored nothing (possible with No Fail) is not a clear. A custom map that
+    // happens to carry a story level's id must not write to that level's record either.
+    const fromStory = play.returnTo.scene === SceneKeys.LevelSelect;
+    const borrowsStoryId = levelForChart(play.chart.id) !== undefined && !fromStory;
+    if (!failed && !play.practice && !play.autoplay && stats.score > 0 && !borrowsStoryId) {
       newBest = submitScore(play.chart.id, {
         score: stats.score,
         accuracy: percent,

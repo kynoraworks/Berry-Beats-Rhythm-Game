@@ -176,7 +176,7 @@ export class PlayScene extends Phaser.Scene {
       while (this.turnIndex < this.turns.length && this.turns[this.turnIndex].end <= startAt) this.turnIndex++;
     }
     const ends = [...this.engine.notes, ...(this.rivalEngine?.notes ?? [])].map((n) => n.end);
-    this.lastNoteEnd = ends.length ? Math.max(...ends) : 0;
+    this.lastNoteEnd = ends.reduce((latest, end) => Math.max(latest, end), 0);
 
     const playerX = hasRival ? PLAYER_X : GAME_W / 2;
     this.stage = new StageFx(this, chart.stage ?? level?.stage ?? Tex.room, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
@@ -195,7 +195,9 @@ export class PlayScene extends Phaser.Scene {
     const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
     pause.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
-      this.pauseGame();
+      // While the song is still loading there is nothing to pause, so the button leaves instead.
+      if (this.state === 'loading') this.quit();
+      else this.pauseGame();
     });
 
     this.countText = addText(this, GAME_W / 2, 390, 'Loading...', 64).setDepth(Depth.overlay);
@@ -268,7 +270,17 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private pauseGame(): void {
-    if (this.state !== 'playing' || !this.conductor) return;
+    if (!this.conductor) return;
+    if (this.state === 'resuming') {
+      // Interrupted during the 3-2-1 (tab hidden, window blurred, phone rotated): stay paused.
+      this.state = 'paused';
+      this.countText.setText('');
+      this.tweens.pauseAll();
+      this.pauseLayer.setVisible(true);
+      music.play('pause', 400);
+      return;
+    }
+    if (this.state !== 'playing') return;
     this.state = 'paused';
     this.conductor.pause();
     if (this.laneInput) this.laneInput.enabled = false;
@@ -302,7 +314,18 @@ export class PlayScene extends Phaser.Scene {
       this.touchLanes?.setGuideVisible(true);
       this.conductor?.resume();
       this.state = 'playing';
+      this.dropUnheldHolds();
     });
+  }
+
+  /** Holds whose key or finger was let go while the game was paused do not finish themselves. */
+  private dropUnheldHolds(): void {
+    if (this.playData.autoplay) return;
+    const time = this.heardTime();
+    for (const lane of [0, 1, 2, 3] as Lane[]) {
+      const down = this.laneInput?.isDown(lane) || this.touchLanes?.isDown(lane);
+      if (this.engine.heldNote(lane) && !down) this.handleEvents(this.engine.release(lane, time));
+    }
   }
 
   private restart(): void {
@@ -450,6 +473,7 @@ export class PlayScene extends Phaser.Scene {
       back: () => {
         if (this.state === 'playing') this.pauseGame();
         else if (this.state === 'paused') this.resumeGame();
+        else if (this.state === 'loading') this.quit();
       },
     });
     this.input.keyboard?.on('keydown-P', () => {

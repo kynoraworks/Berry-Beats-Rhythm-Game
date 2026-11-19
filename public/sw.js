@@ -31,11 +31,23 @@ function isCacheable(response) {
   return response && response.status === 200 && response.type === 'basic';
 }
 
+/** Store a copy without ever failing the request it belongs to (storage can be full). */
+function store(cache, key, response) {
+  return cache.put(key, response).catch(() => undefined);
+}
+
+/** True for the game's own page, as opposed to a file opened directly in a tab. */
+function isGamePage(request) {
+  const path = new URL(request.url).pathname;
+  const root = new URL(SCOPE).pathname;
+  return path === root || path === root + 'index.html';
+}
+
 async function pageFromNetworkFirst(request) {
   const cache = await caches.open(CACHE);
   try {
     const response = await fetch(request);
-    if (isCacheable(response)) await cache.put(SCOPE, response.clone());
+    if (isCacheable(response) && isGamePage(request)) void store(cache, SCOPE, response.clone());
     return response;
   } catch (error) {
     // Offline: any page URL (including ones with ?scene=...) is the same single page.
@@ -49,8 +61,9 @@ async function fileFromCacheFirst(request) {
   const cache = await caches.open(CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
-  const response = await fetch(request);
-  if (isCacheable(response)) await cache.put(request, response.clone());
+  // Ask the server rather than the browser's HTTP cache, which may still hold the last deploy's copy.
+  const response = await fetch(request, { cache: 'no-cache' });
+  if (isCacheable(response)) void store(cache, request, response.clone());
   return response;
 }
 
@@ -73,8 +86,8 @@ async function precache() {
     const url = SCOPE + file;
     try {
       if (await cache.match(url)) continue;
-      const fetched = await fetch(url);
-      if (isCacheable(fetched)) await cache.put(url, fetched);
+      const fetched = await fetch(url, { cache: 'no-cache' });
+      if (isCacheable(fetched)) await store(cache, url, fetched);
     } catch {
       return; // connection lost: the rest is fetched on demand later
     }

@@ -16,7 +16,7 @@ const CHARTS_KEY = 'berrybeats.charts.v1';
 function read<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
+    return raw ? ((JSON.parse(raw) as T | null) ?? fallback) : fallback;
   } catch {
     return fallback;
   }
