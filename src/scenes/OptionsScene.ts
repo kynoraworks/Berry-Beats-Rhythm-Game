@@ -136,7 +136,7 @@ export class OptionsScene extends Phaser.Scene {
     } else {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
       LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 60 + lane * KEY_DY));
-      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Each lane has two keys. Select a key and press Enter to change it.', 18, { color: CSS.grey });
+      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Select a key and press Enter to change it.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
     }
 
     this.addButtonRow(DESC.x + DESC.w / 2, 668, 'Reset to defaults', 400, 'Put every option and key back to how it started.', () => this.reset());
@@ -286,7 +286,8 @@ export class OptionsScene extends Phaser.Scene {
     this.add.image(RIGHT.x + 60, y, Tex.notes, lane).setScale(3);
     addText(this, RIGHT.x + 100, y, capital(LANE_NAMES[lane]), 32, { origin: [0, 0.5], stroke: false });
     const slotX = [right - 196, right - 68];
-    this.slotBounds[lane] = slotX.map((x) => ({ x: x - SLOT_W / 2 - 4, y: y - SLOT_H / 2 - 4, w: SLOT_W + 8, h: SLOT_H + 8 }));
+    // The focus frame is drawn under the slot, so it reaches 8px past it to show its yellow ring.
+    this.slotBounds[lane] = slotX.map((x) => ({ x: x - SLOT_W / 2 - 8, y: y - SLOT_H / 2 - 8, w: SLOT_W + 16, h: SLOT_H + 16 }));
     const texts = slotX.map((x, slot) => {
       const box = addBox(this, x - SLOT_W / 2, y - SLOT_H / 2, SLOT_W, SLOT_H, 'track').setInteractive({ useHandCursor: true });
       box.on(Phaser.Input.Events.POINTER_OVER, () => {

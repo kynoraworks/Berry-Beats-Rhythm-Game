@@ -7,7 +7,7 @@ import { onSwipe } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
 import { getBest } from '../core/saves';
 import { playSfx } from '../core/sfx';
-import { HEADER_H, UiButton, addBody, addBox, addHeader, addHints, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { UiButton, addBody, addBox, addHeader, addHints, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
 import { formatScore } from '../menus/kit';
 
@@ -121,7 +121,6 @@ export class LevelSelectScene extends Phaser.Scene {
       goTo(this, SceneKeys.Menu);
     };
     addHeader(this, 'Story', toMenu);
-    this.add.image(GAME_W - 88, HEADER_H / 2, Tex.logo).setScale(0.2).setAngle(-4);
     addHints(this, 'Left / Right: choose a stage     Enter: play     Esc: back', 'Swipe or tap the arrows to choose a stage, then tap Play');
 
     this.buildPanel();

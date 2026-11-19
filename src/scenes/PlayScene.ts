@@ -534,8 +534,8 @@ export class PlayScene extends Phaser.Scene {
     const hints = PLAYER_LANES.map((x, lane) => {
       // Arrow keys are obvious from the receptor shapes, so prefer showing a letter binding.
       const labels = keys[lane].map(keyLabel);
-      const label = labels.find((l) => l.length <= 2) ?? labels[0];
-      return addText(this, x, RECEPTOR_Y - 84, label, label.length <= 2 ? 32 : 16, { color: CSS.yellow }).setDepth(Depth.hud);
+      const label = labels.find((l) => l.length === 1) ?? labels[0];
+      return addText(this, x, RECEPTOR_Y - 84, label, label.length === 1 ? 32 : 16, { color: CSS.yellow }).setDepth(Depth.hud);
     });
     this.tweens.add({ targets: hints, alpha: 0, delay: 4200 + this.introTime * 1000, duration: 500, onComplete: () => hints.forEach((h) => h.destroy()) });
   }

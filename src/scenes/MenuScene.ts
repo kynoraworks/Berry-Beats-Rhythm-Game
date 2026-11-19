@@ -13,8 +13,8 @@ interface MenuItem {
 }
 
 const ITEMS: MenuItem[] = [
-  { label: 'Story', blurb: 'Dance your way through the stages, one battle at a time.', scene: SceneKeys.LevelSelect },
-  { label: 'Beat Maps', blurb: 'Make your own beat maps, or play ones you have imported.', scene: SceneKeys.BeatMaps },
+  { label: 'Story', blurb: 'Dance through the stages, one battle at a time.', scene: SceneKeys.LevelSelect },
+  { label: 'Beat Maps', blurb: 'Make your own beat maps and play them.', scene: SceneKeys.BeatMaps },
   { label: 'Options', blurb: 'Sound, note speed, timing and keys.', scene: SceneKeys.Options },
 ];
 
