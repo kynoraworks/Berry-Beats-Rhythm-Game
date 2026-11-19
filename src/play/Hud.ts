@@ -27,7 +27,7 @@ const TURN_Y = 250;
 const CALLOUT_Y = 326;
 const CALLOUT_TIME = 0.95;
 
-const METER_Y = 790;
+const METER_Y = 788;
 const METER_HALF = 150;
 const METER_TICKS = 14;
 const TICK_LIFE = 4;
@@ -108,10 +108,10 @@ export class Hud {
     this.missSplash.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => this.missSplash.setVisible(false));
 
     // Hit error meter: early on the left, late on the right, the centre line is dead on.
-    scene.add.rectangle(PLAYER_FIELD_CENTER, METER_Y, METER_HALF * 2 + 8, 6, COLORS.ink, 0.7).setDepth(Depth.hud);
-    scene.add.rectangle(PLAYER_FIELD_CENTER, METER_Y, 4, 16, COLORS.cream, 0.9).setDepth(Depth.hud);
+    scene.add.rectangle(PLAYER_FIELD_CENTER, METER_Y, METER_HALF * 2 + 12, 8, COLORS.ink, 0.75).setDepth(Depth.hud);
+    scene.add.rectangle(PLAYER_FIELD_CENTER, METER_Y, 4, 18, COLORS.cream, 0.9).setDepth(Depth.hud);
     for (let i = 0; i < METER_TICKS; i++) {
-      this.ticks.push(scene.add.rectangle(0, METER_Y, 4, 14, 0xffffff).setDepth(Depth.hud).setVisible(false));
+      this.ticks.push(scene.add.rectangle(0, METER_Y, 6, 18, 0xffffff).setDepth(Depth.hud).setVisible(false));
       this.tickAge.push(Infinity);
     }
 
@@ -119,9 +119,10 @@ export class Hud {
     this.drawHealth(0.5);
   }
 
-  /** Hide the rival's berry when there is nobody to battle. */
+  /** Hide the rival's half of the bar when there is nobody to battle. */
   setSolo(): void {
     this.raspberry.setVisible(false);
+    this.pink.setVisible(false);
   }
 
   showJudgement(judgement: Judgement, combo: number): void {

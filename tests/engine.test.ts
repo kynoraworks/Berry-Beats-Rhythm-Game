@@ -90,6 +90,23 @@ describe('Engine', () => {
     expect(safe.stats.health).toBe(0);
   });
 
+  it('lets outside events move the bar and add points', () => {
+    const engine = new Engine([tap(1)]);
+    engine.adjustHealth(0.2);
+    expect(engine.stats.health).toBeCloseTo(0.7);
+    engine.adjustHealth(5);
+    expect(engine.stats.health).toBe(1);
+    engine.addBonus(1000);
+    expect(engine.stats.score).toBe(1000);
+    engine.adjustHealth(-2);
+    expect(engine.stats.health).toBe(0);
+    expect(engine.stats.failed).toBe(true);
+
+    const safe = new Engine([tap(1)], { noFail: true });
+    safe.adjustHealth(-2);
+    expect(safe.stats.failed).toBe(false);
+  });
+
   it('reports accuracy and rank', () => {
     const engine = new Engine([tap(1), tap(2)]);
     engine.press(0, 1);

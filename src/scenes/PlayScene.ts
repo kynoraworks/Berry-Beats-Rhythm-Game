@@ -189,6 +189,7 @@ export class PlayScene extends Phaser.Scene {
       this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y);
     } else {
       this.hud.setSolo();
+      this.stage.setTurn('player');
     }
 
     const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
