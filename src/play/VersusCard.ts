@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, GAME_H, GAME_W, Tex } from '../core/config';
-import { addText } from '../core/ui';
+import { addBody, addText } from '../core/ui';
 import { BERRY_ORIGIN_Y, BerryFrame } from './characters';
 import { Depth } from './layout';
+import type { RivalProfile } from './rivals';
 
 const SLIDE = 0.35;
 const FADE = 0.25;
@@ -22,15 +23,17 @@ export class VersusCard {
   private readonly versus: Phaser.GameObjects.Text;
   private done = false;
 
-  constructor(scene: Phaser.Scene, rivalName: string, rivalTexture: string) {
+  constructor(scene: Phaser.Scene, rivalName: string, rivalTexture: string, look: RivalProfile) {
     const dim = scene.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.86).setOrigin(0);
-    const side = (texture: string, frame: number, name: string, color: string, flip: boolean) => {
+    const side = (texture: string, frame: number, name: string, color: string, flip: boolean, trait = '') => {
       const sprite = scene.add.sprite(0, 0, texture, frame).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(SCALE).setFlipX(flip);
       const label = addText(scene, 0, 44, name, 48, { color });
-      return scene.add.container(0, 560, [sprite, label]);
+      const parts: Phaser.GameObjects.GameObject[] = [sprite, label];
+      if (trait) parts.push(addBody(scene, 0, 92, trait, 26, { color: CSS.cream, stroke: true }));
+      return scene.add.container(0, 560, parts);
     };
     this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Blackberry', CSS.blue, false);
-    this.right = side(rivalTexture, BerryFrame.dab, rivalName, CSS.pink, true);
+    this.right = side(rivalTexture, look.versusFrame, rivalName, look.css, true, look.trait);
     this.versus = addText(scene, GAME_W / 2, 330, 'VS', 128, { color: CSS.yellow });
     this.layer = scene.add.container(0, 0, [dim, this.left, this.right, this.versus]).setDepth(Depth.overlay + 5);
     this.update(0);

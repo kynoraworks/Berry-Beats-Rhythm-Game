@@ -27,11 +27,15 @@ export class PreloadScene extends Phaser.Scene {
     sheet(Tex.berrySit, 'berry_sit.png', 75, 75);
     sheet(Tex.raspberrySit, 'raspberry_sit.png', 75, 75);
     sheet(Tex.coachSit, 'coach_sit.png', 75, 75);
+    sheet(Tex.pearSit, 'pear_sit.png', 75, 75);
+    sheet(Tex.lemonSit, 'lemon_sit.png', 75, 75);
     sheet(Tex.portraits, 'portraits.png', 64, 64);
     sheet(Tex.blackberry, 'blackberry.png', 64, 64);
     sheet(Tex.raspberry, 'raspberry.png', 64, 64);
     sheet(Tex.dancer, 'dancer.png', 160, 160);
     sheet(Tex.instructor, 'instructor.png', 64, 64);
+    sheet(Tex.pear, 'pear.png', 64, 64);
+    sheet(Tex.lemon, 'lemon.png', 64, 64);
     this.load.image(Tex.stageRaspberry, `${IMG}stage_raspberry.png`);
     this.load.image(Tex.stageRooftop, `${IMG}stage_rooftop.png`);
     this.load.image(Tex.stageClub, `${IMG}stage_club.png`);
@@ -81,6 +85,8 @@ export class PreloadScene extends Phaser.Scene {
     for (const [key, texture] of [
       [Anim.raspberrySit, Tex.raspberrySit],
       [Anim.coachSit, Tex.coachSit],
+      [Anim.pearSit, Tex.pearSit],
+      [Anim.lemonSit, Tex.lemonSit],
     ] as const) {
       if (!this.textures.exists(texture)) continue;
       this.anims.create({

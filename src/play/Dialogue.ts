@@ -30,6 +30,8 @@ export interface Speaker {
   name: string;
   /** Colour of the name tag. */
   color: number;
+  /** Dark lettering, for a tag too pale for the usual cream. */
+  darkText?: boolean;
   /** Sprite sheet in the shared berry layout, used when there are no drawn portraits. */
   texture: string | null;
   /** First of this speaker's two frames in the portrait sheet: neutral, then bold. */
@@ -177,7 +179,7 @@ export class Dialogue {
     // Wrap the whole line up front, so words do not jump to the next row as they type out.
     this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
 
-    this.nameText.setText(speaker.name);
+    this.nameText.setText(speaker.name).setColor(speaker.darkText ? CSS.ink : CSS.cream);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;
     const tagX = onLeft ? boxX + 24 : boxX + BOX_W - 24 - tagWidth;
     this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(speaker.color);
@@ -188,8 +190,10 @@ export class Dialogue {
   private setPortrait(speaker: Speaker, bold: boolean, centerX: number, faceLeft: boolean): void {
     const centerY = GAME_H - MARGIN - PORTRAIT_BOX / 2;
     const image = this.portrait;
-    if (this.scene.textures.exists(Tex.portraits)) {
-      image.setTexture(Tex.portraits, speaker.portraitFrame + (bold ? 1 : 0)).setCrop().setOrigin(0.5).setScale(3).setFlipX(false);
+    const frame = speaker.portraitFrame + (bold ? 1 : 0);
+    // The portrait sheet may be older than the cast: a speaker without a frame in it uses the close-up below.
+    if (this.scene.textures.exists(Tex.portraits) && this.scene.textures.get(Tex.portraits).has(String(frame))) {
+      image.setTexture(Tex.portraits, frame).setCrop().setOrigin(0.5).setScale(3).setFlipX(false);
       image.setPosition(centerX, centerY).setVisible(true);
       return;
     }

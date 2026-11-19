@@ -1,4 +1,4 @@
-import { beatToSec, type Chart, type ChartNote } from './chart';
+import { beatToSec, type Chart, type ChartNote, type RivalKind } from './chart';
 import { ACCURACY_WEIGHT, HEALTH_CHANGE, type Engine, type JudgeEvent, type Judgement } from './engine';
 import type { Lane } from './config';
 
@@ -142,13 +142,16 @@ export interface PlannedHit {
   delta: number;
 }
 
+/** Chance of each grade: [perfect, good, hit, miss]. */
+type Skill = [number, number, number, number];
+
 /**
- * Chance of each grade, by chart difficulty: [perfect, good, hit, miss].
+ * The mix of grades by chart difficulty.
  * Her accuracy works out at roughly 60, 60, 70, 77 and 85 percent, so the first
  * battle can be won by an average player and the last ones need a good run.
  * At the low end she is sloppy rather than clumsy: mostly late hits, few misses.
  */
-const SKILL: Record<number, [number, number, number, number]> = {
+const SKILL: Record<number, Skill> = {
   1: [0.18, 0.3, 0.37, 0.15],
   2: [0.18, 0.3, 0.37, 0.15],
   3: [0.32, 0.32, 0.24, 0.12],
@@ -163,7 +166,7 @@ const DELTA_RANGE: Record<Exclude<Judgement, 'miss'>, [number, number]> = {
   hit: [0.096, 0.128],
 };
 
-export function rivalSkill(difficulty: number | undefined): [number, number, number, number] {
+export function rivalSkill(difficulty: number | undefined): Skill {
   return SKILL[Math.min(5, Math.max(1, Math.round(difficulty ?? 2)))];
 }
 
@@ -182,20 +185,107 @@ export function seededRandom(seed: string): () => number {
 }
 
 /**
- * Decide in advance how the rival does on each of her notes.
- * `flawless` is for the Coach, who demonstrates and never slips.
+ * How a rival's form moves through a song, on top of the skill table:
+ * `steady` plays at the level's skill throughout, `closer` starts sloppy and
+ * finishes strong, `wild` swings between hot streaks and meltdowns.
  */
-export function planRival(noteCount: number, difficulty: number | undefined, seed: string, flawless = false): PlannedHit[] {
+export type Personality = 'steady' | 'closer' | 'wild';
+
+export function rivalPersonality(kind: RivalKind | undefined): Personality {
+  return kind === 'pear' ? 'closer' : kind === 'lemon' ? 'wild' : 'steady';
+}
+
+/** The mixes a personality drifts toward at its worst and at its best. */
+const COLD: Skill = [0.03, 0.12, 0.55, 0.3];
+const HOT: Skill = [0.8, 0.16, 0.04, 0];
+
+/**
+ * Closer: accuracy runs in a straight line from this far below the level's
+ * skill on the first note to this far above it on the last (0.2 = 20 points).
+ */
+const CLOSER_SWING = 0.2;
+/** Wild: shortest and longest meltdown, in notes missed in a row. */
+const WILD_MELTDOWN: [number, number] = [3, 5];
+/** Wild: shortest and longest stretch of ordinary play between a streak and a meltdown. */
+const WILD_CALM: [number, number] = [1, 4];
+
+/** Expected accuracy (0..1) of a mix of grades. */
+export function skillAccuracy([perfect, good, hit]: Skill): number {
+  return perfect * ACCURACY_WEIGHT.perfect + good * ACCURACY_WEIGHT.good + hit * ACCURACY_WEIGHT.hit;
+}
+
+/** Move a mix toward COLD or HOT until its accuracy has changed by `swing` (as a fraction, either sign). */
+function shiftSkill(base: Skill, swing: number): Skill {
+  const target = swing < 0 ? COLD : HOT;
+  const room = Math.abs(skillAccuracy(target) - skillAccuracy(base));
+  const weight = room === 0 ? 0 : Math.min(1, Math.abs(swing) / room);
+  return base.map((share, i) => share + (target[i] - share) * weight) as Skill;
+}
+
+type Form = 'calm' | 'hot' | 'meltdown';
+
+/**
+ * The wild rival's form for each note: hot streaks and meltdowns in turn, with
+ * a little ordinary play between them. Each streak is sized against its
+ * meltdown so the two cancel out and the song as a whole averages the level's skill.
+ */
+function wildForms(count: number, base: Skill, random: () => number): Form[] {
+  const between = ([min, max]: [number, number]): number => min + Math.floor(random() * (max - min + 1));
+  const gain = Math.max(0.05, skillAccuracy(HOT) - skillAccuracy(base));
+  const forms: Form[] = [];
+  const add = (form: Form, notes: number): void => {
+    for (let i = 0; i < notes; i++) forms.push(form);
+  };
+  const meltdownFirst = random() < 0.5;
+  while (forms.length < count) {
+    const meltdown = between(WILD_MELTDOWN);
+    const streak = Math.round((meltdown * skillAccuracy(base)) / gain);
+    add('calm', between(WILD_CALM));
+    add(meltdownFirst ? 'meltdown' : 'hot', meltdownFirst ? meltdown : streak);
+    add('calm', between(WILD_CALM));
+    add(meltdownFirst ? 'hot' : 'meltdown', meltdownFirst ? streak : meltdown);
+  }
+  return forms;
+}
+
+export interface RivalPlanOptions {
+  /** For the Coach, who demonstrates and never slips. */
+  flawless?: boolean;
+  personality?: Personality;
+  /**
+   * The rival's notes in plan order. With them a closer's form follows the
+   * clock instead of the note count, and he never drops a hold.
+   */
+  notes?: readonly { t: number; isHold: boolean }[];
+}
+
+/** Decide in advance how the rival does on each of her notes. */
+export function planRival(noteCount: number, difficulty: number | undefined, seed: string, options: RivalPlanOptions = {}): PlannedHit[] {
   const random = seededRandom(seed);
-  const [perfect, good, hit] = rivalSkill(difficulty);
+  const base = rivalSkill(difficulty);
+  const { flawless = false, personality = 'steady', notes } = options;
+  // The forms draw from their own generator, so a steady rival's plan does not depend on them.
+  const forms = personality === 'wild' ? wildForms(noteCount, base, seededRandom(`${seed}:form`)) : null;
+  const first = notes?.[0]?.t ?? 0;
+  const length = notes && notes.length > 1 ? notes[notes.length - 1].t - first : 0;
   const plan: PlannedHit[] = [];
   for (let i = 0; i < noteCount; i++) {
     if (flawless) {
       plan.push({ judgement: 'perfect', delta: 0 });
       continue;
     }
+    let skill = base;
+    if (personality === 'closer') {
+      const progress = length > 0 && notes?.[i] ? (notes[i].t - first) / length : noteCount > 1 ? i / (noteCount - 1) : 0.5;
+      skill = shiftSkill(base, CLOSER_SWING * (2 * progress - 1));
+    } else if (forms?.[i] === 'hot') {
+      skill = HOT;
+    }
+    const [perfect, good, hit] = skill;
     const roll = random();
-    const judgement: Judgement = roll < perfect ? 'perfect' : roll < perfect + good ? 'good' : roll < perfect + good + hit ? 'hit' : 'miss';
+    let judgement: Judgement = roll < perfect ? 'perfect' : roll < perfect + good ? 'good' : roll < perfect + good + hit ? 'hit' : 'miss';
+    if (forms?.[i] === 'meltdown') judgement = 'miss';
+    else if (judgement === 'miss' && personality === 'closer' && notes?.[i]?.isHold) judgement = 'hit';
     if (judgement === 'miss') {
       plan.push({ judgement, delta: 0 });
       continue;

@@ -10,12 +10,14 @@ import {
   buildRounds,
   buildTurns,
   planRival,
+  rivalPersonality,
   rivalSkill,
   seededRandom,
+  skillAccuracy,
   type PlannedHit,
 } from '../src/core/battle';
 import { parseChart, toTimedNotes, type Chart, type ChartNote } from '../src/core/chart';
-import { Engine, type Judgement } from '../src/core/engine';
+import { ACCURACY_WEIGHT, Engine, type Judgement } from '../src/core/engine';
 
 const timing = { bpm: 120, offset: 0 }; // one bar = 2 seconds
 const bar = (index: number, lanes: number[] = [0]): ChartNote[] => lanes.map((l, i) => ({ b: index * 4 + i, l: l as 0 | 1 | 2 | 3 }));
@@ -100,7 +102,71 @@ describe('planRival', () => {
   });
 
   it('never slips when flawless', () => {
-    expect(planRival(20, 1, 'coach', true).every((p) => p.judgement === 'perfect' && p.delta === 0)).toBe(true);
+    expect(planRival(20, 1, 'coach', { flawless: true }).every((p) => p.judgement === 'perfect' && p.delta === 0)).toBe(true);
+  });
+});
+
+const planAccuracy = (plan: PlannedHit[]): number => plan.reduce((sum, p) => sum + ACCURACY_WEIGHT[p.judgement], 0) / plan.length;
+
+describe('rival personalities', () => {
+  it('gives the Pear and the Lemon their own, and everyone else the steady one', () => {
+    expect(rivalPersonality('pear')).toBe('closer');
+    expect(rivalPersonality('lemon')).toBe('wild');
+    expect(rivalPersonality('raspberry')).toBe('steady');
+    expect(rivalPersonality(undefined)).toBe('steady');
+  });
+
+  it('leaves a steady rival exactly as she was', () => {
+    expect(planRival(80, 3, 'level1', { personality: 'steady' })).toEqual(planRival(80, 3, 'level1'));
+  });
+
+  for (const difficulty of [2, 3, 4]) {
+    const target = skillAccuracy(rivalSkill(difficulty));
+
+    it(`closer at difficulty ${difficulty}: weak first, strong last, the level's skill on average`, () => {
+      const plan = planRival(6000, difficulty, 'closer', { personality: 'closer' });
+      const third = plan.length / 3;
+      const [first, middle, last] = [0, 1, 2].map((i) => planAccuracy(plan.slice(i * third, (i + 1) * third)));
+      expect(first).toBeLessThan(target - 0.09);
+      expect(middle).toBeCloseTo(target, 1);
+      expect(last).toBeGreaterThan(target + 0.09);
+      expect(planAccuracy(plan)).toBeCloseTo(target, 1);
+      expect(planRival(6000, difficulty, 'closer', { personality: 'closer' })).toEqual(plan);
+    });
+
+    it(`wild at difficulty ${difficulty}: streaks and meltdowns that average the level's skill`, () => {
+      const plan = planRival(6000, difficulty, 'wild', { personality: 'wild' });
+      expect(planAccuracy(plan)).toBeCloseTo(target, 1);
+      // Misses come in runs of three or more, never one at a time out of a streak.
+      const runs: number[] = [];
+      let run = 0;
+      for (const p of plan) {
+        if (p.judgement === 'miss') run++;
+        else if (run > 0) {
+          runs.push(run);
+          run = 0;
+        }
+      }
+      const meltdowns = runs.filter((length) => length >= 3);
+      expect(meltdowns.length).toBeGreaterThan(100);
+      expect(Math.max(...runs)).toBeLessThanOrEqual(12);
+      // Outside the meltdowns he is far sharper than a steady rival of the same level.
+      const steady = planRival(6000, difficulty, 'wild');
+      const perfects = (hits: PlannedHit[]) => hits.filter((p) => p.judgement === 'perfect').length;
+      expect(perfects(plan)).toBeGreaterThan(perfects(steady) * 1.15);
+      expect(planRival(6000, difficulty, 'wild', { personality: 'wild' })).toEqual(plan);
+    });
+  }
+
+  it('a closer follows the clock when given his notes, and never drops a hold', () => {
+    // Most notes are crammed into the first tenth of the song: by count they are "late", by time early.
+    const notes = Array.from({ length: 400 }, (_, i) => ({ t: i < 360 ? i * 0.01 : 4 + (i - 360), isHold: i % 3 === 0 }));
+    const plan = planRival(notes.length, 2, 'clock', { personality: 'closer', notes });
+    const early = planAccuracy(plan.slice(0, 360));
+    const late = planAccuracy(plan.slice(360));
+    expect(late - early).toBeGreaterThan(0.1);
+    expect(plan.filter((p, i) => notes[i].isHold && p.judgement === 'miss')).toEqual([]);
+    expect(plan.some((p) => p.judgement === 'miss')).toBe(true);
   });
 });
 
@@ -201,7 +267,8 @@ function simulate(chart: Chart, hitRate: number, sharp = false) {
   const player = new Engine(toTimedNotes(chart, chart.notes));
   const rival = new Engine(toTimedNotes(chart, rivalNotes), { noFail: true });
   const me = new PlannedPlayer(player, planPlayer(player.notes.length, hitRate, `${chart.id}-${hitRate}`, sharp));
-  const her = new PlannedPlayer(rival, planRival(rival.notes.length, chart.difficulty, chart.id));
+  const plan = planRival(rival.notes.length, chart.difficulty, chart.id, { personality: rivalPersonality(chart.rivalCharacter), notes: rival.notes });
+  const her = new PlannedPlayer(rival, plan);
   const battle = new Battle(buildRounds(chart, chart.notes, rivalNotes));
   let lowest = 1;
   for (let t = 0; t < 120 && !player.stats.failed; t += 1 / 60) {
@@ -212,7 +279,8 @@ function simulate(chart: Chart, hitRate: number, sharp = false) {
     }
     lowest = Math.min(lowest, player.stats.health);
   }
-  return { health: player.stats.health, lowest, failed: player.stats.failed, ...battle.result() };
+  const rounds = battle.rounds.map((_, i) => ({ player: battle.accuracy('player', i), rival: battle.accuracy('rival', i) }));
+  return { health: player.stats.health, lowest, failed: player.stats.failed, rounds, ...battle.result() };
 }
 
 describe('battle balance on the story levels', () => {
@@ -246,11 +314,12 @@ describe('battle balance on the story levels', () => {
 
 describe.skipIf(!process.env.BALANCE)('balance table', () => {
   it('prints the numbers', () => {
-    for (const id of ['level1', 'bonus-title', 'bonus-menu']) {
+    for (const id of ['level1', 'level2', 'level3', 'bonus-title', 'bonus-menu']) {
       const chart = loadChart(id);
       for (const rate of [1, 0.9, 0.8, 0.7, 0.6, 0.5]) {
         const r = simulate(chart, rate);
-        console.log(`${id} hit ${rate}: bar ${r.health.toFixed(2)} (low ${r.lowest.toFixed(2)})${r.failed ? ' FAILED' : ''} rounds ${r.playerRounds}-${r.rivalRounds} acc ${r.playerAccuracy.toFixed(0)} vs ${r.rivalAccuracy.toFixed(0)}`);
+        const rounds = r.rounds.map((round) => `${round.player.toFixed(0)}/${round.rival.toFixed(0)}`).join(' ');
+        console.log(`${id} hit ${rate}: bar ${r.health.toFixed(2)} (low ${r.lowest.toFixed(2)})${r.failed ? ' FAILED' : ''} rounds ${r.playerRounds}-${r.rivalRounds} acc ${r.playerAccuracy.toFixed(0)} vs ${r.rivalAccuracy.toFixed(0)} by round (you/rival) ${rounds}`);
       }
     }
   });

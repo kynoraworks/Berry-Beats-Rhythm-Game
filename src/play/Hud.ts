@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_W, PX, Tex } from '../core/config';
 import type { Side } from '../core/battle';
+import type { RivalKind } from '../core/chart';
 import { WINDOWS, accuracy, type Judgement, type Stats } from '../core/engine';
 import { addText } from '../core/ui';
 import { CENTER_GAP, Depth, PLAYER_FIELD_CENTER } from './layout';
+import { rivalBarTexture, rivalIcon, rivalProfile } from './rivals';
 
 const BAR_X = GAME_W / 2;
 const BAR_Y = 15 * PX;
@@ -42,15 +44,18 @@ export interface HudOptions {
   rivalScore: boolean;
   /** Number of round pips to draw under the bar (0 for none). */
   rounds: number;
+  /** Whose colours and marker the far half of the bar wears (Raspberry's by default). */
+  rival?: RivalKind;
 }
 
 /** Everything drawn over the stage: the bar, scores, round pips, whose turn it is, call-outs and judgements. */
 export class Hud {
   private readonly scene: Phaser.Scene;
   private readonly blue: Phaser.GameObjects.Image;
-  private readonly pink: Phaser.GameObjects.Image;
+  private readonly rivalFill: Phaser.GameObjects.Image;
   private readonly blackberry: Phaser.GameObjects.Image;
-  private readonly raspberry: Phaser.GameObjects.Image;
+  private readonly rivalMarker: Phaser.GameObjects.Image;
+  private readonly rivalColor: number;
   private readonly scoreText: Phaser.GameObjects.Text;
   private readonly multiplierText: Phaser.GameObjects.Text;
   private readonly accuracyText: Phaser.GameObjects.Text;
@@ -80,16 +85,20 @@ export class Hud {
     const layer = (image: Phaser.GameObjects.Image) => image.setScale(PX).setDepth(Depth.hud);
     layer(scene.add.image(BAR_X, BAR_Y, Tex.barYellow));
     this.blue = layer(scene.add.image(BAR_X, BAR_Y, Tex.barBlue));
-    this.pink = layer(scene.add.image(BAR_X, BAR_Y, Tex.barPink));
+    const rival = options.rival ?? 'raspberry';
+    const look = rivalProfile(rival);
+    this.rivalColor = look.color;
+    this.rivalFill = layer(scene.add.image(BAR_X, BAR_Y, rivalBarTexture(scene, rival)));
     layer(scene.add.image(BAR_X, BAR_Y, Tex.barFrame));
     this.blackberry = layer(scene.add.image(BAR_X, BAR_Y, Tex.berries, 0));
-    this.raspberry = layer(scene.add.image(BAR_X, BAR_Y, Tex.berries, 1));
+    const icon = rivalIcon(scene, rival);
+    this.rivalMarker = layer(scene.add.image(BAR_X, BAR_Y, icon.key, icon.frame));
 
     this.scoreText = addText(scene, GAME_W / 2, SCORE_Y, '0', 40).setDepth(Depth.hud);
     this.multiplierText = addText(scene, GAME_W / 2 + 96, SCORE_Y, '', 24, { color: CSS.yellow, origin: [0, 0.5] }).setDepth(Depth.hud);
     this.accuracyText = addText(scene, 104, 24, '', 24, { origin: [0, 0], color: CSS.lilac }).setDepth(Depth.hud);
     this.rivalScoreText = options.rivalScore
-      ? addText(scene, GAME_W - 20, 24, '0', 24, { origin: [1, 0], color: CSS.pink }).setDepth(Depth.hud)
+      ? addText(scene, GAME_W - 20, 24, '0', 24, { origin: [1, 0], color: look.css }).setDepth(Depth.hud)
       : null;
 
     for (let i = 0; i < options.rounds; i++) {
@@ -121,8 +130,8 @@ export class Hud {
 
   /** Hide the rival's half of the bar when there is nobody to battle. */
   setSolo(): void {
-    this.raspberry.setVisible(false);
-    this.pink.setVisible(false);
+    this.rivalMarker.setVisible(false);
+    this.rivalFill.setVisible(false);
   }
 
   showJudgement(judgement: Judgement, combo: number): void {
@@ -166,7 +175,7 @@ export class Hud {
   setRound(index: number, winner: Side): void {
     const pip = this.pips[index];
     if (!pip) return;
-    pip.setFillStyle(winner === 'player' ? COLORS.blue : COLORS.pink, 1);
+    pip.setFillStyle(winner === 'player' ? COLORS.blue : this.rivalColor, 1);
     pip.setScale(2);
     this.scene.tweens.add({ targets: pip, scale: 1, duration: 260, ease: 'Back.easeOut' });
   }
@@ -209,7 +218,7 @@ export class Hud {
     const whole = Math.floor(beat);
     if (whole !== this.lastBeat) {
       this.lastBeat = whole;
-      for (const berry of [this.blackberry, this.raspberry]) {
+      for (const berry of [this.blackberry, this.rivalMarker]) {
         berry.setScale(PX * 1.12);
         this.scene.tweens.add({ targets: berry, scale: PX, duration: 160, ease: 'Quad.easeOut' });
       }
@@ -249,12 +258,12 @@ export class Hud {
   }
 
   private drawHealth(health: number): void {
-    // Tug of war: blue grows from the left as the player does well, pink covers the rest.
+    // Tug of war: blue grows from the left as the player does well, the rival's colour covers the rest.
     const split = FILL_LEFT + 10 + (FILL_WIDTH - 20 - BERRY_GAP) * health;
     this.blue.setCrop(0, 0, split, 32);
-    this.pink.setCrop(split + BERRY_GAP, 0, 128 - split - BERRY_GAP, 32);
+    this.rivalFill.setCrop(split + BERRY_GAP, 0, 128 - split - BERRY_GAP, 32);
     const left = BAR_X - 64 * PX;
     this.blackberry.setPosition(left + split * PX, BAR_Y);
-    this.raspberry.setPosition(left + (split + BERRY_GAP) * PX, BAR_Y);
+    this.rivalMarker.setPosition(left + (split + BERRY_GAP) * PX, BAR_Y);
   }
 }

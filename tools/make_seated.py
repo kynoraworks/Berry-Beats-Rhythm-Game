@@ -14,10 +14,17 @@ The hand-editable sources are in archive/generated-sprites:
   head tilt), already placed like Berry's frames: body centred on x=38, feet on
   row 66. Drawn at the same position as Berry but further along the bench, a
   rival sits on the same seat line.
+  pear_sit.png, lemon_sit.png: the same three cells and placement. Their eyes
+  are hidden, so the middle cell is not a blink: the Pear dips his chin as if
+  nodding to a beat, and the Lemon shuts his grin into a tight little smile.
+  The Pear sits slouched with his knees apart, the Lemon bolt upright with his
+  flask on his lap. In both, the second and third cells reuse the first cell's
+  body below the chest (row 42 for the Pear, row 36 for the Lemon) so that only
+  the head moves, and a few stray pixels in the Pear's beanie brim were fixed.
 
 This script adds a one-pixel "breathing" variant of the neutral and tilt frames
 and writes five-frame sheets to public/assets/img:
-  0 neutral, 1 neutral (bob), 2 blink, 3 tilt, 4 tilt (bob)
+  0 neutral, 1 neutral (bob), 2 blink (Pear: nod, Lemon: tight smile), 3 tilt, 4 tilt (bob)
 """
 from pathlib import Path
 
@@ -30,7 +37,7 @@ OUT = ROOT / "public" / "assets" / "img"
 CELL = 75
 
 # Row (within the 75px cell) of the character's lap: everything above it sinks by one pixel on the bob.
-LAP_ROW = {"raspberry_sit": 36, "coach_sit": 42}
+LAP_ROW = {"raspberry_sit": 36, "coach_sit": 42, "pear_sit": 50, "lemon_sit": 49}
 
 
 def cells(sheet: Image.Image) -> list[np.ndarray]:

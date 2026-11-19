@@ -10,6 +10,7 @@ import { playSfx } from '../core/sfx';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
 import { BERRY_ORIGIN_Y, BerryFrame } from '../play/characters';
 import { skipNextIntro } from '../play/Dialogue';
+import { rivalProfile } from '../play/rivals';
 
 const ROWS: [Judgement, string, string][] = [
   ['perfect', 'Perfect', CSS.perfect],
@@ -93,6 +94,7 @@ export class ResultsScene extends Phaser.Scene {
 
     addText(this, GAME_W / 2, 104, failed ? 'Failed' : 'Results', 64, { color: failed ? CSS.miss : CSS.lilac });
     addBody(this, GAME_W / 2, 152, play.chart.title, 24, { color: CSS.lilac });
+    const rivalCss = rivalProfile(play.chart.rivalCharacter).css;
     // A failed run shows the rival celebrating but no round count: the battle was cut short.
     const scored = battle && !failed ? battle : undefined;
     if (scored) {
@@ -100,7 +102,7 @@ export class ResultsScene extends Phaser.Scene {
       const score = `${Math.max(battle.playerRounds, battle.rivalRounds)} to ${Math.min(battle.playerRounds, battle.rivalRounds)}`;
       const rounds = battle.playerRounds + battle.rivalRounds > 1 ? ` ${score}` : '';
       const outcome = battle.won ? `You win${rounds}!` : `${battle.rivalName} wins${rounds}`;
-      addText(this, GAME_W / 2, 192, outcome, 32, { color: battle.won ? CSS.blue : CSS.pink });
+      addText(this, GAME_W / 2, 192, outcome, 32, { color: battle.won ? CSS.blue : rivalCss });
     }
 
     // Left column: hit counts and accuracy.
@@ -115,7 +117,7 @@ export class ResultsScene extends Phaser.Scene {
     };
     line(454, 'Max combo', String(stats.maxCombo), CSS.lilac);
     line(496, scored ? 'You' : 'Accuracy', `${percent.toFixed(1)}%`, scored ? CSS.blue : CSS.lilac);
-    if (scored) line(538, scored.rivalName, `${scored.rivalAccuracy.toFixed(1)}%`, CSS.pink);
+    if (scored) line(538, scored.rivalName, `${scored.rivalAccuracy.toFixed(1)}%`, rivalCss);
 
     // Right column: the rank lands like a stamp, then the score counts up.
     addText(this, RANK_X, 244, 'Rank', 32, { color: CSS.lilac });

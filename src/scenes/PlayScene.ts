@@ -10,6 +10,7 @@ import {
   buildRounds,
   buildTurns,
   planRival,
+  rivalPersonality,
   type Side,
   type Turn,
   type TurnSegment,
@@ -28,11 +29,12 @@ import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { createPlayer, createRival, rivalTexture, type Dancer } from '../play/characters';
+import { createPlayer, createRival, type Dancer } from '../play/characters';
 import { Dialogue, consumeSkipIntro, skipNextIntro, type Speaker } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
+import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
 
@@ -59,13 +61,16 @@ const TURN_LABELS: Record<'battle' | 'lesson', Record<Exclude<Turn, 'rest'>, str
   lesson: { player: 'Your turn!', rival: 'Watch', both: 'Together!' },
 };
 const TURN_COLORS: Record<Exclude<Turn, 'rest'>, string> = { player: CSS.blue, rival: CSS.pink, both: CSS.yellow };
+/** The pause screen's own track, and the one it borrows on the stage that dances to that track. */
+const PAUSE_SONG = 'pause';
+const PAUSE_SONG_SPARE = 'menu';
 
 /** Tint for the dancer who is not speaking during a conversation. */
 const LISTENER_TINT = 0x7a7896;
 /** Tempo of the standing idle while no music is playing. */
 const IDLE_BPM = 77;
-/** Accent colours for the speakers' name tags. */
-const TAG_COLORS = { player: 0x6f7cff, raspberry: COLORS.pink, coach: 0x2fb8a6 } as const;
+/** Accent colour of Blackberry's name tag. */
+const PLAYER_TAG = 0x6f7cff;
 
 export class PlayScene extends Phaser.Scene {
   private playData!: PlayData;
@@ -82,6 +87,7 @@ export class PlayScene extends Phaser.Scene {
   private rivalEngine: Engine | null = null;
   private rivalDriver: PlannedPlayer | null = null;
   private rivalName = '';
+  private rivalLook: RivalProfile = rivalProfile(undefined);
   private battle: Battle | null = null;
   private flawless: FlawlessTracker | null = null;
   private turns: TurnSegment[] = [];
@@ -128,6 +134,7 @@ export class PlayScene extends Phaser.Scene {
     this.rivalEngine = null;
     this.rivalDriver = null;
     this.rivalName = '';
+    this.rivalLook = rivalProfile(undefined);
     this.battle = null;
     this.flawless = null;
     this.turns = [];
@@ -165,7 +172,8 @@ export class PlayScene extends Phaser.Scene {
     const rivalChart = rivalKind === 'none' ? [] : (chart.rival ?? []);
     const hasRival = rivalKind !== 'none';
     const isCoach = rivalKind === 'dancer';
-    this.rivalName = level?.rivalName ?? (isCoach ? 'Coach' : 'Raspberry');
+    this.rivalLook = rivalProfile(rivalKind);
+    this.rivalName = level?.rivalName ?? this.rivalLook.name;
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
     const isBattle = hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && (level?.battle ?? true);
@@ -173,7 +181,8 @@ export class PlayScene extends Phaser.Scene {
     this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail: settings.noFail || !!this.playData.practice });
     if (hasRival) {
       this.rivalEngine = new Engine(toTimedNotes(chart, rivalChart), { noFail: true });
-      const plan = planRival(this.rivalEngine.notes.length, chart.difficulty, chart.id, !isBattle);
+      const notes = this.rivalEngine.notes;
+      const plan = planRival(notes.length, chart.difficulty, chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
       this.rivalDriver = new PlannedPlayer(this.rivalEngine, plan);
       this.turns = buildTurns(chart, chart.notes, rivalChart);
     }
@@ -195,10 +204,10 @@ export class PlayScene extends Phaser.Scene {
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     this.player = createPlayer(this, playerX, FLOOR_Y);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
-    this.hud = new Hud(this, { rivalScore: isBattle, rounds });
+    this.hud = new Hud(this, { rivalScore: isBattle, rounds, rival: rivalKind });
     if (this.rivalEngine) {
       this.rivalField = new NoteField(this, RIVAL_LANES, this.rivalEngine.notes, true);
-      this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y);
+      this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y, { seed: chart.id, calm: settings.reduceMotion });
     } else {
       this.hud.setSolo();
       this.stage.setTurn('player');
@@ -296,7 +305,7 @@ export class PlayScene extends Phaser.Scene {
     this.countText.setText(startAt > 0 ? 'Ready' : '');
     if (this.introTime > 0) {
       const texture = rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
-      this.versus = new VersusCard(this, this.rivalName, texture);
+      this.versus = new VersusCard(this, this.rivalName, texture, this.rivalLook);
       playSfx(this.game, 'banner');
     }
     this.showSongCredit();
@@ -343,11 +352,16 @@ export class PlayScene extends Phaser.Scene {
   // ---------------------------------------------------------------------
 
   private speakers(): { player: Speaker; rival: Speaker } {
-    const kind = this.chart.rivalCharacter ?? 'raspberry';
-    const coach = kind === 'dancer';
+    const look = this.rivalLook;
     return {
-      player: { name: 'Blackberry', color: TAG_COLORS.player, texture: Tex.blackberry, portraitFrame: 0 },
-      rival: { name: this.rivalName, color: coach ? TAG_COLORS.coach : TAG_COLORS.raspberry, texture: rivalTexture(this, kind), portraitFrame: coach ? 4 : 2 },
+      player: { name: 'Blackberry', color: PLAYER_TAG, texture: Tex.blackberry, portraitFrame: 0 },
+      rival: {
+        name: this.rivalName,
+        color: look.tag,
+        darkText: look.darkTagText,
+        texture: rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry'),
+        portraitFrame: look.portraitFrame,
+      },
     };
   }
 
@@ -379,7 +393,7 @@ export class PlayScene extends Phaser.Scene {
       this.countText.setText('');
       this.tweens.pauseAll();
       this.pauseLayer.setVisible(true);
-      music.play('pause', 400);
+      this.playPauseMusic();
       return;
     }
     if (this.state !== 'playing') return;
@@ -390,8 +404,13 @@ export class PlayScene extends Phaser.Scene {
     this.tweens.pauseAll();
     this.pauseFocus.focus(0, true);
     this.pauseLayer.setVisible(true);
-    music.play('pause', 400);
+    this.playPauseMusic();
     playSfx(this.game, 'back');
+  }
+
+  /** One stage dances to the pause screen's own track; pausing there plays another. */
+  private playPauseMusic(): void {
+    music.play(this.chart.song === PAUSE_SONG ? PAUSE_SONG_SPARE : PAUSE_SONG, 400);
   }
 
   private resumeGame(): void {
@@ -489,8 +508,8 @@ export class PlayScene extends Phaser.Scene {
     } else {
       if (summary) {
         playSfx(this.game, summary.won ? 'cheer' : 'round');
-        this.hud.callout(summary.won ? 'You win!' : `${this.rivalName} wins!`, summary.won ? CSS.blue : CSS.pink);
-        this.stage.flash(summary.won ? COLORS.blue : COLORS.pink, 0.3);
+        this.hud.callout(summary.won ? 'You win!' : `${this.rivalName} wins!`, summary.won ? CSS.blue : this.rivalLook.css);
+        this.stage.flash(summary.won ? COLORS.blue : this.rivalLook.color, 0.3);
         if (summary.won) this.stage.cheer();
       }
       this.time.delayedCall(summary ? 1900 : 1400, wrapUp);
@@ -707,7 +726,7 @@ export class PlayScene extends Phaser.Scene {
     this.currentTurn = turn;
     const labels = TURN_LABELS[this.battle ? 'battle' : 'lesson'];
     const label = turn === 'rival' && this.battle ? `${this.rivalName}${labels.rival}` : labels[turn];
-    this.hud.setTurn(label, TURN_COLORS[turn]);
+    this.hud.setTurn(label, turn === 'rival' ? this.rivalLook.css : TURN_COLORS[turn]);
     this.stage.setTurn(turn);
     this.playerField.setDimmed(turn === 'rival');
     this.rivalField?.setDimmed(turn === 'player');
@@ -718,9 +737,9 @@ export class PlayScene extends Phaser.Scene {
     const winner: Side = battle.roundWinner(index);
     const mine = winner === 'player';
     this.hud.setRound(index, winner);
-    this.hud.callout(mine ? 'Round to you!' : `Round to ${this.rivalName}`, mine ? CSS.blue : CSS.pink);
+    this.hud.callout(mine ? 'Round to you!' : `Round to ${this.rivalName}`, mine ? CSS.blue : this.rivalLook.css);
     if (index + 1 < battle.rounds.length) this.hud.callout(`Round ${index + 2}`, CSS.cream);
-    this.stage.flash(mine ? COLORS.blue : COLORS.pink, 0.28);
+    this.stage.flash(mine ? COLORS.blue : this.rivalLook.color, 0.28);
     playSfx(this.game, 'round');
     if (mine) {
       this.player.special();
