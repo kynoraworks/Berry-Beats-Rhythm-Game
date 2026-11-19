@@ -44,9 +44,11 @@ The Pear (pear.png) and the Lemon (lemon.png) are rivals made the same way,
 from a design sheet instead of an original sprite. Their palettes
 (palette_pear.png, palette_lemon.png, 14 colours each) were picked by hand from
 their first sheets. All their sheets are 3x2; sheet d holds three frames and
-three spare poses that are not used. Pixel sizes passed to pixelize_sprites.py:
+three spare poses that are not used. lemon_j is a later sheet that replaces
+three of the Lemon's frames (38, 41 and 42). Pixel sizes passed to
+pixelize_sprites.py:
   pear   a 12.0  b 11.5   c 12.13  d 11.48  e 10.61  f 10.66  g 11.32  h 11.3   i 11.05
-  lemon  a 12.3  b 12.05  c 11.5   d 11.9   e 11.5   f 11.25  g 11.9   h 10.45  i 12.1
+  lemon  a 12.3  b 12.05  c 11.5   d 11.9   e 11.5   f 11.25  g 11.9   h 10.45  i 12.1  j 11.7
 
 The Pear is a b-boy in a pear-shaped beanie. He is taller than the others
 because of the beanie and its stalk (up to 59 pixels).
@@ -81,11 +83,14 @@ The Lemon is a mad scientist doctor who dances with a flask of pink liquid.
   27-28  stumble: the flask flies out of his hands, then he clutches it on one leg
   29-32  victory jump, a toast, defeat on his knees by the broken flask, hype hop
   33-36  left and right (alt): hunched scuttle, then a pointing lunge
-  37-38  up (alt): crouch over the flask, then a leap with the flask overhead
+  37-38  up (alt): crouch over the flask, then a leap with both arms up in a V
   39-40  down (alt): bent double pointing at the floor, then a palm slam on one knee
   41-44  showpieces: "eureka" finger with a spark, shaking two flasks, electric jolt, maniacal laugh
   45-50  idle dance: twitchy sway (flask jerked up on the left accent, finger up on the high beat)
   spares in lemon_d: 3 whirl seen from behind, 4 electric jolt, 5 fumbled flask
+  spares in lemon_j: 0 leap with a fist out, 1 star jump, 5 leap with legs apart
+  replaced and no longer used: lemon_g 5 (a leap that hid his hair behind his
+  arms), lemon_h 2 (its spark was lost in conversion), lemon_h 3
 """
 from pathlib import Path
 
@@ -144,6 +149,7 @@ def standard(prefix: str) -> dict[int, tuple[str, int]]:
 # Both were checked frame by frame: 11-12 point down-left on screen and 13-14 down-right.
 PEAR = standard("pear")
 LEMON = standard("lemon")
+LEMON |= {38: ("lemon_j", 2), 41: ("lemon_j", 3), 42: ("lemon_j", 4)}
 
 # Frames where the character is in the air: how many pixels the feet are off the floor.
 LIFT = {29: 8, 32: 3, 38: 7}
