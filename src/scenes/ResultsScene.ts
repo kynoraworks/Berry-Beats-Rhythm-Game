@@ -29,6 +29,11 @@ const RANK_COLOR: Record<string, string> = {
 
 /** Timing errors smaller than this are not worth correcting. */
 const TIMING_NOTICE_MS = 15;
+/**
+ * Input is ignored for this long after the screen opens, so a press meant for the
+ * closing dialogue cannot carry the player straight past their results.
+ */
+const INPUT_GUARD_MS = 500;
 
 const LEFT = 230;
 const RIGHT = 610;
@@ -160,20 +165,24 @@ export class ResultsScene extends Phaser.Scene {
     const nextIndex = level && !failed ? LEVELS.indexOf(level) + 1 : -1;
     const next = nextIndex > 0 && nextIndex < LEVELS.length && isUnlocked(nextIndex) ? LEVELS[nextIndex] : undefined;
 
-    const back = () => this.leave(play.returnTo.scene, play.returnTo.data);
+    const openedAt = performance.now();
+    const guarded = (action: () => void) => () => {
+      if (performance.now() - openedAt >= INPUT_GUARD_MS) action();
+    };
+    const back = guarded(() => this.leave(play.returnTo.scene, play.returnTo.data));
     const entries: [string, () => void, string | undefined][] = [
       [
         'Retry',
-        () => {
+        guarded(() => {
           // The stage's opening was seen moments ago: go straight back into the song.
           skipNextIntro();
           this.leave(SceneKeys.Play, play);
-        },
+        }),
         undefined,
       ],
       [play.practice ? 'Back to editor' : 'Continue', back, undefined],
     ];
-    if (next) entries.push(['Next stage', () => this.leave(SceneKeys.LevelSelect, { levelId: next.id }), 'icon_next']);
+    if (next) entries.push(['Next stage', guarded(() => this.leave(SceneKeys.LevelSelect, { levelId: next.id })), 'icon_next']);
     const width = entries.length > 2 ? 272 : 288;
     const step = width + 24;
     this.choices = entries.map(([label, action, icon], i) => addUiButton(this, GAME_W / 2 + (i - (entries.length - 1) / 2) * step, BUTTON_Y, label, action, { width, icon }));

@@ -3,6 +3,7 @@ import { newChart, parseChart, serializeChart, type Chart } from '../src/core/ch
 import { History } from '../src/composer/history';
 import { EditorDoc, noteAt, notesInRange, overlaps } from '../src/composer/model';
 import { formatBeat, formatTime, gridLines, measureOf, snapBeat, tapTempo } from '../src/composer/grid';
+import { isFirstComposerVisit } from '../src/composer/firstUse';
 import { computePeaks, displayLevel, peakBetween } from '../src/composer/waveform';
 
 function blank(): Chart {
@@ -255,5 +256,26 @@ describe('waveform', () => {
     expect(displayLevel(peaks, 0.8)).toBeCloseTo(1);
     expect(displayLevel(peaks, 0.4)).toBeLessThan(0.5);
     expect(displayLevel(computePeaks([new Float32Array(10)], 10, 1), 0)).toBe(0);
+  });
+});
+
+describe('first use', () => {
+  it('is true once per device, then false', () => {
+    const data = new Map<string, string>();
+    const store = { getItem: (key: string) => data.get(key) ?? null, setItem: (key: string, value: string) => void data.set(key, value) };
+    expect(isFirstComposerVisit(store)).toBe(true);
+    expect(isFirstComposerVisit(store)).toBe(false);
+    expect(isFirstComposerVisit(store)).toBe(false);
+  });
+
+  it('never nags when storage is missing or broken', () => {
+    expect(isFirstComposerVisit(null)).toBe(false);
+    const broken = {
+      getItem: (): string | null => {
+        throw new Error('blocked');
+      },
+      setItem: (): void => undefined,
+    };
+    expect(isFirstComposerVisit(broken)).toBe(false);
   });
 });

@@ -35,13 +35,14 @@ export class TitleScene extends Phaser.Scene {
       playSfx(this.game, 'select');
       goTo(this, SceneKeys.Menu);
     };
-    // Wait a moment so the key that led here does not skip the title.
-    this.time.delayedCall(250, () => {
-      this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-        if (event.metaKey || event.ctrlKey || event.altKey) return;
-        start();
-      });
-      this.input.on(Phaser.Input.Events.POINTER_DOWN, start);
+    // Ignore the first moment and held keys, so the key that led here does not skip the title.
+    // Measured on the wall clock: scene timers run slow when the device is busy.
+    const openedAt = performance.now();
+    const ready = () => performance.now() - openedAt >= 250;
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (event.repeat || event.metaKey || event.ctrlKey || event.altKey || !ready()) return;
+      start();
     });
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, () => ready() && start());
   }
 }

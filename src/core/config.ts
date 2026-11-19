@@ -85,9 +85,13 @@ export const Tex = {
   berries: 'berries', // 2 frames, 24x24: 0 blackberry, 1 raspberry
   pauseButton: 'pause_button', // 19x19
   uiKit: 'ui_kit', // atlas of panels, buttons, toggles and icons drawn by tools/make_ui_kit.py (see core/ui.ts)
-  raspberrySit: 'raspberry_sit', // optional: rivals seated on the train, 75x75 frames like berry_sit
+  // Rivals seated on the train: 5 frames of 75x75 (0 neutral, 1 neutral bob, 2 blink, 3 head tilt, 4 tilt bob).
+  // Framed like berry_sit (body centred on x=38, feet on row 66): draw at Berry's y, about 34 train pixels along the bench.
+  raspberrySit: 'raspberry_sit',
   coachSit: 'coach_sit',
-  portraits: 'portraits', // optional: 64x64 dialogue portraits, see play/Dialogue
+  // Dialogue portraits, 6 frames of 64x64, busts standing on the bottom edge:
+  // 0 Blackberry neutral, 1 Blackberry bold, 2 Raspberry neutral, 3 Raspberry bold, 4 Coach neutral, 5 Coach bold.
+  portraits: 'portraits',
   ui: 'ui', // 128x128 atlas of UI pieces from the original composer (buttons, panels); not sliced into frames
   missSplash: 'miss_splash', // 10 frames, 211x164
   arrowLeft: 'arrow_ui_left', // 128x128 yellow menu arrows

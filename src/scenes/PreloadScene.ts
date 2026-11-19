@@ -25,6 +25,9 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image(Tex.room, `${IMG}room.png`);
     sheet(Tex.train, 'train.png', 256, 160);
     sheet(Tex.berrySit, 'berry_sit.png', 75, 75);
+    sheet(Tex.raspberrySit, 'raspberry_sit.png', 75, 75);
+    sheet(Tex.coachSit, 'coach_sit.png', 75, 75);
+    sheet(Tex.portraits, 'portraits.png', 64, 64);
     sheet(Tex.blackberry, 'blackberry.png', 64, 64);
     sheet(Tex.raspberry, 'raspberry.png', 64, 64);
     sheet(Tex.dancer, 'dancer.png', 160, 160);
@@ -71,6 +74,20 @@ export class PreloadScene extends Phaser.Scene {
       frameRate: 12,
       repeat: -1,
     });
+    // Seated rivals: a slow breathing bob with a blink and a head tilt (frames are listed in tools/make_seated.py).
+    const seatedLoop = [0, 1, 0, 1, 2, 1, 0, 1, 3, 4, 3, 4];
+    for (const [key, texture] of [
+      [Anim.raspberrySit, Tex.raspberrySit],
+      [Anim.coachSit, Tex.coachSit],
+    ] as const) {
+      if (!this.textures.exists(texture)) continue;
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(texture, { frames: seatedLoop }),
+        frameRate: 5,
+        repeat: -1,
+      });
+    }
     this.anims.create({
       key: Anim.missSplash,
       frames: this.anims.generateFrameNumbers(Tex.missSplash, { start: 0, end: 9 }),

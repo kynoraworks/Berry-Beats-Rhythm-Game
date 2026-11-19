@@ -307,7 +307,10 @@ export class PlayScene extends Phaser.Scene {
     this.state = 'playing';
   }
 
-  /** Title and artist, shown through the count-in once the versus card has cleared. */
+  /**
+   * Title and artist, shown at the start of the count-in once the versus card has
+   * cleared. It is gone before the first turn label and round call-out need the space.
+   */
   private showSongCredit(): void {
     const { title, artist } = this.chart;
     const name = addText(this, GAME_W / 2, 276, title, 32, { color: CSS.lilac }).setDepth(Depth.overlay);
@@ -317,7 +320,7 @@ export class PlayScene extends Phaser.Scene {
       lines.forEach((line) => line.setAlpha(0));
       this.tweens.add({ targets: lines, alpha: 1, delay: this.introTime * 1000, duration: 200 });
     }
-    this.tweens.add({ targets: lines, alpha: 0, delay: 2600 + this.introTime * 1000, duration: 500, onComplete: () => lines.forEach((line) => line.destroy()) });
+    this.tweens.add({ targets: lines, alpha: 0, delay: 1500 + this.introTime * 1000, duration: 300, onComplete: () => lines.forEach((line) => line.destroy()) });
   }
 
   private showLoadError(message: string): void {

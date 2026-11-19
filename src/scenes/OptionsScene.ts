@@ -136,7 +136,7 @@ export class OptionsScene extends Phaser.Scene {
     } else {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
       LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 60 + lane * KEY_DY));
-      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Select a key and press Enter to change it.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
+      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Press Enter to change one.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
     }
 
     this.addButtonRow(DESC.x + DESC.w / 2, 668, 'Reset to defaults', 400, 'Put every option and key back to how it started.', () => this.reset());
