@@ -11,6 +11,7 @@ import { PlayScene } from './scenes/PlayScene';
 import { ResultsScene } from './scenes/ResultsScene';
 import { BeatMapsScene } from './scenes/BeatMapsScene';
 import { ComposerScene } from './scenes/ComposerScene';
+import { UiKitScene } from './scenes/UiKitScene';
 
 /** Set by vite.config.ts: changes with every production build. */
 declare const __BUILD_ID__: string;
@@ -28,7 +29,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   input: { activePointers: 4 },
-  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene],
+  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene, UiKitScene],
 });
 
 music.init(game);

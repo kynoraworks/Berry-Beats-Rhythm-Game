@@ -6,7 +6,10 @@ export const GAME_H = 800;
 /** The room and train backgrounds are 256x160 pixel art, shown at 5x. */
 export const PX = 5;
 
+/** Display font: the game's own 3x5 pixel face. Use it for titles, buttons and short labels. */
 export const FONT = 'Glacier35';
+/** Body font: a readable pixel face for sentences, dialogue, descriptions and small print. */
+export const FONT_BODY = 'Pixelify Sans';
 
 export const LANE_COUNT = 4;
 /** On-screen lane order, matching the original art: left, up, down, right. */
@@ -56,6 +59,7 @@ export const SceneKeys = {
   Results: 'Results',
   BeatMaps: 'BeatMaps',
   Composer: 'Composer',
+  UiKit: 'UiKit',
 } as const;
 
 /** Texture keys. Frame sizes are noted where the texture is a spritesheet. */
@@ -80,6 +84,10 @@ export const Tex = {
   barYellow: 'bar_yellow',
   berries: 'berries', // 2 frames, 24x24: 0 blackberry, 1 raspberry
   pauseButton: 'pause_button', // 19x19
+  uiKit: 'ui_kit', // atlas of panels, buttons, toggles and icons drawn by tools/make_ui_kit.py (see core/ui.ts)
+  raspberrySit: 'raspberry_sit', // optional: rivals seated on the train, 75x75 frames like berry_sit
+  coachSit: 'coach_sit',
+  portraits: 'portraits', // optional: 64x64 dialogue portraits, see play/Dialogue
   ui: 'ui', // 128x128 atlas of UI pieces from the original composer (buttons, panels); not sliced into frames
   missSplash: 'miss_splash', // 10 frames, 211x164
   arrowLeft: 'arrow_ui_left', // 128x128 yellow menu arrows
@@ -94,5 +102,7 @@ export const Tex = {
 export const Anim = {
   train: 'train-loop',
   berrySit: 'berry-sit-loop',
+  raspberrySit: 'raspberry-sit-loop',
+  coachSit: 'coach-sit-loop',
   missSplash: 'miss-splash',
 } as const;

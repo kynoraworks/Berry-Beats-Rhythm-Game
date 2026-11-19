@@ -43,6 +43,7 @@ export class PreloadScene extends Phaser.Scene {
     sheet(Tex.berries, 'berries.png', 24, 24);
     this.load.image(Tex.pauseButton, `${IMG}pause_button.png`);
     this.load.image(Tex.ui, `${IMG}ui.png`);
+    this.load.atlas(Tex.uiKit, `${IMG}ui_kit.png`, `${IMG}ui_kit.json`);
     sheet(Tex.missSplash, 'miss_splash.png', 211, 164);
     this.load.image(Tex.arrowLeft, `${IMG}arrow_ui_left.png`);
     this.load.image(Tex.arrowRight, `${IMG}arrow_ui_right.png`);
