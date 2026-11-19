@@ -2,27 +2,40 @@ import Phaser from 'phaser';
 import type { Chart } from '../core/chart';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
 import type { PlayData } from '../core/flow';
-import { LEVELS, isUnlocked, loadLevelChart } from '../core/levels';
+import { LEVELS, isUnlocked, loadLevelChart, type LevelDef } from '../core/levels';
+import { onSwipe } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
 import { getBest } from '../core/saves';
 import { playSfx } from '../core/sfx';
-import { hint, onSwipe } from '../core/mobile';
-import { addBackButton, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { HEADER_H, UiButton, addBody, addBox, addHeader, addHints, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
+import { formatScore } from '../menus/kit';
 
 interface LevelSelectData {
   levelId?: string;
 }
 
-// Berry's frame sits at (109, 74) in the 256x160 train art; the frame is 75px square.
+// Berry's frame sits at (109, 74) in the 256x160 train art; the frame is 75px square
+// and his body is centred in it with his feet on row 66.
 const BERRY_X = (109 + 37.5) * PX;
 const BERRY_Y = (74 + 37.5) * PX;
+/** The opponent sits this many art pixels to Berry's right, which leaves a gap between them. */
+const SEAT_GAP = 36;
+const RIVAL_X = BERRY_X + SEAT_GAP * PX;
+/** Where a standing sprite's feet go when the seated art is not available. */
+const FLOOR_Y = (74 + 67) * PX;
 
-const PANEL = { x: 120, y: 290, w: 500, h: 350 };
+const PANEL = { x: 96, y: 152, w: 504, h: 472 };
 const PANEL_CX = PANEL.x + PANEL.w / 2;
 const POLE_W = 560;
 const WIPE_MS = 300;
 const MAX_DIFFICULTY = 5;
+
+/** Seated art for each opponent, with the standing dance sprite as a stand-in. */
+const SEATS: Record<LevelDef['rival'], { sit: string; anim: string; stand: string }> = {
+  coach: { sit: Tex.coachSit, anim: Anim.coachSit, stand: Tex.instructor },
+  raspberry: { sit: Tex.raspberrySit, anim: Anim.raspberrySit, stand: Tex.raspberry },
+};
 
 const OPENED_KEY = 'berrybeats.opened.v1';
 
@@ -58,23 +71,25 @@ export class LevelSelectScene extends Phaser.Scene {
   /** Levels that opened since the player last looked. */
   private fresh = new Set<number>();
 
+  private rival!: Phaser.GameObjects.Sprite;
   private nameText!: Phaser.GameObjects.Text;
   private blurbText!: Phaser.GameObjects.Text;
   private countText!: Phaser.GameObjects.Text;
-  private infoText!: Phaser.GameObjects.Text;
-  private bestText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
+  private rivalTag!: Phaser.GameObjects.NineSlice;
+  private rivalText!: Phaser.GameObjects.Text;
   private difficultyLabel!: Phaser.GameObjects.Text;
   private pips: Phaser.GameObjects.Image[] = [];
+  private infoText!: Phaser.GameObjects.Text;
+  private bestText!: Phaser.GameObjects.Text;
+  private lockText!: Phaser.GameObjects.Text;
+  private statusText!: Phaser.GameObjects.Text;
+  private newTag!: Phaser.GameObjects.Container;
+  private playButton!: UiButton;
+  private lockedButton!: UiButton;
+  private lockedZone!: Phaser.GameObjects.Zone;
   private left!: MenuArrow;
   private right!: MenuArrow;
   private pole!: Phaser.GameObjects.Container;
-  private rivalText!: Phaser.GameObjects.Text;
-  private playText!: Phaser.GameObjects.Text;
-  private playPulse!: Phaser.Tweens.Tween;
-  private lockShade!: Phaser.GameObjects.Graphics;
-  private lockText!: Phaser.GameObjects.Text;
-  private newText!: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.LevelSelect);
@@ -83,6 +98,7 @@ export class LevelSelectScene extends Phaser.Scene {
   init(data: LevelSelectData): void {
     const requested = LEVELS.findIndex((level) => level.id === data?.levelId);
     this.index = requested >= 0 ? requested : Math.min(lastIndex, LEVELS.length - 1);
+    lastIndex = this.index;
     this.busy = false;
     this.run++;
     this.charts = [];
@@ -96,62 +112,72 @@ export class LevelSelectScene extends Phaser.Scene {
 
     this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
     this.add.sprite(BERRY_X, BERRY_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit);
-    this.add.image(170, 132, Tex.logo).setScale(0.44).setAngle(-4);
+    this.rival = this.add.sprite(RIVAL_X, BERRY_Y, Tex.berrySit).setScale(PX);
 
-    addPanel(this, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
-    const top = PANEL.y;
-    this.countText = addText(this, PANEL.x + PANEL.w - 24, top + 30, '', 16, { origin: [1, 0.5], color: CSS.grey, stroke: false });
-    this.rivalText = addText(this, PANEL.x + 24, top + 30, '', 24, { origin: [0, 0.5] });
-    this.nameText = addText(this, PANEL_CX, top + 76, '', 64);
-    this.blurbText = addText(this, PANEL_CX, top + 134, '', 24, { color: CSS.lilac, wrapWidth: PANEL.w - 40 });
-    this.difficultyLabel = addText(this, PANEL.x + 40, top + 190, 'difficulty', 24, { origin: [0, 0.5] });
-    this.pips = Array.from({ length: MAX_DIFFICULTY }, (_, i) => this.add.image(PANEL.x + 250 + i * 46, top + 188, Tex.berries, 0).setScale(2));
-    this.infoText = addText(this, PANEL_CX, top + 234, '', 24, { color: CSS.grey });
-    this.bestText = addText(this, PANEL_CX, top + 272, '', 24);
-
-    // Locked levels dim everything above the play line and say what to clear first.
-    this.lockShade = this.add.graphics();
-    this.lockShade.fillStyle(COLORS.night, 0.72);
-    this.lockShade.fillRoundedRect(PANEL.x + 4, PANEL.y + 4, PANEL.w - 8, PANEL.h - 8, 12);
-    this.lockText = addText(this, PANEL_CX, top + 250, '', 32, { color: CSS.yellow, wrapWidth: PANEL.w - 60 });
-    this.newText = addText(this, PANEL_CX, top - 24, 'new stage open!', 32, { color: CSS.yellow });
-    this.tweens.add({ targets: this.newText, scale: 1.1, duration: 420, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
-
-    const play = (this.playText = addText(this, PANEL_CX, top + 316, 'play', 40, { color: CSS.yellow }));
-    play.setInteractive({ useHandCursor: true });
-    play.on(Phaser.Input.Events.POINTER_OVER, () => this.isLocked() || play.setColor(CSS.cream));
-    play.on(Phaser.Input.Events.POINTER_OUT, () => this.isLocked() || play.setColor(CSS.yellow));
-    play.setPadding(40, 14, 40, 14);
-    play.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => pointer.getDistance() < 30 && void this.start());
-    this.playPulse = this.tweens.add({ targets: play, scale: 1.08, duration: 500, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
-
-    this.statusText = addText(this, PANEL_CX, PANEL.y + PANEL.h + 30, '', 24, { color: CSS.miss });
-
-    this.left = addMenuArrow(this, 60, GAME_H / 2 + 60, 'left', () => this.change(-1));
-    this.right = addMenuArrow(this, GAME_W - 60, GAME_H / 2 + 60, 'right', () => this.change(1));
-
-    addText(this, GAME_W - 28, GAME_H - 28, hint('left/right: choose   enter: play   esc: menu', 'swipe or tap the arrows, then tap play'), 24, { origin: [1, 0.5] });
     const toMenu = () => {
-      if (this.busy) return;
+      if (this.busy || isLeaving(this)) return;
       this.preview?.remove();
-      playSfx(this.game, 'back');
       music.play('menu');
       goTo(this, SceneKeys.Menu);
     };
-    addBackButton(this, 20, GAME_H - 36, toMenu, '< menu');
+    addHeader(this, 'Story', toMenu);
+    this.add.image(GAME_W - 88, HEADER_H / 2, Tex.logo).setScale(0.2).setAngle(-4);
+    addHints(this, 'Left / Right: choose a stage     Enter: play     Esc: back', 'Swipe or tap the arrows to choose a stage, then tap Play');
+
+    this.buildPanel();
+    this.statusText = addBody(this, PANEL_CX, PANEL.y + PANEL.h + 44, '', 24, { stroke: true, bold: true });
+
+    this.left = addMenuArrow(this, 44, PANEL.y + PANEL.h / 2, 'left', () => this.change(-1));
+    this.right = addMenuArrow(this, GAME_W - 44, PANEL.y + PANEL.h / 2, 'right', () => this.change(1));
     onSwipe(this, { left: () => this.change(1), right: () => this.change(-1) });
 
     this.pole = this.buildPole();
     this.loadCharts();
     this.noteNewlyOpened();
-    this.refresh();
+    this.refreshPanel();
+    this.refreshRival(this.index);
 
     menuKeys(this, {
       left: () => this.change(-1),
       right: () => this.change(1),
       confirm: () => void this.start(),
-      back: toMenu,
+      back: () => {
+        if (this.busy) return;
+        playSfx(this.game, 'back');
+        toMenu();
+      },
     });
+  }
+
+  private buildPanel(): void {
+    const { x, y, w } = PANEL;
+    addBox(this, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
+
+    this.countText = addBody(this, x + 28, y + 38, '', 20, { origin: [0, 0.5], color: CSS.grey });
+    this.rivalTag = addBox(this, x + w - 24 - 216, y + 16, 216, 44, 'tag');
+    this.rivalText = addText(this, x + w - 24 - 108, y + 38, '', 24, { stroke: false });
+
+    this.nameText = addText(this, PANEL_CX, y + 112, '', 64);
+    this.blurbText = addBody(this, PANEL_CX, y + 170, '', 24, { color: CSS.lilac, wrapWidth: w - 64 });
+    this.add.rectangle(x + 32, y + 212, w - 64, 4, COLORS.purple, 0.6).setOrigin(0, 0.5);
+
+    this.difficultyLabel = addText(this, x + 40, y + 252, 'Difficulty', 24, { origin: [0, 0.5], stroke: false });
+    this.pips = Array.from({ length: MAX_DIFFICULTY }, (_, i) => this.add.image(x + 256 + i * 46, y + 250, Tex.berries, 0).setScale(2));
+    this.infoText = addBody(this, PANEL_CX, y + 300, '', 22, { color: CSS.grey });
+    this.bestText = addBody(this, PANEL_CX, y + 342, '', 24, { bold: true });
+    this.lockText = addBody(this, PANEL_CX, y + 322, '', 24, { bold: true, color: CSS.yellow, wrapWidth: w - 64 });
+
+    const buttonY = y + 412;
+    this.playButton = addUiButton(this, PANEL_CX, buttonY, 'Play', () => void this.start(), { width: 320, sfx: null }).setFocused(true);
+    this.lockedButton = addUiButton(this, PANEL_CX, buttonY, 'Locked', () => undefined, { width: 320, icon: 'icon_lock' }).setEnabled(false);
+    // A disabled button ignores presses, so this zone gives a locked stage its "no" feedback.
+    this.lockedZone = this.add.zone(PANEL_CX, buttonY, 320, 64).setInteractive();
+    this.lockedZone.on(Phaser.Input.Events.POINTER_UP, () => void this.start());
+
+    const tag = addBox(this, -148, -22, 296, 44, 'tag').setTint(COLORS.yellow);
+    const label = addText(this, 0, 0, 'New stage open!', 24, { stroke: false, color: CSS.ink });
+    this.newTag = this.add.container(PANEL_CX, y, [tag, label]);
+    this.tweens.add({ targets: this.newTag, y: y - 6, duration: 420, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
   }
 
   /** A blurred pole rushing past the window, wide enough to hide the info panel while it swaps. */
@@ -180,7 +206,7 @@ export class LevelSelectScene extends Phaser.Scene {
   private onChart(run: number, index: number, chart: Chart | null): void {
     if (run !== this.run || !this.scene.isActive()) return;
     this.charts[index] = chart;
-    if (index === this.index) this.refresh();
+    if (index === this.index) this.refreshPanel();
   }
 
   private isLocked(): boolean {
@@ -195,7 +221,7 @@ export class LevelSelectScene extends Phaser.Scene {
     // A first visit has nothing to compare against, so nothing is announced.
     if (seen === null || open <= seen) return;
     for (let i = seen; i < open; i++) this.fresh.add(i);
-    const name = LEVELS[seen].name.toLowerCase();
+    const name = LEVELS[seen].name;
     this.time.delayedCall(450, () => {
       playSfx(this.game, 'bonus');
       this.statusText.setText(`${name} is now open!`).setColor(CSS.yellow);
@@ -203,45 +229,69 @@ export class LevelSelectScene extends Phaser.Scene {
     });
   }
 
-  private refresh(): void {
+  private refreshPanel(): void {
     const level = LEVELS[this.index];
     const chart = this.charts[this.index];
     const locked = this.isLocked();
-    this.countText.setText(`${this.index + 1} / ${LEVELS.length}`);
-    this.nameText.setText(level.name.toLowerCase());
-    this.blurbText.setText(level.blurb.toLowerCase());
-    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName.toLowerCase()}`).setColor(level.battle ? CSS.pink : CSS.lilac);
 
-    this.lockShade.setVisible(locked);
+    this.countText.setText(`Stage ${this.index + 1} of ${LEVELS.length}`);
+    this.nameText.setText(level.name).setAlpha(locked ? 0.55 : 1);
+    this.blurbText.setText(level.blurb).setAlpha(locked ? 0.55 : 1);
+    this.rivalTag.setTint(level.battle ? COLORS.pink : COLORS.lilac);
+    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName}`).setColor(level.battle ? CSS.cream : CSS.ink);
+
+    this.playButton.setVisible(!locked);
+    this.lockedButton.setVisible(locked);
+    if (locked) this.lockedZone.setInteractive();
+    else this.lockedZone.disableInteractive();
     this.lockText.setVisible(locked);
-    if (locked) this.lockText.setText(`clear ${LEVELS[this.index - 1].name.toLowerCase()} first`);
-    this.newText.setVisible(!locked && this.fresh.has(this.index));
-    this.playText.setText(locked ? 'locked' : 'play').setColor(locked ? CSS.grey : CSS.yellow);
-    if (locked) this.playPulse.pause();
-    else this.playPulse.resume();
-    if (locked) this.playText.setScale(1);
+    if (locked) this.lockText.setText(`Clear ${LEVELS[this.index - 1].name} first`);
+    this.newTag.setVisible(!locked && this.fresh.has(this.index));
     this.infoText.setVisible(!locked);
     this.bestText.setVisible(!locked);
 
     const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
-    this.difficultyLabel.setAlpha(chart ? 1 : 0.4);
+    this.difficultyLabel.setAlpha(chart && !locked ? 1 : 0.45);
     this.pips.forEach((pip, i) => {
       const on = i < difficulty;
-      pip.setAlpha(on ? 1 : 0.45).setTint(on ? 0xffffff : 0x6a5a86);
+      pip.setAlpha((on ? 1 : 0.45) * (locked ? 0.6 : 1)).setTint(on ? 0xffffff : 0x6a5a86);
     });
-    if (chart) this.infoText.setText(`${chart.notes.length} notes   ${Math.round(chart.bpm)} bpm`);
-    else this.infoText.setText(chart === null ? 'chart not available' : 'loading...');
+    if (chart) this.infoText.setText(`${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM`);
+    else this.infoText.setText(chart === null ? 'Chart not available' : 'Loading...');
 
     const best = getBest(level.id);
     if (best) {
-      const flag = best.fullCombo ? '   full combo!' : '';
-      this.bestText.setText(`best ${best.score}   rank ${best.rank.toLowerCase()}${flag}`).setColor(CSS.yellow);
+      const flag = best.fullCombo ? '   Full combo!' : '';
+      this.bestText.setText(`Best ${formatScore(best.score)}   Rank ${best.rank}${flag}`).setColor(CSS.yellow);
     } else {
-      this.bestText.setText('no score yet').setColor(CSS.cream);
+      this.bestText.setText('No score yet').setColor(CSS.cream);
     }
 
     this.left.image.setAlpha(this.index > 0 ? 1 : 0.25);
     this.right.image.setAlpha(this.index < LEVELS.length - 1 ? 1 : 0.25);
+  }
+
+  /** Seat the stage's opponent beside Berry. A locked stage only shows her outline. */
+  private refreshRival(index: number): void {
+    const seat = SEATS[LEVELS[index].rival];
+    const rival = this.rival;
+    if (this.textures.exists(seat.sit) && this.anims.exists(seat.anim)) {
+      rival.setVisible(true).setOrigin(0.5).setPosition(RIVAL_X, BERRY_Y);
+      rival.play(seat.anim, true);
+    } else if (this.textures.exists(seat.stand)) {
+      // No seated art yet: she stands at the bench instead. Frames are 64x64 with the feet on row 62.
+      rival.anims.stop();
+      rival
+        .setVisible(true)
+        .setTexture(seat.stand, 0)
+        .setOrigin(0.5, 63 / 64)
+        .setPosition(RIVAL_X, FLOOR_Y);
+    } else {
+      rival.setVisible(false);
+      return;
+    }
+    if (isUnlocked(index)) rival.clearTint().setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);
+    else rival.setTint(COLORS.ink).setTintMode(Phaser.TintModes.FILL).setAlpha(0.85);
   }
 
   private change(dir: number): void {
@@ -254,8 +304,11 @@ export class LevelSelectScene extends Phaser.Scene {
     this.statusText.setText('');
 
     // Moving on means the train runs forward, so the pole passes right to left.
+    // The panel and the opponent each swap as the pole covers them.
     const edge = GAME_W / 2 + dir * (GAME_W / 2 + POLE_W / 2 + 80);
-    let swapped = false;
+    const passed = (x: number) => (dir > 0 ? this.pole.x <= x : this.pole.x >= x);
+    let panelSwapped = false;
+    let rivalSwapped = false;
     this.pole.setVisible(true).setX(edge);
     this.tweens.add({
       targets: this.pole,
@@ -263,12 +316,15 @@ export class LevelSelectScene extends Phaser.Scene {
       duration: WIPE_MS,
       ease: 'Linear',
       onUpdate: () => {
-        const covered = dir > 0 ? this.pole.x <= PANEL_CX : this.pole.x >= PANEL_CX;
-        if (!swapped && covered) {
-          swapped = true;
+        if (!rivalSwapped && passed(RIVAL_X)) {
+          rivalSwapped = true;
+          this.refreshRival(next);
+        }
+        if (!panelSwapped && passed(PANEL_CX)) {
+          panelSwapped = true;
           this.index = next;
           lastIndex = next;
-          this.refresh();
+          this.refreshPanel();
         }
       },
       onComplete: () => {
@@ -297,7 +353,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const run = this.run;
     const level = LEVELS[this.index];
     playSfx(this.game, 'select');
-    this.statusText.setText('loading...').setColor(CSS.cream);
+    this.statusText.setText('Loading...').setColor(CSS.cream);
     try {
       const chart = await loadLevelChart(level);
       if (run !== this.run || !this.scene.isActive()) return;
@@ -308,7 +364,7 @@ export class LevelSelectScene extends Phaser.Scene {
     } catch {
       if (run !== this.run || !this.scene.isActive()) return;
       playSfx(this.game, 'back');
-      this.statusText.setText(`${level.name.toLowerCase()} could not be loaded`).setColor(CSS.miss);
+      this.statusText.setText(`${level.name} could not be loaded`).setColor(CSS.miss);
       this.busy = false;
     }
   }

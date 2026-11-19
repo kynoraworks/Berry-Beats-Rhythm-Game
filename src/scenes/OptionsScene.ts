@@ -1,27 +1,23 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, GAME_H, GAME_W, LANE_NAMES, SceneKeys, Tex } from '../core/config';
+import { CSS, LANE_NAMES, SceneKeys, Tex } from '../core/config';
+import { isTouch } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel, resetSettings, updateSettings, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { hint, isTouch } from '../core/mobile';
-import { addCover, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addSlider, addText, addToggle, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { FocusFrame, addSectionTitle, addStepArrow, type Bounds } from '../menus/kit';
 import { OffsetTest } from '../menus/offsetTest';
 
 interface OptionsData {
   returnTo?: string;
 }
 
-interface Bounds {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 interface Row {
+  /** Shown in the description box while the row has focus. */
   hint: string;
-  /** Area highlighted when the row has focus. Key rows highlight one slot instead. */
-  bounds: Bounds;
+  /** Area framed when the row has focus. Button rows light their button instead. */
+  bounds?: Bounds;
+  button?: UiButton;
   lane?: number;
   refresh(): void;
   /** Left/right. */
@@ -29,23 +25,28 @@ interface Row {
   confirm?(): void;
 }
 
-const LEFT: Bounds = { x: 50, y: 130, w: 610, h: 450 };
-const RIGHT: Bounds = { x: 690, y: 130, w: 540, h: 450 };
-const ROW_Y = 170;
+const LEFT: Bounds = { x: 40, y: 112, w: 624, h: 400 };
+const RIGHT: Bounds = { x: 680, y: 112, w: 560, h: 588 };
+const DESC: Bounds = { x: 40, y: 528, w: 624, h: 92 };
+const ROW_H = 48;
 const ROW_DY = 52;
-const ROW_H = 46;
-const KEY_Y = 244;
-const KEY_DY = 72;
-const SLOT_X = [1010, 1140];
-const SLOT_W = 116;
-const SLOT_H = 52;
+const KEY_DY = 64;
+const SLOT_W = 112;
+const SLOT_H = 48;
 /** Keys the menus and the pause screen rely on. */
 const RESERVED = new Set(['Escape', 'Enter', 'NumpadEnter', 'Tab', 'Backspace', 'KeyP']);
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
+const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
 /** Move a value one step and snap it to the step grid, without floating point crumbs. */
 const step = (value: number, dir: number, size: number, min: number, max: number) =>
   Phaser.Math.Clamp(Math.round(Math.round(value / size + dir) * size * 1000) / 1000, min, max);
+
+/** Where a row's controls sit, measured back from its panel's right edge. */
+const controls = (panel: Bounds) => {
+  const right = panel.x + panel.w;
+  return { label: panel.x + 40, value: right - 260, arrowLeft: right - 232, control: right - 136, arrowRight: right - 40 };
+};
 
 export class OptionsScene extends Phaser.Scene {
   private returnTo: string = SceneKeys.Menu;
@@ -57,10 +58,13 @@ export class OptionsScene extends Phaser.Scene {
   /** Set when the capture listener has dealt with a key, so the menu handlers skip it. */
   private consumed = false;
   private test: OffsetTest | null = null;
-  private focusBox!: Phaser.GameObjects.Graphics;
+  private frame!: FocusFrame;
   private hintText!: Phaser.GameObjects.Text;
   private slotTexts: Phaser.GameObjects.Text[][] = [];
+  private slotBounds: Bounds[][] = [];
   private blink?: Phaser.Tweens.Tween;
+  /** True for the rest of a click that only served to end a rebind. */
+  private swallowPointer = false;
 
   constructor() {
     super(SceneKeys.Options);
@@ -76,49 +80,66 @@ export class OptionsScene extends Phaser.Scene {
     this.consumed = false;
     this.test = null;
     this.slotTexts = [];
+    this.slotBounds = [];
     this.blink = undefined;
+    this.swallowPointer = false;
   }
 
   create(): void {
     fadeIn(this);
     if (!music.current) music.play('menu');
 
-    addCover(this, Tex.titleBg);
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x1a0a3a, 0.78);
-    addText(this, GAME_W / 2, 68, 'options', 64);
-    addPanel(this, LEFT.x, LEFT.y, LEFT.w, LEFT.h);
-    addPanel(this, RIGHT.x, RIGHT.y, RIGHT.w, RIGHT.h);
-    this.focusBox = this.add.graphics();
+    addBackdrop(this);
+    addHeader(this, 'Options', () => this.leave(false));
+    addHints(this, 'Up / Down: move     Left / Right: change     Enter: select     Esc: back', 'Tap a row to select it, and tap the arrows to change it');
 
-    this.addSlider('music volume', 'how loud the songs and menu music are', (s) => percent(s.musicVolume), (s, d) => ({ musicVolume: step(s.musicVolume, d, 0.05, 0, 1) }));
-    this.addSlider('sound volume', 'how loud menu and hit sounds are', (s) => percent(s.sfxVolume), (s, d) => ({ sfxVolume: step(s.sfxVolume, d, 0.05, 0, 1) }));
-    this.addSlider('scroll speed', 'how fast the notes fall', (s) => `x${s.scrollSpeed.toFixed(1)}`, (s, d) => ({ scrollSpeed: step(s.scrollSpeed, d, 0.1, 0.5, 2.5) }));
+    addBox(this, LEFT.x, LEFT.y, LEFT.w, LEFT.h);
+    addBox(this, RIGHT.x, RIGHT.y, RIGHT.w, RIGHT.h);
+    addBox(this, DESC.x, DESC.y, DESC.w, DESC.h);
+    this.frame = new FocusFrame(this);
+    this.hintText = addBody(this, DESC.x + DESC.w / 2, DESC.y + DESC.h / 2, '', 22, { color: CSS.lilac, wrapWidth: DESC.w - 48 });
+
+    const leftY = (i: number) => LEFT.y + 88 + i * ROW_DY;
+    addSectionTitle(this, LEFT.x + 32, LEFT.y + 36, LEFT.w - 64, 'Sound');
+    this.addSlider(LEFT, leftY(0), 'Music volume', 'How loud the songs and the menu music are.', (s) => percent(s.musicVolume), (s) => s.musicVolume, (s, d) => ({
+      musicVolume: step(s.musicVolume, d, 0.05, 0, 1),
+    }));
+    this.addSlider(LEFT, leftY(1), 'Sound volume', 'How loud menu sounds and hit sounds are.', (s) => percent(s.sfxVolume), (s) => s.sfxVolume, (s, d) => ({
+      sfxVolume: step(s.sfxVolume, d, 0.05, 0, 1),
+    }));
+    this.addToggle(LEFT, leftY(2), 'Hit sounds', 'Play a sound each time you hit a note.', 'hitSounds');
+
+    addSectionTitle(this, LEFT.x + 32, leftY(2) + 56, LEFT.w - 64, 'Timing');
     this.addSlider(
-      'audio offset',
-      'raise it if your hits land late, lower it if they land early',
+      LEFT,
+      leftY(2) + 108,
+      'Audio offset',
+      'Raise it if your hits keep landing late, lower it if they land early.',
       (s) => `${s.audioOffsetMs > 0 ? '+' : ''}${Math.round(s.audioOffsetMs)} ms`,
+      (s) => (s.audioOffsetMs + 500) / 1000,
       (s, d) => ({ audioOffsetMs: step(s.audioOffsetMs, d, 5, -500, 500) }),
     );
-    this.addAction(this.leftRow(4), 'measure offset', 'start', 'tap along to a click to set the audio offset for you', () => this.startTest());
-    this.addToggle('hit sounds', 'play a tick whenever you hit a note', 'hitSounds');
-    this.addToggle('no fail', 'keep playing when the health bar runs out', 'noFail');
-    this.addToggle('reduce motion', 'turn off screen shakes, flashes and background pulsing', 'reduceMotion');
+    this.addAction(LEFT, leftY(2) + 160, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
 
+    const rightY = (i: number) => RIGHT.y + 88 + i * ROW_DY;
+    addSectionTitle(this, RIGHT.x + 32, RIGHT.y + 36, RIGHT.w - 64, 'Gameplay');
+    this.addSlider(RIGHT, rightY(0), 'Note speed', 'How fast the notes fall towards the arrows.', (s) => `x${s.scrollSpeed.toFixed(1)}`, (s) => (s.scrollSpeed - 0.5) / 2, (s, d) => ({
+      scrollSpeed: step(s.scrollSpeed, d, 0.1, 0.5, 2.5),
+    }));
+    this.addToggle(RIGHT, rightY(1), 'No fail', 'Keep playing when the bar runs out.', 'noFail');
+    this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, flashes and background pulsing.', 'reduceMotion');
+
+    const controlsY = rightY(2) + 56;
     if (isTouch()) {
-      this.addTouchGuide();
+      addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Touch controls');
+      this.addTouchGuide(controlsY + 40);
     } else {
-      addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + 46, 'lane keys', 32, { color: CSS.lilac });
-      LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane));
-      addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 36, 'each lane has two keys', 16, { color: CSS.grey, stroke: false });
+      addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
+      LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 60 + lane * KEY_DY));
+      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Each lane has two keys. Select a key and press Enter to change it.', 18, { color: CSS.grey });
     }
 
-    const resetBounds: Bounds = { x: 150, y: 612, w: 410, h: 56 };
-    this.addAction(resetBounds, 'reset to defaults', '', 'put every option and key back to how it started', () => this.reset(), true);
-    const backBounds: Bounds = { x: 860, y: 612, w: 200, h: 56 };
-    this.addAction(backBounds, 'back', '', 'return to the menu', () => this.leave(), true);
-
-    this.hintText = addText(this, GAME_W / 2, 716, '', 24, { color: CSS.lilac, wrapWidth: 1160 });
-    addText(this, GAME_W / 2, GAME_H - 28, hint('up/down: move   left/right: change   enter: select   esc: back', 'tap a row to select it, tap the arrows to change it'), 16);
+    this.addButtonRow(DESC.x + DESC.w / 2, 668, 'Reset to defaults', 400, 'Put every option and key back to how it started.', () => this.reset());
 
     this.rows.forEach((row) => row.refresh());
     this.setFocus(0, false);
@@ -134,11 +155,14 @@ export class OptionsScene extends Phaser.Scene {
       left: guard(() => this.adjust(-1)),
       right: guard(() => this.adjust(1)),
       confirm: guard(() => this.confirm()),
-      back: guard(() => this.leave()),
+      back: guard(() => this.leave(true)),
     });
+    // Scene-level pointer events arrive after the ones on game objects.
     this.input.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      this.swallowPointer = this.rebinding;
       if (this.rebinding) this.endRebind();
     });
+    this.input.on(Phaser.Input.Events.POINTER_UP, () => (this.swallowPointer = false));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.test?.destroy();
       this.test = null;
@@ -149,62 +173,67 @@ export class OptionsScene extends Phaser.Scene {
   // Row builders
   // ---------------------------------------------------------------------
 
-  private leftRow(index: number): Bounds {
-    return { x: LEFT.x + 16, y: ROW_Y + index * ROW_DY - ROW_H / 2, w: LEFT.w - 32, h: ROW_H };
+  private rowBounds(panel: Bounds, y: number): Bounds {
+    return { x: panel.x + 16, y: y - ROW_H / 2, w: panel.w - 32, h: ROW_H };
   }
 
-  /** Makes a whole row react to the mouse: hovering focuses it, clicking runs `onClick`. */
+  private idle(): boolean {
+    return !this.rebinding && !this.test && !this.swallowPointer;
+  }
+
+  /** Makes a whole row react to the pointer: hovering focuses it, clicking runs `onClick`. */
   private addHitZone(bounds: Bounds, index: number, onClick?: () => void): void {
     const zone = this.add.zone(bounds.x + bounds.w / 2, bounds.y + bounds.h / 2, bounds.w, bounds.h).setInteractive({ useHandCursor: onClick !== undefined });
     zone.on(Phaser.Input.Events.POINTER_OVER, () => this.setFocus(index, false));
     if (onClick) {
       zone.on(Phaser.Input.Events.POINTER_UP, () => {
-        if (this.rebinding || this.test) return;
+        if (!this.idle()) return;
         this.setFocus(index, false);
         onClick();
       });
     }
   }
 
-  private addSlider(label: string, hint: string, show: (s: Settings) => string, change: (s: Settings, dir: number) => Partial<Settings>): void {
+  private addSlider(panel: Bounds, y: number, label: string, hint: string, show: (s: Settings) => string, amount: (s: Settings) => number, change: (s: Settings, dir: number) => Partial<Settings>): void {
     const index = this.rows.length;
-    const bounds = this.leftRow(index);
-    const y = bounds.y + bounds.h / 2;
+    const bounds = this.rowBounds(panel, y);
+    const at = controls(panel);
     this.addHitZone(bounds, index);
-    addText(this, bounds.x + 20, y, label, 32, { origin: [0, 0.5] });
-    const value = addText(this, 510, y, '', 32, { color: CSS.yellow });
-    const adjust = (dir: number) => {
-      const before = getSettings();
-      const after = updateSettings(change(before, dir));
-      if (show(before) !== show(after)) playSfx(this.game, 'move');
-      value.setText(show(after));
+    addText(this, at.label, y, label, 32, { origin: [0, 0.5], stroke: false });
+    const value = addText(this, at.value, y, '', 24, { origin: [1, 0.5], color: CSS.yellow, stroke: false });
+    const slider = addSlider(this, at.control, y, 144);
+    const refresh = () => {
+      const settings = getSettings();
+      value.setText(show(settings));
+      slider.setValue(amount(settings));
     };
-    for (const [x, glyph, dir] of [
-      [420, '<', -1],
-      [600, '>', 1],
-    ] as const) {
-      const arrow = addText(this, x, y, glyph, 32).setInteractive({ useHandCursor: true });
-      arrow.on(Phaser.Input.Events.POINTER_OVER, () => {
-        arrow.setColor(CSS.yellow);
-        this.setFocus(index, false);
-      });
-      arrow.on(Phaser.Input.Events.POINTER_OUT, () => arrow.setColor(CSS.cream));
-      arrow.on(Phaser.Input.Events.POINTER_DOWN, () => {
-        if (!this.rebinding && !this.test) adjust(dir);
-      });
-    }
-    this.rows.push({ hint, bounds, refresh: () => value.setText(show(getSettings())), adjust });
+    const adjust = (dir: number) => {
+      const before = show(getSettings());
+      updateSettings(change(getSettings(), dir));
+      if (before !== show(getSettings())) playSfx(this.game, 'move');
+      refresh();
+    };
+    const press = (dir: -1 | 1) => () => {
+      if (!this.idle()) return;
+      this.setFocus(index, false);
+      adjust(dir);
+    };
+    addStepArrow(this, at.arrowLeft, y, -1, press(-1), () => this.setFocus(index, false));
+    addStepArrow(this, at.arrowRight, y, 1, press(1), () => this.setFocus(index, false));
+    this.rows.push({ hint, bounds, refresh, adjust });
   }
 
-  private addToggle(label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion'): void {
+  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion'): void {
     const index = this.rows.length;
-    const bounds = this.leftRow(index);
-    const y = bounds.y + bounds.h / 2;
-    addText(this, bounds.x + 20, y, label, 32, { origin: [0, 0.5] });
-    const value = addText(this, 510, y, '', 32);
+    const bounds = this.rowBounds(panel, y);
+    const at = controls(panel);
+    addText(this, at.label, y, label, 32, { origin: [0, 0.5], stroke: false });
+    const value = addText(this, at.value, y, '', 24, { origin: [1, 0.5], stroke: false });
+    const control = addToggle(this, at.control, y);
     const refresh = () => {
       const on = getSettings()[key];
-      value.setText(on ? 'on' : 'off').setColor(on ? CSS.perfect : CSS.grey);
+      value.setText(on ? 'On' : 'Off').setColor(on ? CSS.yellow : CSS.grey);
+      control.setOn(on);
     };
     const toggle = () => {
       updateSettings({ [key]: !getSettings()[key] });
@@ -215,48 +244,58 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, bounds, refresh, adjust: toggle, confirm: toggle });
   }
 
-  private addAction(bounds: Bounds, label: string, value: string, hint: string, run: () => void, centred = false): void {
+  /** A labelled row with a small button on the right. */
+  private addAction(panel: Bounds, y: number, label: string, action: string, hint: string, run: () => void): void {
     const index = this.rows.length;
-    const y = bounds.y + bounds.h / 2;
-    if (centred) addText(this, bounds.x + bounds.w / 2, y, label, 32);
-    else addText(this, bounds.x + 20, y, label, 32, { origin: [0, 0.5] });
-    if (value) addText(this, 510, y, value, 32, { color: CSS.yellow });
+    const bounds = this.rowBounds(panel, y);
+    const at = controls(panel);
+    addText(this, at.label, y, label, 32, { origin: [0, 0.5], stroke: false });
     this.addHitZone(bounds, index, run);
-    this.rows.push({ hint, bounds, refresh: () => undefined, confirm: run });
+    const button = addUiButton(this, at.control, y + 2, action, () => this.idle() && run(), { width: 176, height: 44, size: 24, sfx: null });
+    button.onHover = () => this.setFocus(index, false);
+    this.rows.push({ hint, bounds, button, refresh: () => undefined, confirm: run });
   }
 
-  /** Phones have no keys to rebind, so the right-hand panel explains the touch controls instead. */
-  private addTouchGuide(): void {
-    const cx = RIGHT.x + RIGHT.w / 2;
-    addText(this, cx, RIGHT.y + 46, 'touch controls', 32, { color: CSS.lilac });
-    // The four columns of the screen, in lane order.
-    const columnW = 110;
-    LANE_NAMES.forEach((name, lane) => {
-      const x = cx + (lane - 1.5) * (columnW + 10);
-      this.add.rectangle(x, RIGHT.y + 170, columnW, 150, COLORS.ink, 0.9).setStrokeStyle(4, COLORS.purple);
-      this.add.image(x, RIGHT.y + 152, Tex.notes, lane).setScale(4);
-      addText(this, x, RIGHT.y + 220, name, 24, { stroke: false });
-    });
-    const lines = ['the screen is four columns', 'tap a column to hit its arrow', 'keep holding for long notes', 'tap the pause button to stop'];
-    lines.forEach((line, i) => addText(this, cx, RIGHT.y + 290 + i * 40, line, 24, { stroke: false, color: i === 0 ? CSS.cream : CSS.lilac }));
-  }
-
-  private addKeyRow(lane: number): void {
+  /** A full kit button that takes part in the focus order. */
+  private addButtonRow(x: number, y: number, label: string, width: number, hint: string, run: () => void): void {
     const index = this.rows.length;
-    const y = KEY_Y + lane * KEY_DY;
-    const bounds: Bounds = { x: RIGHT.x + 16, y: y - 32, w: RIGHT.w - 32, h: 64 };
+    const button = addUiButton(this, x, y, label, () => this.idle() && run(), { width, sfx: null });
+    button.onHover = () => this.setFocus(index, false);
+    this.rows.push({ hint, button, refresh: () => undefined, confirm: run });
+  }
+
+  /** Phones have no keys to rebind, so the controls section explains the touch columns instead. */
+  private addTouchGuide(top: number): void {
+    const cx = RIGHT.x + RIGHT.w / 2;
+    const columnW = 112;
+    LANE_NAMES.forEach((name, lane) => {
+      const x = cx + (lane - 1.5) * (columnW + 12);
+      addBox(this, x - columnW / 2, top, columnW, 128, 'track');
+      this.add.image(x, top + 50, Tex.notes, lane).setScale(4);
+      addText(this, x, top + 104, capital(name), 24, { stroke: false });
+    });
+    const lines = ['The screen is split into four columns.', 'Tap a column to hit its arrow, and keep', 'holding for long notes. Tap the pause', 'button in the corner to stop.'];
+    addBody(this, cx, top + 212, lines.join('\n'), 22, { color: CSS.lilac });
+  }
+
+  private addKeyRow(lane: number, y: number): void {
+    const index = this.rows.length;
+    const right = RIGHT.x + RIGHT.w;
+    const bounds: Bounds = { x: RIGHT.x + 16, y: y - 28, w: RIGHT.w - 32, h: 56 };
     this.addHitZone(bounds, index);
-    this.add.image(RIGHT.x + 62, y, Tex.notes, lane).setScale(3);
-    addText(this, RIGHT.x + 108, y, LANE_NAMES[lane], 32, { origin: [0, 0.5] });
-    const texts = SLOT_X.map((x, slot) => {
-      const box = this.add.rectangle(x, y, SLOT_W, SLOT_H, COLORS.ink, 0.9).setStrokeStyle(4, COLORS.purple).setInteractive({ useHandCursor: true });
+    this.add.image(RIGHT.x + 60, y, Tex.notes, lane).setScale(3);
+    addText(this, RIGHT.x + 100, y, capital(LANE_NAMES[lane]), 32, { origin: [0, 0.5], stroke: false });
+    const slotX = [right - 196, right - 68];
+    this.slotBounds[lane] = slotX.map((x) => ({ x: x - SLOT_W / 2 - 4, y: y - SLOT_H / 2 - 4, w: SLOT_W + 8, h: SLOT_H + 8 }));
+    const texts = slotX.map((x, slot) => {
+      const box = addBox(this, x - SLOT_W / 2, y - SLOT_H / 2, SLOT_W, SLOT_H, 'track').setInteractive({ useHandCursor: true });
       box.on(Phaser.Input.Events.POINTER_OVER, () => {
-        if (this.rebinding || this.test) return;
+        if (!this.idle()) return;
         this.slot = slot;
         this.setFocus(index, false);
       });
       box.on(Phaser.Input.Events.POINTER_UP, () => {
-        if (this.rebinding || this.test) return;
+        if (!this.idle()) return;
         this.slot = slot;
         this.setFocus(index, false);
         this.beginRebind();
@@ -265,15 +304,15 @@ export class OptionsScene extends Phaser.Scene {
     });
     this.slotTexts[lane] = texts;
     this.rows.push({
-      hint: 'enter: change this key',
+      hint: `The two keys that play the ${LANE_NAMES[lane]} arrow. Press Enter to change the selected one.`,
       bounds,
       lane,
       refresh: () => {
         const codes = getSettings().keys[lane];
-        texts.forEach((text, slot) => text.setText(codes[slot] ? keyLabel(codes[slot]).toLowerCase().slice(0, 7) : '-').setColor(CSS.cream));
+        texts.forEach((text, slot) => text.setText(codes[slot] ? keyLabel(codes[slot]).slice(0, 7) : '-').setColor(CSS.cream));
       },
       adjust: (dir) => {
-        const next = Phaser.Math.Clamp(this.slot + dir, 0, SLOT_X.length - 1);
+        const next = Phaser.Math.Clamp(this.slot + dir, 0, slotX.length - 1);
         if (next === this.slot) return;
         this.slot = next;
         playSfx(this.game, 'move');
@@ -288,28 +327,28 @@ export class OptionsScene extends Phaser.Scene {
   // ---------------------------------------------------------------------
 
   private setFocus(index: number, sound = true): void {
-    if (this.rebinding || this.test) return;
+    if (!this.idle()) return;
     const next = (index + this.rows.length) % this.rows.length;
     if (next !== this.focus) {
       if (sound) playSfx(this.game, 'move');
-      this.disarmReset();
+      this.resetArmed = false;
     }
     this.focus = next;
-    this.hintText.setText(this.rows[next].hint).setColor(CSS.lilac);
+    this.say(this.rows[next].hint);
     this.drawFocus();
   }
 
   private drawFocus(): void {
     const row = this.rows[this.focus];
-    let b = row.bounds;
-    if (row.lane !== undefined) {
-      b = { x: SLOT_X[this.slot] - SLOT_W / 2 - 8, y: KEY_Y + row.lane * KEY_DY - SLOT_H / 2 - 8, w: SLOT_W + 16, h: SLOT_H + 16 };
-    }
-    this.focusBox.clear();
-    this.focusBox.fillStyle(COLORS.purple, 0.55);
-    this.focusBox.fillRoundedRect(b.x, b.y, b.w, b.h, 10);
-    this.focusBox.lineStyle(4, COLORS.yellow, 1);
-    this.focusBox.strokeRoundedRect(b.x, b.y, b.w, b.h, 10);
+    this.rows.forEach((other) => other.button?.setFocused(other === row));
+    if (row.lane !== undefined) this.frame.moveTo(this.slotBounds[row.lane][this.slot]);
+    else if (row.bounds) this.frame.moveTo(row.bounds);
+    else this.frame.hide();
+  }
+
+  /** Show a line in the description box. */
+  private say(message: string, color: string = CSS.lilac): void {
+    this.hintText.setText(message).setColor(color);
   }
 
   private adjust(dir: number): void {
@@ -317,13 +356,13 @@ export class OptionsScene extends Phaser.Scene {
   }
 
   private confirm(): void {
-    const row = this.rows[this.focus];
-    if (row.confirm) row.confirm();
+    this.rows[this.focus].confirm?.();
   }
 
-  private leave(): void {
-    if (isLeaving(this)) return;
-    playSfx(this.game, 'back');
+  /** `sound` is false when the header's Back button, which makes its own sound, was used. */
+  private leave(sound: boolean): void {
+    if (isLeaving(this) || !this.idle()) return;
+    if (sound) playSfx(this.game, 'back');
     goTo(this, this.returnTo);
   }
 
@@ -331,18 +370,14 @@ export class OptionsScene extends Phaser.Scene {
     if (!this.resetArmed) {
       this.resetArmed = true;
       playSfx(this.game, 'move');
-      this.hintText.setText('press again to reset everything').setColor(CSS.miss);
+      this.say('Press again to reset everything.', CSS.miss);
       return;
     }
     this.resetArmed = false;
     resetSettings();
     playSfx(this.game, 'select');
     this.rows.forEach((row) => row.refresh());
-    this.hintText.setText('options reset').setColor(CSS.perfect);
-  }
-
-  private disarmReset(): void {
-    this.resetArmed = false;
+    this.say('Options reset.', CSS.perfect);
   }
 
   // ---------------------------------------------------------------------
@@ -368,9 +403,9 @@ export class OptionsScene extends Phaser.Scene {
     this.rebinding = true;
     playSfx(this.game, 'select');
     const text = this.slotTexts[lane][this.slot];
-    text.setText('press').setColor(CSS.yellow);
+    text.setText('Press').setColor(CSS.yellow);
     this.blink = this.tweens.add({ targets: text, alpha: 0.2, duration: 350, yoyo: true, repeat: -1 });
-    this.hintText.setText('press the new key   esc: cancel').setColor(CSS.yellow);
+    this.say('Press the new key, or Esc to cancel.', CSS.yellow);
   }
 
   private endRebind(message = '', color: string = CSS.lilac): void {
@@ -380,7 +415,7 @@ export class OptionsScene extends Phaser.Scene {
     this.blink = undefined;
     if (row.lane !== undefined) this.slotTexts[row.lane][this.slot].setAlpha(1);
     this.rows.forEach((r) => r.refresh());
-    this.hintText.setText(message || row.hint).setColor(color);
+    this.say(message || row.hint, color);
   }
 
   private rebind(code: string): void {
@@ -393,7 +428,7 @@ export class OptionsScene extends Phaser.Scene {
     }
     if (RESERVED.has(code) || code.startsWith('Meta') || code.startsWith('Control') || code.startsWith('Alt') || /^F\d+$/.test(code)) {
       playSfx(this.game, 'miss');
-      this.hintText.setText('that key is reserved: press another   esc: cancel').setColor(CSS.miss);
+      this.say('That key is reserved. Press another, or Esc to cancel.', CSS.miss);
       return;
     }
     const keys = getSettings().keys.map((codes) => codes.slice());
@@ -410,7 +445,7 @@ export class OptionsScene extends Phaser.Scene {
       else if (keys[otherLane].length > 1) keys[otherLane].splice(otherSlot, 1);
       else {
         playSfx(this.game, 'miss');
-        this.hintText.setText(`that is the only key for ${LANE_NAMES[otherLane]}: press another   esc: cancel`).setColor(CSS.miss);
+        this.say(`That is the only key for ${LANE_NAMES[otherLane]}. Press another, or Esc to cancel.`, CSS.miss);
         return;
       }
     }
@@ -418,7 +453,7 @@ export class OptionsScene extends Phaser.Scene {
     else keys[lane].push(code);
     updateSettings({ keys });
     playSfx(this.game, 'select');
-    this.endRebind(`${LANE_NAMES[lane]} is now ${getSettings().keys[lane].map((c) => keyLabel(c).toLowerCase()).join(' or ')}`, CSS.perfect);
+    this.endRebind(`${capital(LANE_NAMES[lane])} is now ${getSettings().keys[lane].map(keyLabel).join(' or ')}.`, CSS.perfect);
   }
 
   // ---------------------------------------------------------------------
@@ -434,12 +469,12 @@ export class OptionsScene extends Phaser.Scene {
       this.test = null;
       if (resume) music.play(resume);
       if (offsetMs === null) {
-        this.hintText.setText(this.rows[this.focus].hint).setColor(CSS.lilac);
+        this.say(this.rows[this.focus].hint);
         return;
       }
       updateSettings({ audioOffsetMs: offsetMs });
       this.rows.forEach((row) => row.refresh());
-      this.hintText.setText(`audio offset set to ${offsetMs > 0 ? '+' : ''}${offsetMs} ms`).setColor(CSS.perfect);
+      this.say(`Audio offset set to ${offsetMs > 0 ? '+' : ''}${offsetMs} ms.`, CSS.perfect);
     });
   }
 }

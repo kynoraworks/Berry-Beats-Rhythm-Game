@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, GAME_H, GAME_W, SceneKeys } from '../core/config';
+import { CSS, GAME_H, GAME_W, SceneKeys } from '../core/config';
 import { newChart, parseChart, serializeChart, type Chart } from '../core/chart';
 import type { ComposerData, PlayData } from '../core/flow';
 import { LEVELS, loadLevelChart } from '../core/levels';
@@ -7,8 +7,7 @@ import { music } from '../core/music';
 import { deleteCustomChart, getBest, listCustomCharts, saveCustomChart } from '../core/saves';
 import { playSfx } from '../core/sfx';
 import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getSong, listCustomAudio, loadSongBuffer, saveCustomAudio } from '../core/songs';
-import { hint } from '../core/mobile';
-import { addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { FOOTER_H, HEADER_H, UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { MAX_AUDIO_BYTES, baseName, disposePicker, downloadText, pickFile, safeFileName } from '../composer/files';
 import { Modal, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
 
@@ -18,21 +17,29 @@ interface BeatMapsData {
 }
 
 interface RowView {
-  bg: Phaser.GameObjects.Rectangle;
+  box: Phaser.GameObjects.NineSlice;
+  focus: Phaser.GameObjects.NineSlice;
   title: Phaser.GameObjects.Text;
   info: Phaser.GameObjects.Text;
   best: Phaser.GameObjects.Text;
-  actions: Phaser.GameObjects.Text[];
+  zone: Phaser.GameObjects.Rectangle;
   index: number;
 }
 
-const TOP_ACTIONS = ['New', 'Import', 'Remix', 'Back'] as const;
+/** Header buttons, left to right. Back is the header's own button. */
+const TOP_ACTIONS = ['Back', 'New', 'Import', 'Remix'] as const;
 const ROW_ACTIONS = ['Play', 'Edit', 'Export', 'Delete'] as const;
-const ROW_H = 84;
-const LIST_Y = 132;
-const VISIBLE_ROWS = 7;
-const ROW_FILL = 0x241640;
-const ROW_FILL_SELECTED = 0x3a2670;
+type TopAction = (typeof TOP_ACTIONS)[number];
+type RowAction = (typeof ROW_ACTIONS)[number];
+const TOP_START = 1;
+const ROW_H = 104;
+const LIST_Y = HEADER_H + 12;
+const VISIBLE_ROWS = 6;
+const ROW_X = 20;
+const ROW_W = GAME_W - ROW_X * 2;
+const ACTION_W = 120;
+const ACTION_GAP = 8;
+const ACTIONS_X = ROW_X + ROW_W - 24 - ROW_ACTIONS.length * ACTION_W - (ROW_ACTIONS.length - 1) * ACTION_GAP;
 const MAX_CHART_BYTES = 5 * 1024 * 1024;
 
 /** The player's own beat maps: create, play, edit, import, export and delete. */
@@ -40,17 +47,17 @@ export class BeatMapsScene extends Phaser.Scene {
   private charts: Chart[] = [];
   private audioNames = new Map<string, string>();
   private rows: RowView[] = [];
-  private topButtons: Phaser.GameObjects.Text[] = [];
-  private emptyText: Phaser.GameObjects.Text | null = null;
+  private topButtons: UiButton[] = [];
+  private actionButtons: UiButton[] = [];
+  private emptyState: Phaser.GameObjects.Container | null = null;
   private countText: Phaser.GameObjects.Text | null = null;
   private modal: Modal | null = null;
   private focus: 'top' | 'list' = 'top';
-  private topIndex = 0;
+  private topIndex = TOP_START;
   private listIndex = 0;
   private actionIndex = 0;
   private scrollTop = 0;
   private busy = false;
-  private pressed: unknown = null;
   private selectId: string | undefined;
 
   constructor() {
@@ -63,50 +70,54 @@ export class BeatMapsScene extends Phaser.Scene {
     this.audioNames = new Map();
     this.rows = [];
     this.topButtons = [];
-    this.emptyText = null;
+    this.actionButtons = [];
+    this.emptyState = null;
     this.countText = null;
     this.modal = null;
     this.focus = 'top';
-    this.topIndex = 0;
+    this.topIndex = TOP_START;
     this.listIndex = 0;
     this.actionIndex = 0;
     this.scrollTop = 0;
     this.busy = false;
-    this.pressed = null;
   }
 
   create(): void {
     fadeIn(this);
     music.play('menu');
 
-    this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, COLORS.night);
-    this.add.rectangle(GAME_W / 2, 52, GAME_W, 104, 0x1c1136);
-    this.add.rectangle(GAME_W / 2, 104, GAME_W, 4, COLORS.ink);
-    addText(this, 48, 52, 'Beat Maps', 48, { origin: [0, 0.5], color: CSS.lilac });
-
-    TOP_ACTIONS.forEach((label, index) => {
-      const x = GAME_W - 48 - (TOP_ACTIONS.length - 1 - index) * 150;
-      const button = addText(this, x, 52, label, 32, { origin: [1, 0.5] });
-      this.makeClickable(button, () => {
+    addBackdrop(this);
+    const header = addHeader(this, 'Beat Maps', () => this.runTop('Back'));
+    if (header.back) this.topButtons.push(header.back);
+    const labels: TopAction[] = ['New', 'Import', 'Remix'];
+    labels.forEach((label, i) => {
+      const x = GAME_W - 20 - 66 - (labels.length - 1 - i) * 144;
+      this.topButtons.push(addUiButton(this, x, HEADER_H / 2 - 2, label, () => this.runTop(label), { width: 132, height: 56, size: 24 }));
+    });
+    this.topButtons.forEach((button, index) => {
+      button.onHover = () => {
+        if (this.modal || this.busy) return;
         this.focus = 'top';
         this.topIndex = index;
         this.refresh();
-      }, () => this.activateTop(index));
-      this.topButtons.push(button);
+      };
     });
 
     for (let slot = 0; slot < VISIBLE_ROWS; slot++) this.rows.push(this.buildRow(slot));
+    // One set of action buttons, moved onto whichever row is selected.
+    ROW_ACTIONS.forEach((label, action) => {
+      const button = addUiButton(this, 0, 0, label, () => this.runRow(this.listIndex, label), { width: ACTION_W, height: 56, size: 24 });
+      button.onHover = () => {
+        if (this.modal || this.busy || this.actionIndex === action) return;
+        this.actionIndex = action;
+        this.refresh();
+      };
+      this.actionButtons.push(button.setVisible(false));
+    });
 
-    this.emptyText = addText(
-      this,
-      GAME_W / 2,
-      GAME_H / 2 - 20,
-      'No beat maps yet\n\nNew: chart one of the songs or your own audio\nRemix: start from a story level\nImport: load a .berrybeat.json file',
-      24,
-      { color: CSS.grey },
-    ).setLineSpacing(12);
-    this.countText = addText(this, GAME_W - 48, GAME_H - 36, '', 16, { origin: [1, 0.5], color: CSS.grey });
-    addText(this, 48, GAME_H - 36, hint('Arrows: move   Enter: choose   Esc: back', 'Tap a map or a button'), 16, { origin: [0, 0.5], color: CSS.grey });
+    this.emptyState = this.buildEmptyState();
+    addHints(this, 'Arrows: move   Enter: choose   Esc: back', 'Tap a map, then a button');
+    this.countText = addBody(this, GAME_W - 24, GAME_H - FOOTER_H / 2, '', 20, { origin: [1, 0.5], color: CSS.lilac });
 
     const key = (action: ModalKey) => () => this.onKey(action);
     menuKeys(this, { up: key('up'), down: key('down'), left: key('left'), right: key('right'), confirm: key('confirm'), back: key('back') });
@@ -148,46 +159,56 @@ export class BeatMapsScene extends Phaser.Scene {
     this.refresh();
   }
 
+  private rowY(slot: number): number {
+    return LIST_Y + slot * ROW_H + (ROW_H - 8) / 2;
+  }
+
   private buildRow(slot: number): RowView {
-    const y = LIST_Y + slot * ROW_H + ROW_H / 2 - 4;
-    const bg = this.add.rectangle(GAME_W / 2, y, GAME_W - 80, ROW_H - 12, ROW_FILL).setStrokeStyle(4, COLORS.ink);
+    const y = this.rowY(slot);
+    const top = y - (ROW_H - 8) / 2;
     const row: RowView = {
-      bg,
-      title: addText(this, 64, y - 14, '', 24, { origin: [0, 0.5] }),
-      info: addText(this, 64, y + 18, '', 16, { origin: [0, 0.5], color: CSS.grey }),
-      best: addText(this, 776, y, '', 24, { origin: [1, 0.5], color: CSS.lilac }),
-      actions: [],
+      box: addBox(this, ROW_X, top, ROW_W, ROW_H - 8),
+      focus: addBox(this, ROW_X, top, ROW_W, ROW_H - 8, 'panel_focus').setVisible(false),
+      title: addText(this, ROW_X + 28, y - 18, '', 24, { origin: [0, 0.5], stroke: false }),
+      info: addBody(this, ROW_X + 28, y + 18, '', 20, { origin: [0, 0.5], color: CSS.lilac }),
+      best: addText(this, ACTIONS_X - 28, y - 18, '', 24, { origin: [1, 0.5], stroke: false }),
+      zone: this.add.rectangle(GAME_W / 2, y, ROW_W, ROW_H - 8, 0, 0),
       index: slot,
     };
-    this.makeClickable(bg, () => this.selectRow(row.index), undefined);
-    ROW_ACTIONS.forEach((label, action) => {
-      const button = addText(this, 850 + action * 106, y, label, 24);
-      this.makeClickable(button, () => {
-        this.selectRow(row.index);
-        if (this.actionIndex !== action) {
-          this.actionIndex = action;
-          this.refresh();
-        }
-      }, () => this.activateRow(row.index, action));
-      row.actions.push(button);
-    });
+    this.makeClickable(row.zone, () => this.selectRow(row.index));
     return row;
   }
 
-  /** Hover focuses, and a click fires only when press and release land on the same object. */
-  private makeClickable(object: Phaser.GameObjects.Text | Phaser.GameObjects.Rectangle, onFocus: () => void, onClick: (() => void) | undefined): void {
+  private buildEmptyState(): Phaser.GameObjects.Container {
+    const width = 760;
+    const height = 328;
+    const tips: [string, string][] = [
+      ['New', 'Chart one of the songs, or your own audio file.'],
+      ['Remix', 'Start from a copy of a story level.'],
+      ['Import', 'Load a .berrybeat.json file someone shared.'],
+    ];
+    const parts: Phaser.GameObjects.GameObject[] = [
+      addBox(this, -width / 2, -height / 2, width, height),
+      addIcon(this, 0, -height / 2 + 60, 'icon_note'),
+      addText(this, 0, -height / 2 + 116, 'No beat maps yet', 32, { color: CSS.yellow, stroke: false }),
+    ];
+    tips.forEach(([name, text], i) => {
+      const y = -height / 2 + 176 + i * 44;
+      parts.push(addText(this, -width / 2 + 180, y, name, 24, { origin: [1, 0.5], stroke: false }));
+      parts.push(addBody(this, -width / 2 + 204, y, text, 22, { origin: [0, 0.5], color: CSS.lilac }));
+    });
+    const listMiddle = LIST_Y + (VISIBLE_ROWS * ROW_H) / 2;
+    return this.add.container(GAME_W / 2, Math.round(listMiddle), parts).setVisible(false);
+  }
+
+  /** Hover focuses, and a press focuses too so a tap on a touch screen selects the row. */
+  private makeClickable(object: Phaser.GameObjects.Rectangle, onFocus: () => void): void {
     object.setInteractive({ useHandCursor: true });
     object.on(Phaser.Input.Events.POINTER_OVER, () => {
       if (!this.modal && !this.busy) onFocus();
     });
     object.on(Phaser.Input.Events.POINTER_DOWN, () => {
-      this.pressed = object;
       if (!this.modal && !this.busy) onFocus();
-    });
-    object.on(Phaser.Input.Events.POINTER_UP, () => {
-      const wasPressed = this.pressed === object;
-      this.pressed = null;
-      if (wasPressed && onClick && !this.modal && !this.busy && !isLeaving(this)) onClick();
     });
   }
 
@@ -209,40 +230,42 @@ export class BeatMapsScene extends Phaser.Scene {
     if (this.listIndex >= this.scrollTop + VISIBLE_ROWS) this.scrollTop = this.listIndex - VISIBLE_ROWS + 1;
     this.scrollTop = Phaser.Math.Clamp(this.scrollTop, 0, Math.max(0, count - VISIBLE_ROWS));
 
-    this.topButtons.forEach((button, index) => {
-      button.setColor(this.focus === 'top' && this.topIndex === index ? CSS.yellow : CSS.cream);
-    });
+    this.topButtons.forEach((button, index) => button.setFocused(this.focus === 'top' && this.topIndex === index));
 
+    let selectedSlot = -1;
     this.rows.forEach((row, slot) => {
       const index = this.scrollTop + slot;
       const chart = this.charts[index];
       row.index = index;
       const visible = chart !== undefined;
-      row.bg.setVisible(visible);
+      const selected = visible && this.focus === 'list' && this.listIndex === index;
+      row.box.setVisible(visible && !selected);
+      row.focus.setVisible(selected);
       row.title.setVisible(visible);
       row.info.setVisible(visible);
       row.best.setVisible(visible);
-      if (!chart) {
-        row.actions.forEach((a) => a.setVisible(false));
-        return;
-      }
-      const selected = this.focus === 'list' && this.listIndex === index;
-      row.bg.setFillStyle(selected ? ROW_FILL_SELECTED : ROW_FILL).setStrokeStyle(4, selected ? COLORS.yellow : COLORS.ink);
+      if (visible) row.zone.setInteractive({ useHandCursor: true });
+      else row.zone.disableInteractive();
+      if (!chart) return;
+      if (selected) selectedSlot = slot;
       const title = chart.title || 'Untitled';
-      row.title.setText(title.length > 30 ? `${title.slice(0, 29)}...` : title);
+      row.title.setText(title.length > 30 ? `${title.slice(0, 29)}...` : title).setColor(selected ? CSS.yellow : CSS.cream);
       const song = this.songName(chart.song);
       const rival = chart.rival?.length ?? 0;
       row.info.setText(`${song.length > 24 ? `${song.slice(0, 23)}...` : song}   ${chart.notes.length} notes${rival ? ` + ${rival} rival` : ''}   ${Math.round(chart.bpm * 10) / 10} bpm`);
       const best = getBest(chart.id);
       row.best.setText(best ? `${best.rank}  ${best.score}` : 'No score');
-      row.best.setColor(best ? CSS.lilac : CSS.grey);
-      row.actions.forEach((button, action) => {
-        button.setVisible(selected);
-        button.setColor(selected && this.actionIndex === action ? CSS.yellow : CSS.cream);
-      });
+      row.best.setColor(best ? CSS.cream : CSS.grey);
     });
 
-    this.emptyText?.setVisible(count === 0);
+    this.actionButtons.forEach((button, action) => {
+      button.setVisible(selectedSlot >= 0);
+      if (selectedSlot < 0) return;
+      button.setPosition(ACTIONS_X + ACTION_W / 2 + action * (ACTION_W + ACTION_GAP), this.rowY(selectedSlot));
+      button.setFocused(this.actionIndex === action);
+    });
+
+    this.emptyState?.setVisible(count === 0);
     this.countText?.setText(count > VISIBLE_ROWS ? `${this.listIndex + 1} / ${count}` : '');
   }
 
@@ -283,19 +306,15 @@ export class BeatMapsScene extends Phaser.Scene {
         break;
       }
       case 'confirm':
-        if (this.focus === 'top') this.activateTop(this.topIndex);
-        else this.activateRow(this.listIndex, this.actionIndex);
+        // The buttons play their own sound, so the keyboard goes through them.
+        if (this.focus === 'top') this.topButtons[this.topIndex]?.click();
+        else this.actionButtons[this.actionIndex]?.click();
         return;
       case 'back':
-        this.leave();
+        this.topButtons[0]?.click();
         return;
     }
     this.refresh();
-  }
-
-  private leave(): void {
-    playSfx(this.game, 'back');
-    goTo(this, SceneKeys.Menu);
   }
 
   private openModal(config: ModalConfig): void {
@@ -310,9 +329,9 @@ export class BeatMapsScene extends Phaser.Scene {
   // Actions
   // ---------------------------------------------------------------------------
 
-  private activateTop(index: number): void {
-    playSfx(this.game, 'select');
-    switch (TOP_ACTIONS[index]) {
+  private runTop(action: TopAction): void {
+    if (this.modal || this.busy || isLeaving(this)) return;
+    switch (action) {
       case 'New':
         this.chooseSong();
         break;
@@ -323,16 +342,15 @@ export class BeatMapsScene extends Phaser.Scene {
         this.chooseRemix();
         break;
       case 'Back':
-        this.leave();
+        goTo(this, SceneKeys.Menu);
         break;
     }
   }
 
-  private activateRow(index: number, action: number): void {
+  private runRow(index: number, action: RowAction): void {
     const chart = this.charts[index];
-    if (!chart) return;
-    playSfx(this.game, 'select');
-    switch (ROW_ACTIONS[action]) {
+    if (!chart || this.modal || this.busy || isLeaving(this)) return;
+    switch (action) {
       case 'Play': {
         if (chart.notes.length === 0) {
           showToast(this, 'This map has no notes yet. Edit it first.', CSS.good);

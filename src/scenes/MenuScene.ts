@@ -1,49 +1,30 @@
 import Phaser from 'phaser';
-import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
+import { COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
+import { canFullscreen, onSwipe, toggleFullscreen } from '../core/mobile';
 import { music } from '../core/music';
 import { playSfx } from '../core/sfx';
-import { canFullscreen, hint, onSwipe, toggleFullscreen } from '../core/mobile';
-import { addBackButton, addButton, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { addMenuArrow, type MenuArrow } from '../menus/arrows';
+import { getSong } from '../core/songs';
+import { FocusGroup, UiButton, addBody, addBox, addHints, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 
 interface MenuItem {
   label: string;
   blurb: string;
   scene: string;
-  build: (scene: Phaser.Scene) => Phaser.GameObjects.GameObject[];
 }
 
-const SLIDE_MS = 320;
-
 const ITEMS: MenuItem[] = [
-  {
-    label: 'story',
-    blurb: 'dance through the stages',
-    scene: SceneKeys.LevelSelect,
-    build: (scene) => [
-      scene.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train),
-      scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x2a1458, 0.55),
-    ],
-  },
-  {
-    label: 'beat maps',
-    blurb: 'make and play your own',
-    scene: SceneKeys.BeatMaps,
-    build: (scene) => [
-      scene.add.image(GAME_W / 2, GAME_H / 2, Tex.room).setScale(PX),
-      scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, COLORS.night, 0.5),
-    ],
-  },
-  {
-    label: 'options',
-    blurb: 'sound, speed and keys',
-    scene: SceneKeys.Options,
-    build: (scene) => [
-      scene.add.image(GAME_W / 2, GAME_H / 2, Tex.titleBg),
-      scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x1a0a3a, 0.72),
-    ],
-  },
+  { label: 'Story', blurb: 'Dance your way through the stages, one battle at a time.', scene: SceneKeys.LevelSelect },
+  { label: 'Beat Maps', blurb: 'Make your own beat maps, or play ones you have imported.', scene: SceneKeys.BeatMaps },
+  { label: 'Options', blurb: 'Sound, note speed, timing and keys.', scene: SceneKeys.Options },
 ];
+
+const PANEL = { x: 64, y: 232, w: 400, h: 456 };
+const PANEL_CX = PANEL.x + PANEL.w / 2;
+/** Blackberry's idle dance: centre, left, left accent, left, centre, right, right accent, right. */
+const GROOVE = [45, 46, 47, 46, 48, 49, 50, 49];
+/** The stage platform in the room art: its centre and the row the dancers' feet stand on. */
+const STAGE_X = 128 * PX;
+const STAGE_Y = 138 * PX;
 
 /** Remembered between visits so backing out of a sub-menu lands on the same item. */
 let lastIndex = 0;
@@ -51,13 +32,9 @@ let lastIndex = 0;
 const SYNC_NOTE_KEY = 'berrybeats.syncNote.v1';
 
 export class MenuScene extends Phaser.Scene {
-  private index = 0;
-  private sliding = false;
-  private panels: Phaser.GameObjects.Container[] = [];
-  private dots: Phaser.GameObjects.Rectangle[] = [];
-  private arrowUp!: MenuArrow;
-  private arrowDown!: MenuArrow;
-  private syncNote: Phaser.GameObjects.Container | null = null;
+  private focus!: FocusGroup;
+  private blurb!: Phaser.GameObjects.Text;
+  private syncNote: (Phaser.GameObjects.GameObject | UiButton)[] = [];
 
   constructor() {
     super(SceneKeys.Menu);
@@ -66,50 +43,73 @@ export class MenuScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     music.play('menu');
-    this.index = lastIndex;
-    this.sliding = false;
-    this.syncNote = null;
+    this.syncNote = [];
 
-    this.panels = ITEMS.map((item, i) => {
-      const label = addText(this, GAME_W / 2, GAME_H / 2 - 20, item.label, 128);
-      label.setInteractive({ useHandCursor: true });
-      label.on(Phaser.Input.Events.POINTER_OVER, () => label.setColor(CSS.yellow));
-      label.on(Phaser.Input.Events.POINTER_OUT, () => label.setColor(CSS.cream));
-      // A swipe that happens to end on the label should not open it.
-      label.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => pointer.getDistance() < 30 && this.confirm());
-      const blurb = addText(this, GAME_W / 2, GAME_H / 2 + 90, item.blurb, 32, { color: CSS.lilac });
-      const panel = this.add.container(0, 0, [...item.build(this), label, blurb]);
-      panel.setVisible(i === this.index);
-      return panel;
-    });
+    this.buildScenery();
 
-    this.arrowUp = addMenuArrow(this, GAME_W / 2, 110, 'up', () => this.change(-1));
-    this.arrowDown = addMenuArrow(this, GAME_W / 2, GAME_H - 110, 'down', () => this.change(1));
-
-    this.dots = ITEMS.map((_, i) => this.add.rectangle(GAME_W - 56, GAME_H / 2 + (i - 1) * 40, 16, 16, COLORS.cream).setStrokeStyle(4, COLORS.ink));
-    this.refreshDots();
-
-    addText(this, 28, GAME_H - 28, hint('up/down: choose   enter: select   esc: title', 'swipe or tap the arrows, then tap the name'), 24, { origin: [0, 0.5] });
     const toTitle = () => {
-      playSfx(this.game, 'back');
+      if (isLeaving(this)) return;
       goTo(this, SceneKeys.Title);
     };
-    addBackButton(this, 20, 44, toTitle, '< title');
+    addUiButton(this, 108, 46, 'Title', toTitle, { width: 176, height: 56, size: 24, icon: 'icon_back', sfx: 'back' });
     if (canFullscreen(this)) {
-      addButton(this, GAME_W - 20, 44, 'fullscreen', 32, () => toggleFullscreen(this), { origin: [1, 0.5] }).setPadding(16, 14, 16, 14);
+      addUiButton(this, GAME_W - 132, 46, 'Fullscreen', () => toggleFullscreen(this), { width: 224, height: 56, size: 24, icon: 'icon_full' });
     }
-    onSwipe(this, { up: () => this.change(1), down: () => this.change(-1) });
 
+    addBox(this, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
+    const buttons = ITEMS.map((item, i) => addUiButton(this, PANEL_CX, PANEL.y + 72 + i * 88, item.label, () => this.open(i), { width: 320, sfx: null }));
+    this.add.rectangle(PANEL.x + 32, PANEL.y + 304, PANEL.w - 64, 4, COLORS.purple, 0.6).setOrigin(0, 0.5);
+    this.blurb = addBody(this, PANEL_CX, PANEL.y + 372, '', 24, { color: CSS.lilac, wrapWidth: PANEL.w - 64 });
+    this.focus = new FocusGroup(this, buttons, {
+      start: lastIndex,
+      onChange: (index) => {
+        lastIndex = index;
+        this.blurb.setText(ITEMS[index].blurb);
+        this.dismissSyncNote();
+      },
+    });
+    this.blurb.setText(ITEMS[this.focus.index].blurb);
+
+    addHints(this, 'Up / Down: choose     Enter: open     Esc: title screen', 'Tap a button to open it');
+
+    onSwipe(this, { up: () => this.focus.move(1), down: () => this.focus.move(-1) });
     menuKeys(this, {
-      up: () => this.change(-1),
-      down: () => this.change(1),
-      confirm: () => this.confirm(),
-      back: toTitle,
+      up: () => this.focus.move(-1),
+      down: () => this.focus.move(1),
+      confirm: () => this.focus.activate(),
+      back: () => {
+        playSfx(this.game, 'back');
+        toTitle();
+      },
+    });
+    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
+      if (dy !== 0 && !isLeaving(this)) this.focus.move(dy > 0 ? 1 : -1);
     });
     this.showSyncNoteOnce();
-    this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (dy !== 0) this.change(dy > 0 ? 1 : -1);
-    });
+  }
+
+  /** Blackberry's room, with him dancing to the menu music under the logo. */
+  private buildScenery(): void {
+    this.add.image(0, 0, Tex.room).setOrigin(0).setScale(PX);
+    this.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.3).setOrigin(0);
+
+    // The original pulsed the logo between 100% and 110%.
+    const logo = this.add.image(STAGE_X, 150, Tex.logo).setScale(0.5).setAngle(-4);
+    this.tweens.add({ targets: logo, scale: 0.5 * 1.08, duration: 830, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+
+    this.add.ellipse(STAGE_X, STAGE_Y + 4, 190, 26, COLORS.ink, 0.35);
+    const berry = this.add.sprite(STAGE_X, STAGE_Y, Tex.blackberry, GROOVE[0]).setOrigin(0.5, 63 / 64).setScale(PX);
+    // One step per half beat of the menu song.
+    const bpm = getSong('menu')?.bpm ?? 77;
+    let step = 0;
+    this.time.addEvent({ delay: 30000 / bpm, loop: true, callback: () => berry.setFrame(GROOVE[++step % GROOVE.length]) });
+  }
+
+  private open(index: number): void {
+    if (isLeaving(this)) return;
+    lastIndex = index;
+    playSfx(this.game, 'select');
+    goTo(this, ITEMS[index].scene);
   }
 
   /**
@@ -123,59 +123,26 @@ export class MenuScene extends Phaser.Scene {
     } catch {
       return; // no storage: skip the note rather than show it every time
     }
-    const box = { x: GAME_W - 476, y: GAME_H - 216, w: 452, h: 150 };
+    const box = { x: GAME_W - 64 - 440, y: GAME_H - 44 - 24 - 212, w: 440, h: 212 };
     const cx = box.x + box.w / 2;
-    const panel = addPanel(this, box.x, box.y, box.w, box.h);
-    const text = addText(this, cx, box.y + 48, 'notes feel early or late?\nmeasure your offset in options', 24, { wrapWidth: box.w - 32 });
-    const open = addButton(this, cx - 90, box.y + 112, 'options', 32, () => goTo(this, SceneKeys.Options), { color: CSS.yellow, hoverColor: CSS.cream });
-    const close = addButton(this, cx + 110, box.y + 112, 'ok', 32, () => this.dismissSyncNote());
-    open.setPadding(12, 10, 12, 10);
-    close.setPadding(24, 10, 24, 10);
-    this.syncNote = this.add.container(0, 0, [panel, text, open, close]).setDepth(10).setAlpha(0);
-    this.tweens.add({ targets: this.syncNote, alpha: 1, delay: 500, duration: 300 });
+    const panel = addBox(this, box.x, box.y, box.w, box.h, 'panel_focus');
+    const text = addBody(this, cx, box.y + 68, 'Notes feel early or late?\nMeasure your timing offset in Options.', 24, { wrapWidth: box.w - 48 });
+    const open = addUiButton(this, cx - 96, box.y + 156, 'Options', () => goTo(this, SceneKeys.Options), { width: 200, height: 56, size: 24 });
+    const close = addUiButton(this, cx + 112, box.y + 156, 'OK', () => this.dismissSyncNote(), { width: 152, height: 56, size: 24 });
+    this.syncNote = [panel, text, open, close];
+    const targets = [panel, text, open.container, close.container];
+    targets.forEach((target) => target.setAlpha(0));
+    this.tweens.add({ targets, alpha: 1, delay: 500, duration: 300 });
   }
 
   private dismissSyncNote(): void {
-    const note = this.syncNote;
-    if (!note) return;
-    this.syncNote = null;
-    this.tweens.killTweensOf(note);
-    this.tweens.add({ targets: note, alpha: 0, duration: 150, onComplete: () => note.destroy() });
-  }
-
-  private refreshDots(): void {
-    this.dots.forEach((dot, i) => dot.setFillStyle(i === this.index ? COLORS.yellow : COLORS.cream, i === this.index ? 1 : 0.45));
-  }
-
-  /** Slide to the next (dir = 1) or previous (dir = -1) item, wrapping around. */
-  private change(dir: number): void {
-    if (this.sliding || isLeaving(this)) return;
-    this.sliding = true;
-    this.dismissSyncNote();
-    (dir < 0 ? this.arrowUp : this.arrowDown).flash();
-    playSfx(this.game, 'move');
-    const from = this.panels[this.index];
-    this.index = (this.index + dir + ITEMS.length) % ITEMS.length;
-    lastIndex = this.index;
-    const to = this.panels[this.index];
-    to.setVisible(true).setY(dir * GAME_H);
-    this.refreshDots();
-    this.tweens.add({ targets: from, y: -dir * GAME_H, duration: SLIDE_MS, ease: 'Cubic.easeInOut' });
-    this.tweens.add({
-      targets: to,
-      y: 0,
-      duration: SLIDE_MS,
-      ease: 'Cubic.easeInOut',
-      onComplete: () => {
-        from.setVisible(false);
-        this.sliding = false;
-      },
-    });
-  }
-
-  private confirm(): void {
-    if (this.sliding || isLeaving(this)) return;
-    playSfx(this.game, 'select');
-    goTo(this, ITEMS[this.index].scene);
+    const parts = this.syncNote;
+    if (parts.length === 0) return;
+    this.syncNote = [];
+    for (const part of parts) {
+      if (!(part instanceof UiButton)) this.tweens.killTweensOf(part);
+      else this.tweens.killTweensOf(part.container);
+      part.destroy();
+    }
   }
 }

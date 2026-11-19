@@ -20,15 +20,16 @@ import { Conductor } from '../core/conductor';
 import { Engine, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
 import { LaneInput } from '../core/input';
-import { levelForChart } from '../core/levels';
+import { levelForChart, type DialogueLine, type LevelDef } from '../core/levels';
 import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
-import { addButton, addDim, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { createPlayer, createRival, rivalTexture, type Dancer } from '../play/characters';
+import { Dialogue, consumeSkipIntro, skipNextIntro, type Speaker } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
@@ -59,10 +60,12 @@ const TURN_LABELS: Record<'battle' | 'lesson', Record<Exclude<Turn, 'rest'>, str
 };
 const TURN_COLORS: Record<Exclude<Turn, 'rest'>, string> = { player: CSS.blue, rival: CSS.pink, both: CSS.yellow };
 
-interface PauseItem {
-  text: Phaser.GameObjects.Text;
-  action: () => void;
-}
+/** Tint for the dancer who is not speaking during a conversation. */
+const LISTENER_TINT = 0x7a7896;
+/** Tempo of the standing idle while no music is playing. */
+const IDLE_BPM = 77;
+/** Accent colours for the speakers' name tags. */
+const TAG_COLORS = { player: 0x6f7cff, raspberry: COLORS.pink, coach: 0x2fb8a6 } as const;
 
 export class PlayScene extends Phaser.Scene {
   private playData!: PlayData;
@@ -100,8 +103,13 @@ export class PlayScene extends Phaser.Scene {
   private countIndex = 0;
   private countText!: Phaser.GameObjects.Text;
   private pauseLayer!: Phaser.GameObjects.Container;
-  private pauseItems: PauseItem[] = [];
-  private pauseIndex = 0;
+  private pauseFocus!: FocusGroup;
+  private dialogue: Dialogue | null = null;
+  private storyLevel: LevelDef | undefined;
+  private buffer: AudioBuffer | null = null;
+  private introDone = true;
+  private loadingBack: UiButton | null = null;
+  private idleClock = 0;
   private autoHeld: (PlayNote | null)[] = [null, null, null, null];
   private nextMilestone = COMBO_MILESTONES[0];
 
@@ -132,8 +140,12 @@ export class PlayScene extends Phaser.Scene {
     this.errorSum = 0;
     this.errorCount = 0;
     this.countIndex = 0;
-    this.pauseItems = [];
-    this.pauseIndex = 0;
+    this.dialogue = null;
+    this.storyLevel = undefined;
+    this.buffer = null;
+    this.introDone = true;
+    this.loadingBack = null;
+    this.idleClock = 0;
     this.touchLanes = null;
     this.stopRotateWatch = null;
     this.autoHeld = [null, null, null, null];
@@ -168,7 +180,7 @@ export class PlayScene extends Phaser.Scene {
     if (isBattle) {
       this.battle = new Battle(buildRounds(chart, chart.notes, rivalChart));
       this.flawless = new FlawlessTracker(buildPhrases(chart, this.turns, chart.notes));
-      if (!this.playData.practice) this.introTime = VersusCard.durationFor(level?.banter);
+      if (!this.playData.practice) this.introTime = VersusCard.DURATION;
     }
     if (startAt > 0) {
       this.engine.skipBefore(startAt);
@@ -200,21 +212,10 @@ export class PlayScene extends Phaser.Scene {
       else this.pauseGame();
     });
 
-    this.countText = addText(this, GAME_W / 2, 390, 'Loading...', 64).setDepth(Depth.overlay);
-    const credit = addText(this, GAME_W / 2, 290, chart.artist ? `${chart.title}\n${chart.artist}` : chart.title, 32, { color: CSS.lilac }).setDepth(Depth.overlay);
-    // The song credit waits for the versus card to clear, then shows through the count-in.
-    if (this.introTime > 0) {
-      credit.setAlpha(0);
-      this.tweens.add({ targets: credit, alpha: 1, delay: this.introTime * 1000, duration: 200 });
-    }
-    this.tweens.add({ targets: credit, alpha: 0, delay: 2600 + this.introTime * 1000, duration: 500 });
+    this.countText = addText(this, GAME_W / 2, 390, '', 64).setDepth(Depth.overlay);
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
-    if (tag) addText(this, 104, 54, tag, 24, { origin: [0, 0], color: CSS.yellow }).setDepth(Depth.hud);
+    if (tag) addBody(this, 104, 54, tag, 22, { origin: [0, 0], color: CSS.yellow, bold: true, stroke: true }).setDepth(Depth.hud);
 
-    if (!this.playData.autoplay) {
-      if (isTouch()) this.showTouchHint();
-      else this.showKeyHints();
-    }
     this.buildPauseMenu();
     this.setupInput();
 
@@ -222,8 +223,28 @@ export class PlayScene extends Phaser.Scene {
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('blur', this.onBlur);
 
+    // Story stages open with a conversation, unless this is a retry of one just seen.
+    const retry = consumeSkipIntro();
+    this.storyLevel = level && !this.playData.practice && !this.playData.autoplay ? level : undefined;
+    const intro = this.storyLevel && !retry && startAt === 0 ? this.storyLevel.intro : [];
+    if (intro.length > 0) {
+      this.introDone = false;
+      this.touchLanes?.setGuideVisible(false);
+      this.pauseButton.setVisible(false);
+      this.startDialogue(intro, () => {
+        this.introDone = true;
+        this.pauseButton.setVisible(true);
+        this.maybeBegin();
+      });
+    } else {
+      this.showLoading();
+    }
+
     loadSongBuffer(this.game, chart.song).then(
-      (buffer) => this.begin(buffer),
+      (buffer) => {
+        this.buffer = buffer;
+        this.maybeBegin();
+      },
       (error: unknown) => this.showLoadError(error instanceof Error ? error.message : 'Could not load the song'),
     );
   }
@@ -231,6 +252,25 @@ export class PlayScene extends Phaser.Scene {
   // ---------------------------------------------------------------------
   // Start, pause, finish
   // ---------------------------------------------------------------------
+
+  /** The song starts once it has loaded and the opening conversation is over. */
+  private maybeBegin(): void {
+    if (!this.introDone) return;
+    if (this.buffer) this.begin(this.buffer);
+    else if (this.state === 'loading') this.showLoading();
+  }
+
+  /** "Loading..." with a way out, in case the song is slow or never arrives. */
+  private showLoading(): void {
+    if (this.loadingBack || !this.sys.isActive()) return;
+    this.countText.setText('Loading...');
+    this.loadingBack = addUiButton(this, GAME_W / 2, 480, 'Back', () => this.quit(), { width: 200, icon: 'icon_back', sfx: 'back' }).setDepth(Depth.overlay);
+  }
+
+  private hideLoading(): void {
+    this.loadingBack?.destroy();
+    this.loadingBack = null;
+  }
 
   private begin(buffer: AudioBuffer): void {
     if (!this.sys.isActive() || this.state !== 'loading' || isLeaving(this)) return;
@@ -246,27 +286,86 @@ export class PlayScene extends Phaser.Scene {
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, unlock);
       return;
     }
+    this.hideLoading();
     this.countText.setFontSize(64);
+    this.touchLanes?.setGuideVisible(true);
     this.conductor = new Conductor(ctx, buffer, getSettings().musicVolume);
     const startAt = this.playData.startAt ?? 0;
     this.conductor.play(startAt > 0 ? startAt - PRACTICE_LEAD_IN : -LEAD_IN - this.introTime);
     this.countIndex = startAt > 0 ? 3 : 0;
     this.countText.setText(startAt > 0 ? 'Ready' : '');
     if (this.introTime > 0) {
-      const level = levelForChart(this.chart.id);
       const texture = rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
-      this.versus = new VersusCard(this, this.rivalName, texture, level?.banter);
+      this.versus = new VersusCard(this, this.rivalName, texture);
       playSfx(this.game, 'banner');
+    }
+    this.showSongCredit();
+    if (!this.playData.autoplay) {
+      if (isTouch()) this.showTouchHint();
+      else this.showKeyHints();
     }
     this.state = 'playing';
   }
 
+  /** Title and artist, shown through the count-in once the versus card has cleared. */
+  private showSongCredit(): void {
+    const { title, artist } = this.chart;
+    const name = addText(this, GAME_W / 2, 276, title, 32, { color: CSS.lilac }).setDepth(Depth.overlay);
+    const by = addBody(this, GAME_W / 2, 314, artist, 24, { stroke: true }).setDepth(Depth.overlay);
+    const lines = [name, by];
+    if (this.introTime > 0) {
+      lines.forEach((line) => line.setAlpha(0));
+      this.tweens.add({ targets: lines, alpha: 1, delay: this.introTime * 1000, duration: 200 });
+    }
+    this.tweens.add({ targets: lines, alpha: 0, delay: 2600 + this.introTime * 1000, duration: 500, onComplete: () => lines.forEach((line) => line.destroy()) });
+  }
+
   private showLoadError(message: string): void {
     if (!this.sys.isActive()) return;
-    this.countText.setText('Song unavailable').setFontSize(48);
-    addText(this, GAME_W / 2, 410, message, 24, { wrapWidth: 900, color: CSS.lilac }).setDepth(Depth.overlay);
-    addButton(this, GAME_W / 2, 500, 'Back', 40, () => this.quit()).setDepth(Depth.overlay);
-    menuKeys(this, { confirm: () => this.quit(), back: () => this.quit() });
+    this.dialogue?.destroy();
+    this.dialogue = null;
+    this.introDone = true;
+    this.hideLoading();
+    this.pauseButton.setVisible(false);
+    addBox(this, GAME_W / 2 - 400, 250, 800, 320, 'panel').setDepth(Depth.overlay);
+    this.countText.setText('Song unavailable').setFontSize(48).setY(316).setDepth(Depth.overlay + 1);
+    addBody(this, GAME_W / 2, 406, message, 24, { wrapWidth: 700 }).setDepth(Depth.overlay + 1);
+    const back = addUiButton(this, GAME_W / 2, 502, 'Back', () => this.quit(), { width: 200, icon: 'icon_back', sfx: 'back' }).setDepth(Depth.overlay + 1);
+    back.setFocused(true);
+    menuKeys(this, { confirm: () => back.click() });
+  }
+
+  // ---------------------------------------------------------------------
+  // Conversations before and after a story stage
+  // ---------------------------------------------------------------------
+
+  private speakers(): { player: Speaker; rival: Speaker } {
+    const kind = this.chart.rivalCharacter ?? 'raspberry';
+    const coach = kind === 'dancer';
+    return {
+      player: { name: 'Blackberry', color: TAG_COLORS.player, texture: Tex.blackberry, portraitFrame: 0 },
+      rival: { name: this.rivalName, color: coach ? TAG_COLORS.coach : TAG_COLORS.raspberry, texture: rivalTexture(this, kind), portraitFrame: coach ? 4 : 2 },
+    };
+  }
+
+  /** Run a conversation over the stage, lighting whoever is speaking. */
+  private startDialogue(lines: DialogueLine[], onDone: () => void): void {
+    this.dialogue = new Dialogue(this, {
+      lines,
+      ...this.speakers(),
+      depth: Depth.overlay + 6,
+      onSpeaker: (who) => {
+        this.stage.setTurn(who);
+        this.player.sprite.setTint(who === 'player' ? 0xffffff : LISTENER_TINT);
+        this.rival?.sprite.setTint(who === 'rival' ? 0xffffff : LISTENER_TINT);
+      },
+      onDone: () => {
+        this.dialogue = null;
+        this.player.sprite.clearTint();
+        this.rival?.sprite.clearTint();
+        onDone();
+      },
+    });
   }
 
   private pauseGame(): void {
@@ -286,8 +385,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.laneInput) this.laneInput.enabled = false;
     this.touchLanes?.setGuideVisible(false);
     this.tweens.pauseAll();
-    this.pauseIndex = 0;
-    this.refreshPauseMenu();
+    this.pauseFocus.focus(0, true);
     this.pauseLayer.setVisible(true);
     music.play('pause', 400);
     playSfx(this.game, 'back');
@@ -329,6 +427,8 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private restart(): void {
+    // The player has just seen this stage's opening: go straight back into the song.
+    skipNextIntro();
     music.stop(200);
     goTo(this, SceneKeys.Play, this.playData);
   }
@@ -366,12 +466,23 @@ export class PlayScene extends Phaser.Scene {
     this.player.finish(playerOnTop);
     this.rival?.finish(!playerOnTop);
     this.stage.setTurn(playerOnTop ? 'player' : 'rival');
+    // A story stage closes with a word from the rival before the results.
+    const outro = this.storyLevel ? (playerOnTop ? this.storyLevel.outroWin : this.storyLevel.outroLose) : [];
+    const toResults = () => goTo(this, SceneKeys.Results, results, 400);
+    const wrapUp = () => {
+      if (outro.length === 0 || isLeaving(this)) toResults();
+      else {
+        this.countText.setText('');
+        this.pauseButton.setVisible(false);
+        this.startDialogue(outro, toResults);
+      }
+    };
     if (failed) {
       this.conductor?.pause();
       playSfx(this.game, 'fail');
       if (!getSettings().reduceMotion) this.cameras.main.shake(350, 0.008);
       this.countText.setText('Failed').setColor(CSS.miss).setAlpha(1).setScale(1);
-      this.time.delayedCall(1300, () => goTo(this, SceneKeys.Results, results, 400));
+      this.time.delayedCall(1300, wrapUp);
     } else {
       if (summary) {
         playSfx(this.game, summary.won ? 'cheer' : 'round');
@@ -379,7 +490,7 @@ export class PlayScene extends Phaser.Scene {
         this.stage.flash(summary.won ? COLORS.blue : COLORS.pink, 0.3);
         if (summary.won) this.stage.cheer();
       }
-      this.time.delayedCall(summary ? 1900 : 1400, () => goTo(this, SceneKeys.Results, results, 400));
+      this.time.delayedCall(summary ? 1900 : 1400, wrapUp);
     }
   }
 
@@ -403,9 +514,8 @@ export class PlayScene extends Phaser.Scene {
 
   /** Explains the touch controls until the song starts. */
   private showTouchHint(): void {
-    const text = 'tap the four coloured columns\nleft  up  down  right';
-    const backing = this.add.rectangle(GAME_W / 2, 600, 760, 110, COLORS.night, 0.8).setDepth(Depth.hud);
-    const hint = addText(this, GAME_W / 2, 600, text, 32, { color: CSS.yellow }).setDepth(Depth.hud);
+    const backing = addBox(this, GAME_W / 2 - 380, 540, 760, 120, 'panel').setDepth(Depth.hud);
+    const hint = addBody(this, GAME_W / 2, 600, 'Tap the four coloured columns:\nleft, up, down and right', 26, { color: CSS.yellow }).setDepth(Depth.hud);
     this.tweens.add({
       targets: [backing, hint],
       alpha: 0,
@@ -462,15 +572,12 @@ export class PlayScene extends Phaser.Scene {
     this.stopRotateWatch = onRotateNoticeChange((shown) => shown && this.pauseGame());
 
     menuKeys(this, {
-      up: () => this.movePause(-1),
-      down: () => this.movePause(1),
-      confirm: () => {
-        if (this.state === 'paused') {
-          playSfx(this.game, 'select');
-          this.pauseItems[this.pauseIndex].action();
-        }
-      },
+      up: () => this.state === 'paused' && this.pauseFocus.move(-1),
+      down: () => this.state === 'paused' && this.pauseFocus.move(1),
+      confirm: () => this.state === 'paused' && this.pauseFocus.activate(),
       back: () => {
+        // A conversation reads Esc itself (skip); that press must not also pause or leave.
+        if (this.dialogue?.busy) return;
         if (this.state === 'playing') this.pauseGame();
         else if (this.state === 'paused') this.resumeGame();
         else if (this.state === 'loading') this.quit();
@@ -630,8 +737,16 @@ export class PlayScene extends Phaser.Scene {
 
   override update(_time: number, deltaMs: number): void {
     const conductor = this.conductor;
-    if (!conductor || this.state === 'loading') return;
     const dt = deltaMs / 1000;
+    if (!conductor || this.state === 'loading') {
+      // No music yet: the dancers idle and the lights follow the conversation.
+      this.idleClock += dt;
+      const idleBeat = (this.idleClock * IDLE_BPM) / 60;
+      this.player.update(dt, idleBeat);
+      this.rival?.update(dt, idleBeat);
+      this.stage.update(idleBeat, dt);
+      return;
+    }
     const time = this.heardTime();
     const beat = secToBeat(this.chart, time);
 
@@ -710,37 +825,20 @@ export class PlayScene extends Phaser.Scene {
 
   private buildPauseMenu(): void {
     const dim = addDim(this, 0.7);
-    const panel = addPanel(this, GAME_W / 2 - 260, 190, 520, 420, COLORS.night, 0.95);
-    const title = addText(this, GAME_W / 2, 250, 'Paused', 64, { color: CSS.lilac });
-    const entries: [string, () => void][] = [
-      ['Resume', () => this.resumeGame()],
-      ['Restart', () => this.restart()],
-      ['Exit', () => this.quit()],
-    ];
-    this.pauseItems = entries.map(([label, action], i) => {
-      const text = addButton(this, GAME_W / 2, 350 + i * 80, label, 48, action);
-      text.on(Phaser.Input.Events.POINTER_OVER, () => {
-        this.pauseIndex = i;
-        this.refreshPauseMenu();
-      });
-      return { text, action };
-    });
     // Block clicks from reaching the lanes while paused.
     dim.setInteractive();
+    const panel = addBox(this, GAME_W / 2 - 240, 180, 480, 440, 'panel');
+    const title = addText(this, GAME_W / 2, 248, 'Paused', 64, { color: CSS.lilac });
+    const entries: [string, () => void, 'select' | 'back'][] = [
+      ['Resume', () => this.resumeGame(), 'select'],
+      ['Restart', () => this.restart(), 'select'],
+      ['Exit', () => this.quit(), 'back'],
+    ];
+    const buttons = entries.map(([label, action, sfx], i) => addUiButton(this, GAME_W / 2, 350 + i * 84, label, action, { width: 320, sfx }));
+    this.pauseFocus = new FocusGroup(this, buttons);
     this.pauseLayer = this.add
-      .container(0, 0, [dim, panel, title, ...this.pauseItems.map((item) => item.text)])
+      .container(0, 0, [dim, panel, title, ...buttons.map((button) => button.container)])
       .setDepth(Depth.overlay + 10)
       .setVisible(false);
-  }
-
-  private movePause(direction: number): void {
-    if (this.state !== 'paused') return;
-    this.pauseIndex = Phaser.Math.Wrap(this.pauseIndex + direction, 0, this.pauseItems.length);
-    this.refreshPauseMenu();
-    playSfx(this.game, 'move');
-  }
-
-  private refreshPauseMenu(): void {
-    this.pauseItems.forEach((item, i) => item.text.setColor(i === this.pauseIndex ? CSS.yellow : CSS.cream));
   }
 }

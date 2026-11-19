@@ -8,9 +8,10 @@ import { listCustomCharts, saveCustomChart } from '../core/saves';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getAudioContext, getSong, loadSongBuffer, saveCustomAudio, songTitle } from '../core/songs';
-import { addDim, addPanel, addText, fadeIn, goTo, isLeaving } from '../core/ui';
+import { UiButton, addBody, addBox, addDim, addText, fadeIn, goTo, isLeaving } from '../core/ui';
 import { scheduleClick } from '../composer/clicks';
 import { MAX_AUDIO_BYTES, baseName, disposePicker, pickFile } from '../composer/files';
+import { isFirstComposerVisit } from '../composer/firstUse';
 import { BEATS_PER_MEASURE, SNAPS, ZOOMS, clamp, formatBeat, formatTime, snapBeat, snapLabel, tapTempo } from '../composer/grid';
 import {
   GROUP_W,
@@ -32,7 +33,7 @@ import { EditorDoc, noteAt, type EditorNote, type Side } from '../composer/model
 import { TimelineView } from '../composer/timeline';
 import { UiFrame, registerUiFrames } from '../composer/uiAtlas';
 import { peaksFromBuffer } from '../composer/waveform';
-import { Chip, Modal, closeTextInput, isTextInputOpen, openTextInput, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
+import { Chip, Modal, closeTextInput, isTextInputOpen, kitBox, openTextInput, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
 
 type Tool = 'draw' | 'select' | 'erase';
 
@@ -55,8 +56,9 @@ interface Recording {
 const RATES = [0.5, 0.75, 1] as const;
 const RIVALS: RivalKind[] = ['raspberry', 'dancer', 'none'];
 const RIVAL_LABELS: Record<RivalKind, string> = { raspberry: 'Raspberry', dancer: 'Coach', none: 'None (solo)' };
-const PANEL_FILL = 0x1c1136;
-const FIELD_FILL = 0x120a24;
+/** Depth of the toolbars and side panels, above the timeline. */
+const CHROME_DEPTH = 20;
+const HELP_DEPTH = 900;
 /** How far ahead of the playhead clicks are handed to the audio clock, in seconds. */
 const CLICK_LOOKAHEAD = 0.12;
 const MIN_HOLD_BEATS = 0.5;
@@ -149,7 +151,7 @@ export class ComposerScene extends Phaser.Scene {
   private startPosition = 0;
 
   private modal: Modal | null = null;
-  private help: Phaser.GameObjects.GameObject[] = [];
+  private help: { destroy(): void }[] = [];
   private refreshers: (() => void)[] = [];
   private timeText!: Phaser.GameObjects.Text;
   private beatText!: Phaser.GameObjects.Text;
@@ -223,6 +225,7 @@ export class ComposerScene extends Phaser.Scene {
     this.refreshUi();
     this.renderTimeline(0);
     void this.loadAudio(this.doc.meta.song);
+    if (isFirstComposerVisit()) this.toggleHelp();
     if (!this.songName) {
       const token = this.loadToken;
       void songTitle(this.doc.meta.song).then((name) => {
@@ -1150,6 +1153,7 @@ export class ComposerScene extends Phaser.Scene {
   private openModal(config: ModalConfig): void {
     this.modal?.close();
     closeTextInput(true);
+    if (this.help.length > 0) this.toggleHelp();
     const modal = new Modal(this, config, () => {
       if (this.modal === modal) this.modal = null;
     });
@@ -1184,23 +1188,29 @@ export class ComposerScene extends Phaser.Scene {
       'Ctrl + S: save',
       'H: this help     Esc: exit',
     ];
-    const dim = addDim(this, 0.75).setDepth(900).setInteractive();
+    const dim = addDim(this, 0.75).setDepth(HELP_DEPTH).setInteractive();
     dim.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       this.toggleHelp();
     });
-    this.help.push(dim, addPanel(this, 120, 96, 1040, 620, 0x24163f, 1).setDepth(901));
-    this.help.push(addText(this, GAME_W / 2, 136, 'Composer help', 32, { color: CSS.yellow }).setDepth(902));
+    this.help.push(dim, addBox(this, 120, 60, 1040, 680).setDepth(HELP_DEPTH + 1));
+    this.help.push(addText(this, GAME_W / 2, 108, 'Composer help', 32, { color: CSS.yellow, stroke: false }).setDepth(HELP_DEPTH + 2));
     const column = (lines: string[], x: number) => {
       lines.forEach((line, index) => {
         if (!line) return;
+        const y = 160 + index * 29;
         const heading = index === 0 || lines[index - 1] === '';
-        this.help.push(addText(this, x, 192 + index * 28, line, heading ? 24 : 16, { origin: [0, 0.5], color: heading ? CSS.lilac : CSS.cream }).setDepth(902));
+        const text = heading
+          ? addText(this, x, y, line, 24, { origin: [0, 0.5], color: CSS.lilac, stroke: false })
+          : addBody(this, x, y, line, 20, { origin: [0, 0.5], align: 'left' });
+        this.help.push(text.setDepth(HELP_DEPTH + 2));
       });
     };
-    column(HELP_LEFT, 168);
-    column(right, 640);
-    this.help.push(addText(this, GAME_W / 2, 688, 'Click anywhere or press H to close', 16, { color: CSS.grey }).setDepth(902));
+    column(HELP_LEFT, 176);
+    column(right, 648);
+    // Any click closes the help (see onPointerDown), so the button only has to look the part.
+    const done = new UiButton(this, GAME_W / 2, 672, 'Got it', () => undefined, { width: 200, height: 56, size: 24, sfx: null });
+    this.help.push(done.setFocused(true).setDepth(HELP_DEPTH + 2));
   }
 
   // ---------------------------------------------------------------------------
@@ -1208,45 +1218,61 @@ export class ComposerScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   private chip(x: number, y: number, label: string, onClick: () => void, width?: number, size = 16): Chip {
-    return new Chip(this, x, y, label, onClick, { width, size }).setDepth(22);
+    return new Chip(this, x, y, label, onClick, { width, size }).setDepth(CHROME_DEPTH + 2);
   }
 
   private label(x: number, y: number, text: string): Phaser.GameObjects.Text {
-    return addText(this, x, y, text, 16, { origin: [0, 0.5], color: CSS.lilac, stroke: false }).setDepth(22);
+    return addText(this, x, y, text, 16, { origin: [0, 0.5], color: CSS.lilac, stroke: false }).setDepth(CHROME_DEPTH + 2);
+  }
+
+  /** A kit panel for the editor's chrome, on a solid backing so the timeline never shows through its corners. */
+  private chromePanel(x: number, y: number, width: number, height: number): void {
+    this.add.rectangle(x + width / 2, y + height / 2, width, height, COLORS.ink).setDepth(CHROME_DEPTH);
+    kitBox(this, x + width / 2, y + height / 2, width, height, 'panel').setDepth(CHROME_DEPTH);
+  }
+
+  /** A yellow outline shown while the pointer is over a field or an icon button. */
+  private hoverOutline(target: Phaser.GameObjects.Rectangle, x: number, y: number, width: number, height: number): void {
+    const outline = this.add.rectangle(x, y, width, height).setStrokeStyle(2, COLORS.yellow).setDepth(CHROME_DEPTH + 3).setVisible(false);
+    target.on(Phaser.Input.Events.POINTER_OVER, () => outline.setVisible(true));
+    target.on(Phaser.Input.Events.POINTER_OUT, () => outline.setVisible(false));
   }
 
   private buildTopBar(): void {
-    this.add.rectangle(GAME_W / 2, TOP_H / 2, GAME_W, TOP_H, PANEL_FILL).setDepth(20);
-    this.add.rectangle(GAME_W / 2, TOP_H - 2, GAME_W, 4, COLORS.ink).setDepth(20);
-    this.chip(52, 28, 'Back', () => this.requestExit(), 80, 24);
-    const title = addText(this, 108, 28, '', 24, { origin: [0, 0.5] }).setDepth(22);
-    this.statusText = addText(this, 0, 28, '', 16, { origin: [0, 0.5] }).setDepth(22);
+    this.chromePanel(0, 0, GAME_W, TOP_H);
+    this.chip(56, 28, 'Back', () => this.requestExit(), 88, 24);
+    const title = addText(this, 116, 26, '', 24, { origin: [0, 0.5], stroke: false }).setDepth(CHROME_DEPTH + 2);
+    this.statusText = addBody(this, 0, 27, '', 20, { origin: [0, 0.5] }).setDepth(CHROME_DEPTH + 2);
     this.refreshers.push(() => {
       const name = this.doc.meta.title || 'Untitled';
       title.setText(name.length > 26 ? `${name.slice(0, 25)}...` : name);
       const dirty = this.doc.dirty;
-      this.statusText.setText(dirty ? 'Unsaved changes' : 'Saved').setColor(dirty ? CSS.good : CSS.grey);
+      this.statusText.setText(dirty ? 'Unsaved changes' : 'Saved').setColor(dirty ? CSS.good : CSS.lilac);
       this.statusText.setX(Math.min(title.x + title.width + 24, 700));
     });
-    this.chip(1224, 28, 'Help', () => this.toggleHelp(), 88, 24);
-    this.chip(1092, 28, 'Test play', () => this.testPlay(), 152, 24);
-    this.chip(960, 28, 'Save', () => this.save(), 88, 24);
+    this.chip(1220, 28, 'Help', () => this.toggleHelp(), 88, 24);
+    this.chip(1088, 28, 'Test play', () => this.testPlay(), 152, 24);
+    this.chip(956, 28, 'Save', () => this.save(), 88, 24);
   }
 
   private field(x: number, y: number, width: number, read: () => string, edit: { maxLength: number; numeric?: boolean; value: () => string; commit: (value: string) => void } | null): void {
     const height = 28;
-    const box = this.add.rectangle(x + width / 2, y, width, height, FIELD_FILL).setStrokeStyle(2, COLORS.ink).setDepth(21);
-    const text = addText(this, x + 8, y, '', 16, { origin: [0, 0.5], stroke: false, color: edit ? CSS.cream : CSS.grey }).setDepth(22);
-    const maxChars = Math.floor((width - 16) / 8);
+    kitBox(this, x + width / 2, y, width, height, 'track').setDepth(CHROME_DEPTH + 1);
+    const text = addBody(this, x + 8, y, '', 18, { origin: [0, 0.5], color: edit ? CSS.cream : CSS.lilac }).setDepth(CHROME_DEPTH + 2);
     this.refreshers.push(() => {
-      const value = read();
-      text.setText(value.length > maxChars ? `${value.slice(0, maxChars - 3)}...` : value);
+      let value = read();
+      text.setText(value);
+      // The body font is proportional, so the value is cut to the width it actually takes.
+      while (text.width > width - 16 && value.length > 1) {
+        value = value.slice(0, -1);
+        text.setText(`${value.trimEnd()}...`);
+      }
     });
     if (!edit) return;
-    box.setInteractive({ useHandCursor: true });
-    box.on(Phaser.Input.Events.POINTER_OVER, () => box.setStrokeStyle(2, COLORS.lilac));
-    box.on(Phaser.Input.Events.POINTER_OUT, () => box.setStrokeStyle(2, COLORS.ink));
-    box.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+    const zone = this.add.rectangle(x + width / 2, y, width, height, 0, 0).setDepth(CHROME_DEPTH + 3);
+    zone.setInteractive({ useHandCursor: true });
+    this.hoverOutline(zone, x + width / 2, y, width, height);
+    zone.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       if (this.modal) return;
       this.pause();
@@ -1255,8 +1281,7 @@ export class ComposerScene extends Phaser.Scene {
   }
 
   private buildLeftPanel(): void {
-    this.add.rectangle(LEFT_W / 2, (GAME_H + TOP_H) / 2, LEFT_W, GAME_H - TOP_H, PANEL_FILL).setDepth(20);
-    this.add.rectangle(LEFT_W - 2, (GAME_H + TOP_H) / 2, 4, GAME_H - TOP_H, COLORS.ink).setDepth(20);
+    this.chromePanel(0, TOP_H, LEFT_W, GAME_H - TOP_H);
     const x = 16;
     const width = LEFT_W - 36;
     const text = (key: 'title' | 'artist' | 'charter', y: number, label: string) => {
@@ -1322,7 +1347,7 @@ export class ComposerScene extends Phaser.Scene {
       this.refreshUi();
     }, width);
 
-    const counts = addText(this, x, 730, '', 16, { origin: [0, 0.5], color: CSS.grey, stroke: false, align: 'left' }).setDepth(22).setLineSpacing(8);
+    const counts = addBody(this, x, 734, '', 18, { origin: [0, 0.5], color: CSS.lilac, align: 'left', lineSpacing: 6 }).setDepth(CHROME_DEPTH + 2);
     this.refreshers.push(() => {
       stars.forEach((chip, index) => chip.setActive(this.doc.meta.difficulty === index + 1));
       rival.setText(RIVAL_LABELS[this.doc.meta.rivalCharacter]);
@@ -1331,17 +1356,17 @@ export class ComposerScene extends Phaser.Scene {
   }
 
   private buildRightPanel(): void {
-    this.add.rectangle((RIGHT_X + GAME_W) / 2, (GAME_H + TOP_H) / 2, GAME_W - RIGHT_X, GAME_H - TOP_H, PANEL_FILL).setDepth(20);
-    this.add.rectangle(RIGHT_X + 2, (GAME_H + TOP_H) / 2, 4, GAME_H - TOP_H, COLORS.ink).setDepth(20);
+    this.chromePanel(RIGHT_X, TOP_H, GAME_W - RIGHT_X, GAME_H - TOP_H);
     const x = RIGHT_X + 20;
     const right = GAME_W - 16;
     const width = right - x;
 
     const icon = (ix: number, frame: string, onClick: () => void) => {
-      const back = this.add.rectangle(ix, 92, 48, 48, 0x2b1d52).setStrokeStyle(2, COLORS.ink).setDepth(22).setInteractive({ useHandCursor: true });
-      const image = this.add.image(ix, 92, Tex.ui, frame).setScale(3).setDepth(23);
-      back.on(Phaser.Input.Events.POINTER_OVER, () => back.setFillStyle(0x45308a));
-      back.on(Phaser.Input.Events.POINTER_OUT, () => back.setFillStyle(0x2b1d52));
+      kitBox(this, ix, 92, 48, 48, 'button').setDepth(CHROME_DEPTH + 2);
+      const back = this.add.rectangle(ix, 92, 48, 48, 0, 0).setDepth(CHROME_DEPTH + 4).setInteractive({ useHandCursor: true });
+      // The original transport icons, sitting on the face of a kit button.
+      const image = this.add.image(ix, 90, Tex.ui, frame).setScale(3).setDepth(CHROME_DEPTH + 3);
+      this.hoverOutline(back, ix, 92, 48, 48);
       back.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
         event.stopPropagation();
         onClick();
@@ -1353,8 +1378,8 @@ export class ComposerScene extends Phaser.Scene {
       this.seekTo(0);
     });
     this.playIcon = icon(x + 80, UiFrame.play, () => this.togglePlay());
-    this.timeText = addText(this, right, 82, '0:00.00', 32, { origin: [1, 0.5] }).setDepth(22);
-    this.beatText = addText(this, right, 132, '', 16, { origin: [1, 0.5], color: CSS.grey, stroke: false }).setDepth(22);
+    this.timeText = addText(this, right, 82, '0:00.00', 32, { origin: [1, 0.5], stroke: false }).setDepth(CHROME_DEPTH + 2);
+    this.beatText = addText(this, right, 132, '', 16, { origin: [1, 0.5], color: CSS.lilac, stroke: false }).setDepth(CHROME_DEPTH + 2);
 
     const row = (labels: string[], y: number, onClick: (index: number) => void, total = width): Chip[] => {
       const gap = 6;
@@ -1373,7 +1398,7 @@ export class ComposerScene extends Phaser.Scene {
 
     this.label(x, 290, 'Zoom  (- / =)');
     const zooms = row(['Out', 'In'], 316, (index) => this.setZoom(this.zoomIndex + (index === 0 ? -1 : 1)), 150);
-    const zoomText = addText(this, right, 316, '', 16, { origin: [1, 0.5], color: CSS.grey, stroke: false }).setDepth(22);
+    const zoomText = addText(this, right, 316, '', 16, { origin: [1, 0.5], color: CSS.lilac, stroke: false }).setDepth(CHROME_DEPTH + 2);
 
     this.label(x, 352, 'Tool  (1 2 3)');
     const tools: Tool[] = ['draw', 'select', 'erase'];
@@ -1392,7 +1417,7 @@ export class ComposerScene extends Phaser.Scene {
     });
 
     this.label(x + 28, 510, 'Keys record to  (Tab)');
-    const dot = this.add.image(x + 10, 510, Tex.ui, UiFrame.record).setScale(1.5).setDepth(22);
+    const dot = this.add.image(x + 10, 510, Tex.ui, UiFrame.record).setScale(1.5).setDepth(CHROME_DEPTH + 2);
     const sides = row(['You', 'Rival'], 536, (index) => this.setRecordSide(index as Side));
 
     this.label(x, 572, 'Sounds  (C / M)');
@@ -1407,14 +1432,12 @@ export class ComposerScene extends Phaser.Scene {
       else this.redo();
     });
 
-    addText(this, x, 730, 'Click lanes to place notes.\nDrag for holds. Right click deletes.\nPress H for all shortcuts.', 16, {
+    addBody(this, x, 734, 'Click a lane to place a note.\nDrag for a hold. Right click deletes.\nPress H for every shortcut.', 18, {
       origin: [0, 0.5],
-      color: CSS.grey,
-      stroke: false,
+      color: CSS.lilac,
       align: 'left',
-    })
-      .setDepth(22)
-      .setLineSpacing(8);
+      lineSpacing: 4,
+    }).setDepth(CHROME_DEPTH + 2);
 
     this.refreshers.push(() => {
       rates.forEach((chip, index) => chip.setActive(index === this.rateIndex));

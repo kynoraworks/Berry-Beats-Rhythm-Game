@@ -1,13 +1,33 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, FONT, GAME_H, GAME_W } from '../core/config';
+import { CSS, FONT_BODY, GAME_H, GAME_W, Tex } from '../core/config';
 import { playSfx } from '../core/sfx';
-import { addDim, addPanel, addText, textStyle } from '../core/ui';
+import { FOOTER_H, UiButton, addBody, addBox, addDim, addText, textStyle } from '../core/ui';
 
-/** Small UI building blocks used by the beat map hub and the composer. */
+/** UI building blocks used by the beat map hub and the composer, drawn with the shared kit. */
 
-const CHIP_FILL = 0x2b1d52;
-const CHIP_HOVER = 0x45308a;
-const CHIP_DISABLED = 0x1c1436;
+/** Corner sizes of the kit's nine-slice frames, in art pixels: left, right, top, bottom. */
+const KIT_SLICES = {
+  panel: [5, 5, 5, 5],
+  panel_focus: [5, 5, 5, 5],
+  button: [4, 4, 4, 6],
+  button_focus: [4, 4, 4, 6],
+  button_disabled: [4, 4, 4, 6],
+  track: [2, 2, 2, 2],
+} as const;
+
+export type KitFrame = keyof typeof KIT_SLICES;
+
+/** The kit is drawn at 4x in menus. The editor is dense, so its controls use the same art at 2x. */
+export const DENSE_SCALE = 2;
+
+/**
+ * A kit box at any pixel scale. `x`, `y` are the centre; sizes are in canvas
+ * pixels and are rounded to whole art pixels so the edges stay crisp.
+ */
+export function kitBox(scene: Phaser.Scene, x: number, y: number, width: number, height: number, frame: KitFrame, scale = DENSE_SCALE): Phaser.GameObjects.NineSlice {
+  const [l, r, t, b] = KIT_SLICES[frame];
+  return scene.add.nineslice(x, y, Tex.uiKit, frame, Math.round(width / scale), Math.round(height / scale), l, r, t, b).setScale(scale);
+}
 
 export interface ChipOptions {
   /** Font size, default 16. */
@@ -18,31 +38,38 @@ export interface ChipOptions {
   sfx?: boolean;
 }
 
-/** A small labelled button that can show an active (selected) and a disabled state. */
+type ChipFace = 'button' | 'button_focus' | 'button_disabled';
+
+/** A small kit button for the editor that can show an active (selected) and a disabled state. */
 export class Chip {
-  readonly bg: Phaser.GameObjects.Rectangle;
   readonly label: Phaser.GameObjects.Text;
+  private readonly faces: Record<ChipFace, Phaser.GameObjects.NineSlice>;
+  private readonly zone: Phaser.GameObjects.Rectangle;
   private active = false;
   private enabled = true;
   private hovered = false;
+  private shown = true;
 
   constructor(scene: Phaser.Scene, x: number, y: number, text: string, onClick: () => void, options: ChipOptions = {}) {
     const size = options.size ?? 16;
-    this.label = scene.add.text(x, y, text, textStyle(size, { stroke: false })).setOrigin(0.5);
-    const width = options.width ?? Math.ceil(this.label.width) + size;
+    // The button face sits above a one art pixel "side", so the label is nudged up to its middle.
+    this.label = scene.add.text(x, y - DENSE_SCALE, text, textStyle(size, { stroke: false })).setOrigin(0.5);
+    const width = options.width ?? Math.ceil(this.label.width) + size + 8;
     const height = options.height ?? size + 12;
-    this.bg = scene.add.rectangle(x, y, width, height, CHIP_FILL).setStrokeStyle(2, COLORS.ink);
-    this.label.setDepth(this.bg.depth + 1);
-    this.bg.setInteractive({ useHandCursor: true });
-    this.bg.on(Phaser.Input.Events.POINTER_OVER, () => {
+    const face = (frame: ChipFace) => kitBox(scene, x, y, width, height, frame).setVisible(false);
+    this.faces = { button: face('button'), button_focus: face('button_focus'), button_disabled: face('button_disabled') };
+    this.zone = scene.add.rectangle(x, y, width, height, 0, 0);
+    this.setDepth(0);
+    this.zone.setInteractive({ useHandCursor: true });
+    this.zone.on(Phaser.Input.Events.POINTER_OVER, () => {
       this.hovered = true;
       this.refresh();
     });
-    this.bg.on(Phaser.Input.Events.POINTER_OUT, () => {
+    this.zone.on(Phaser.Input.Events.POINTER_OUT, () => {
       this.hovered = false;
       this.refresh();
     });
-    this.bg.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+    this.zone.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       if (!this.enabled) return;
       if (options.sfx !== false) playSfx(scene.game, 'move');
@@ -73,35 +100,33 @@ export class Chip {
   }
 
   setDepth(depth: number): this {
-    this.bg.setDepth(depth);
+    for (const face of Object.values(this.faces)) face.setDepth(depth);
     this.label.setDepth(depth + 1);
+    this.zone.setDepth(depth + 2);
     return this;
   }
 
   setVisible(on: boolean): this {
-    this.bg.setVisible(on);
+    this.shown = on;
     this.label.setVisible(on);
-    if (on) this.bg.setInteractive({ useHandCursor: true });
-    else this.bg.disableInteractive();
+    if (on) this.zone.setInteractive({ useHandCursor: true });
+    else this.zone.disableInteractive();
+    this.refresh();
     return this;
   }
 
   destroy(): void {
-    this.bg.destroy();
+    for (const face of Object.values(this.faces)) face.destroy();
+    this.zone.destroy();
     this.label.destroy();
   }
 
   private refresh(): void {
-    if (!this.enabled) {
-      this.bg.setFillStyle(CHIP_DISABLED);
-      this.label.setColor(CSS.grey).setAlpha(0.5);
-    } else if (this.active) {
-      this.bg.setFillStyle(COLORS.yellow);
-      this.label.setColor(CSS.ink).setAlpha(1);
-    } else {
-      this.bg.setFillStyle(this.hovered ? CHIP_HOVER : CHIP_FILL);
-      this.label.setColor(CSS.cream).setAlpha(1);
-    }
+    const frame: ChipFace = !this.enabled ? 'button_disabled' : this.active ? 'button_focus' : 'button';
+    for (const [name, face] of Object.entries(this.faces)) face.setVisible(this.shown && name === frame);
+    if (!this.enabled) this.label.setColor(CSS.grey);
+    else if (this.active) this.label.setColor(CSS.ink);
+    else this.label.setColor(this.hovered ? CSS.yellow : CSS.cream);
   }
 }
 
@@ -111,9 +136,10 @@ export class Chip {
 
 export interface ModalOption {
   label: string;
-  /** Smaller grey text shown under the label (column layout only). */
+  /** Smaller text shown under the label (column layout only). */
   detail?: string;
   action: () => void;
+  /** Kept for callers that mark destructive choices. The kit button has one look, so it is not drawn differently. */
   color?: string;
 }
 
@@ -131,14 +157,23 @@ export interface ModalConfig {
 export type ModalKey = 'up' | 'down' | 'left' | 'right' | 'confirm' | 'back';
 
 const MODAL_DEPTH = 1000;
-const MAX_VISIBLE = 7;
+const MAX_VISIBLE = 6;
+const LINE_H = 32;
 
-/** A centred dialog that blocks everything behind it. Feed it keys with `handleKey`. */
+interface ListRow {
+  focus: Phaser.GameObjects.NineSlice;
+  text: Phaser.GameObjects.Text;
+  detail?: Phaser.GameObjects.Text;
+  index: number;
+}
+
+/** A centred kit panel that blocks everything behind it. Feed it keys with `handleKey`. */
 export class Modal {
   private readonly scene: Phaser.Scene;
   private readonly config: ModalConfig;
-  private readonly objects: Phaser.GameObjects.GameObject[] = [];
-  private readonly rows: { text: Phaser.GameObjects.Text; detail?: Phaser.GameObjects.Text; index: number }[] = [];
+  private readonly objects: { destroy(): void }[] = [];
+  private readonly rows: ListRow[] = [];
+  private readonly buttons: UiButton[] = [];
   private readonly column: boolean;
   private scrollHint: Phaser.GameObjects.Text | null = null;
   private selected = 0;
@@ -193,13 +228,13 @@ export class Modal {
 
   private choose(index: number): void {
     const option = this.config.options[index];
-    if (!option) return;
+    if (!option || this.closed) return;
     playSfx(this.scene.game, 'select');
     this.close();
     option.action();
   }
 
-  private track<T extends Phaser.GameObjects.GameObject & { setDepth(depth: number): unknown }>(object: T, depth = MODAL_DEPTH + 2): T {
+  private track<T extends { destroy(): void; setDepth(depth: number): unknown }>(object: T, depth = MODAL_DEPTH + 3): T {
     object.setDepth(depth);
     this.objects.push(object);
     return object;
@@ -209,11 +244,17 @@ export class Modal {
     const { scene, config } = this;
     const lines = config.lines ?? [];
     const visible = Math.min(config.options.length, MAX_VISIBLE);
-    const rowHeight = this.column ? (config.options.some((o) => o.detail) ? 64 : 48) : 0;
+    const rowHeight = config.options.some((o) => o.detail) ? 72 : 56;
+    const scrolls = this.column && config.options.length > visible;
     const width = config.width ?? (this.column ? 640 : 760);
-    const height = 96 + lines.length * 32 + (lines.length ? 16 : 0) + (this.column ? visible * rowHeight + 40 : 88);
+
+    // Measure the wrapped body text first: the panel grows to fit it.
+    const body = lines.length ? addBody(scene, GAME_W / 2, 0, lines.join('\n'), 24, { wrapWidth: width - 96, origin: [0.5, 0], lineSpacing: 8 }) : null;
+    const bodyHeight = body ? Math.max(LINE_H, Math.ceil(body.height)) + 24 : 0;
+    const optionsHeight = this.column ? visible * rowHeight + (scrolls ? 36 : 0) : 72;
+    const height = Math.ceil((92 + bodyHeight + optionsHeight + 36) / 4) * 4;
     const x = (GAME_W - width) / 2;
-    const y = (GAME_H - height) / 2;
+    const y = Math.round((GAME_H - height) / 2);
 
     const dim = this.track(addDim(scene, 0.7), MODAL_DEPTH);
     dim.setInteractive();
@@ -225,31 +266,30 @@ export class Modal {
       if (this.pressed === dim) this.cancel();
     });
 
-    const panel = this.track(addPanel(scene, x, y, width, height, 0x24163f, 1), MODAL_DEPTH + 1);
+    this.track(addBox(scene, x, y, width, height), MODAL_DEPTH + 1);
     // Clicks on the panel itself must not count as "outside".
-    const blocker = this.track(scene.add.rectangle(GAME_W / 2, GAME_H / 2, width, height, 0, 0), MODAL_DEPTH + 1);
+    const blocker = this.track(scene.add.rectangle(GAME_W / 2, y + height / 2, width, height, 0, 0), MODAL_DEPTH + 1);
     blocker.setInteractive();
     blocker.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       this.pressed = blocker;
     });
-    void panel;
 
-    this.track(addText(scene, GAME_W / 2, y + 48, config.title, 32, { color: CSS.yellow }));
-    let cursor = y + 96;
-    for (const line of lines) {
-      this.track(addText(scene, GAME_W / 2, cursor + 8, line, 24, { color: CSS.cream, wrapWidth: width - 64 }));
-      cursor += 32;
+    this.track(addText(scene, GAME_W / 2, y + 52, config.title, 32, { color: CSS.yellow, stroke: false }));
+    let cursor = y + 92;
+    if (body) {
+      this.track(body).setY(cursor);
+      cursor += bodyHeight;
     }
-    if (lines.length) cursor += 16;
 
     if (this.column) {
       for (let slot = 0; slot < visible; slot++) {
-        const rowY = cursor + slot * rowHeight + (rowHeight === 64 ? 20 : 24);
-        const text = this.track(addText(scene, GAME_W / 2, rowY, '', 24));
-        const detail = rowHeight === 64 ? this.track(addText(scene, GAME_W / 2, rowY + 26, '', 16, { color: CSS.grey })) : undefined;
-        const row = { text, detail, index: slot };
-        const zone = this.track(scene.add.rectangle(GAME_W / 2, cursor + slot * rowHeight + rowHeight / 2, width - 48, rowHeight - 4, 0, 0));
+        const rowY = cursor + slot * rowHeight + rowHeight / 2;
+        const focus = this.track(kitBox(scene, GAME_W / 2, rowY, width - 56, rowHeight - 8, 'panel_focus', 4), MODAL_DEPTH + 2);
+        const text = this.track(addText(scene, GAME_W / 2, rowHeight === 72 ? rowY - 12 : rowY, '', 24, { stroke: false }));
+        const detail = rowHeight === 72 ? this.track(addBody(scene, GAME_W / 2, rowY + 16, '', 18, { color: CSS.lilac })) : undefined;
+        const row: ListRow = { focus, text, detail, index: slot };
+        const zone = this.track(scene.add.rectangle(GAME_W / 2, rowY, width - 56, rowHeight - 8, 0, 0), MODAL_DEPTH + 4);
         zone.setInteractive({ useHandCursor: true });
         zone.on(Phaser.Input.Events.POINTER_OVER, () => {
           if (this.selected !== row.index) {
@@ -267,29 +307,26 @@ export class Modal {
         zone.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _dx: number, dy: number) => this.scroll(dy > 0 ? 1 : -1));
         this.rows.push(row);
       }
-      if (config.options.length > visible) {
-        this.scrollHint = this.track(addText(scene, GAME_W / 2, y + height - 24, '', 16, { color: CSS.grey }));
-      }
+      if (scrolls) this.scrollHint = this.track(addBody(scene, GAME_W / 2, cursor + visible * rowHeight + 18, '', 18, { color: CSS.lilac }));
     } else {
-      const count = config.options.length;
-      const spacing = Math.min(260, (width - 80) / count);
-      config.options.forEach((_option, index) => {
-        const bx = GAME_W / 2 + (index - (count - 1) / 2) * spacing;
-        const text = this.track(addText(scene, bx, cursor + 36, '', 24));
-        text.setInteractive({ useHandCursor: true });
-        text.on(Phaser.Input.Events.POINTER_OVER, () => {
-          this.selected = index;
-          this.refresh();
-        });
-        text.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
-          event.stopPropagation();
-          this.pressed = text;
-        });
-        text.on(Phaser.Input.Events.POINTER_UP, () => {
-          if (this.pressed === text) this.choose(index);
-        });
-        this.rows.push({ text, index });
+      // A row of kit buttons, laid out from their real widths and centred.
+      const gap = 24;
+      config.options.forEach((option, index) => {
+        const button = new UiButton(scene, 0, cursor + 40, option.label, () => this.choose(index), { sfx: null });
+        button.onHover = () => {
+          if (this.selected !== index) {
+            this.selected = index;
+            this.refresh();
+          }
+        };
+        this.buttons.push(this.track(button));
       });
+      const total = this.buttons.reduce((sum, button) => sum + button.width, 0) + gap * (this.buttons.length - 1);
+      let left = GAME_W / 2 - total / 2;
+      for (const button of this.buttons) {
+        button.setPosition(Math.round(left + button.width / 2), cursor + 40);
+        left += button.width + gap;
+      }
     }
     this.refresh();
   }
@@ -302,28 +339,23 @@ export class Modal {
 
   private refresh(): void {
     const options = this.config.options;
-    if (this.column) {
-      const visible = this.rows.length;
-      if (this.selected < this.top) this.top = this.selected;
-      if (this.selected >= this.top + visible) this.top = this.selected - visible + 1;
-      this.rows.forEach((row, slot) => {
-        const index = this.top + slot;
-        const option = options[index];
-        row.index = index;
-        const selected = index === this.selected;
-        row.text.setText(selected ? `> ${option.label} <` : option.label);
-        row.text.setColor(selected ? CSS.yellow : (option.color ?? CSS.cream));
-        row.detail?.setText(option.detail ?? '');
-      });
-      this.scrollHint?.setText(`${this.selected + 1} / ${options.length}`);
-    } else {
-      this.rows.forEach((row, index) => {
-        const option = options[index];
-        const selected = index === this.selected;
-        row.text.setText(selected ? `> ${option.label} <` : option.label);
-        row.text.setColor(selected ? CSS.yellow : (option.color ?? CSS.cream));
-      });
+    if (!this.column) {
+      this.buttons.forEach((button, index) => button.setFocused(index === this.selected));
+      return;
     }
+    const visible = this.rows.length;
+    if (this.selected < this.top) this.top = this.selected;
+    if (this.selected >= this.top + visible) this.top = this.selected - visible + 1;
+    this.rows.forEach((row, slot) => {
+      const index = this.top + slot;
+      const option = options[index];
+      row.index = index;
+      const selected = index === this.selected;
+      row.focus.setVisible(selected);
+      row.text.setText(option.label).setColor(selected ? CSS.yellow : CSS.cream);
+      row.detail?.setText(option.detail ?? '');
+    });
+    this.scrollHint?.setText(`${this.selected + 1} of ${options.length}`);
   }
 }
 
@@ -331,26 +363,34 @@ export class Modal {
 // Toasts
 // ---------------------------------------------------------------------------
 
-const toasts = new WeakMap<Phaser.Scene, { panel: Phaser.GameObjects.Rectangle; text: Phaser.GameObjects.Text; timer?: Phaser.Time.TimerEvent }>();
+interface Toast {
+  box: Phaser.GameObjects.NineSlice | null;
+  text: Phaser.GameObjects.Text;
+  timer?: Phaser.Time.TimerEvent;
+}
 
-/** Brief message at the bottom of the screen. A new toast replaces the previous one. */
+const toasts = new WeakMap<Phaser.Scene, Toast>();
+const TOAST_H = 56;
+/** Toasts sit just above the hint footer so they never cover it. */
+const TOAST_Y = GAME_H - FOOTER_H - 12 - TOAST_H / 2;
+
+/** Brief message near the bottom of the screen, in a kit panel. A new toast replaces the previous one. */
 export function showToast(scene: Phaser.Scene, message: string, color: string = CSS.cream, ms = 2600): void {
   let toast = toasts.get(scene);
   if (!toast || !toast.text.active) {
-    const panel = scene.add.rectangle(GAME_W / 2, GAME_H - 44, 10, 48, COLORS.ink, 0.95).setDepth(MODAL_DEPTH + 10).setStrokeStyle(2, COLORS.lilac);
-    const text = addText(scene, GAME_W / 2, GAME_H - 44, '', 24).setDepth(MODAL_DEPTH + 11);
-    toast = { panel, text };
+    toast = { box: null, text: addBody(scene, GAME_W / 2, TOAST_Y, '', 22).setDepth(MODAL_DEPTH + 11) };
     toasts.set(scene, toast);
   }
   const current = toast;
   current.timer?.remove();
-  current.text.setText(message).setColor(color).setVisible(true).setAlpha(1);
-  current.panel.setSize(Math.min(GAME_W - 40, current.text.width + 48), 48).setVisible(true).setAlpha(0.95);
-  // setSize does not recentre a rectangle's origin offset, so reposition explicitly.
-  current.panel.setPosition(GAME_W / 2, GAME_H - 44).setOrigin(0.5);
+  current.box?.destroy();
+  current.text.setText(message).setColor(color).setVisible(true);
+  const width = Math.min(GAME_W - 40, Math.ceil((current.text.width + 64) / 4) * 4);
+  current.box = kitBox(scene, GAME_W / 2, TOAST_Y, width, TOAST_H, 'panel', 4).setDepth(MODAL_DEPTH + 10);
   current.timer = scene.time.delayedCall(ms, () => {
     current.text.setVisible(false);
-    current.panel.setVisible(false);
+    current.box?.destroy();
+    current.box = null;
   });
 }
 
@@ -398,11 +438,12 @@ export function openTextInput(scene: Phaser.Scene, options: TextInputOptions): v
     margin: '0',
     padding: '0 6px',
     border: `2px solid ${CSS.yellow}`,
+    boxShadow: `0 0 0 2px ${CSS.ink}`,
     borderRadius: '0',
     outline: 'none',
     background: '#120a24',
     color: CSS.cream,
-    fontFamily: `"${FONT}", monospace`,
+    fontFamily: `"${FONT_BODY}", sans-serif`,
     userSelect: 'text',
     webkitUserSelect: 'text',
     touchAction: 'auto',
@@ -415,7 +456,7 @@ export function openTextInput(scene: Phaser.Scene, options: TextInputOptions): v
     input.style.top = `${rect.top + options.y * scale}px`;
     input.style.width = `${options.width * scale}px`;
     input.style.height = `${options.height * scale}px`;
-    input.style.fontSize = `${Math.max(8, Math.round(options.height * 0.5 * scale))}px`;
+    input.style.fontSize = `${Math.max(8, Math.round(options.height * 0.62 * scale))}px`;
   };
   place();
 

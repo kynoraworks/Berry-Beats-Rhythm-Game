@@ -31,8 +31,6 @@ export interface LevelDef {
   outroWin: DialogueLine[];
   /** What is said afterwards when the player loses the battle or fails the stage. */
   outroLose: DialogueLine[];
-  /** @deprecated Replaced by `intro`. Remove once the play scene no longer reads it. */
-  banter?: [string, string];
 }
 
 export const LEVELS: LevelDef[] = [
@@ -73,7 +71,6 @@ export const LEVELS: LevelDef[] = [
     ],
     outroWin: [{ who: 'rival', text: "Hmph. Beginner's luck. Meet me on the roof." }],
     outroLose: [{ who: 'rival', text: 'Told you. Come back when you can keep up.', mood: 'bold' }],
-    banter: ['My room, my rules. Try to keep up!', 'Just press play.'],
   },
   {
     id: 'bonus-title',
@@ -92,7 +89,6 @@ export const LEVELS: LevelDef[] = [
     ],
     outroWin: [{ who: 'rival', text: 'Fine. One more. The club, tonight. Everyone will be watching.' }],
     outroLose: [{ who: 'rival', text: 'The view is better from the top, is it not?', mood: 'bold' }],
-    banter: ['That was a warm-up. Up here I never miss.', 'We will see about that.'],
   },
   {
     id: 'bonus-menu',
@@ -114,7 +110,6 @@ export const LEVELS: LevelDef[] = [
       { who: 'player', text: 'I will bring the music.', mood: 'bold' },
     ],
     outroLose: [{ who: 'rival', text: 'Close. Really close. Again?' }],
-    banter: ['Everyone is watching. Last chance to back out!', 'Not a chance.'],
   },
 ];
 
