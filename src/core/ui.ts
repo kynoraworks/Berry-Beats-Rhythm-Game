@@ -36,16 +36,6 @@ export function addText(scene: Phaser.Scene, x: number, y: number, text: string,
   return scene.add.text(x, y, text, textStyle(size, options)).setOrigin(ox, oy);
 }
 
-/** Rounded panel with the game's dark outline. */
-export function addPanel(scene: Phaser.Scene, x: number, y: number, width: number, height: number, fill: number = COLORS.night, alpha = 0.85): Phaser.GameObjects.Graphics {
-  const g = scene.add.graphics();
-  g.fillStyle(fill, alpha);
-  g.fillRoundedRect(x, y, width, height, 14);
-  g.lineStyle(4, COLORS.ink, 1);
-  g.strokeRoundedRect(x, y, width, height, 14);
-  return g;
-}
-
 /** Full-canvas dimmer, useful behind overlays. */
 export function addDim(scene: Phaser.Scene, alpha = 0.6): Phaser.GameObjects.Rectangle {
   return scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, COLORS.night, alpha);
@@ -56,35 +46,6 @@ export function addCover(scene: Phaser.Scene, key: string, frame?: string | numb
   const image = scene.add.image(GAME_W / 2, GAME_H / 2, key, frame);
   image.setScale(Math.max(GAME_W / image.width, GAME_H / image.height));
   return image;
-}
-
-export interface ButtonOptions extends TextOptions {
-  /** Colour while hovered or focused. */
-  hoverColor?: string;
-  sfx?: boolean;
-}
-
-/** Clickable text. Works with mouse and touch; pair with `menuKeys` for keyboard control. */
-export function addButton(scene: Phaser.Scene, x: number, y: number, label: string, size: number, onClick: () => void, options: ButtonOptions = {}): Phaser.GameObjects.Text {
-  const base = options.color ?? CSS.cream;
-  const hover = options.hoverColor ?? CSS.yellow;
-  const text = addText(scene, x, y, label, size, options);
-  text.setInteractive({ useHandCursor: true });
-  text.on(Phaser.Input.Events.POINTER_OVER, () => text.setColor(hover));
-  text.on(Phaser.Input.Events.POINTER_OUT, () => text.setColor(base));
-  text.on(Phaser.Input.Events.POINTER_UP, () => {
-    if (options.sfx !== false) playSfx(scene.game, 'select');
-    onClick();
-  });
-  return text;
-}
-
-/** A large "back" button in a corner, so every screen can be left without a keyboard. */
-export function addBackButton(scene: Phaser.Scene, x: number, y: number, onBack: () => void, label = '< back'): Phaser.GameObjects.Text {
-  const button = addButton(scene, x, y, label, 32, onBack, { origin: [0, 0.5], sfx: false });
-  // A generous hit area: the text itself is a small target for a thumb.
-  button.setPadding(16, 14, 16, 14);
-  return button;
 }
 
 const leaving = new WeakSet<Phaser.Scene>();
