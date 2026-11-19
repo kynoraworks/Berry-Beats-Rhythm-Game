@@ -7,7 +7,12 @@ one colour per grid square, snaps colours to a reference palette and writes the
 result into a 64x64 cell, keeping the pose where it sat in the original cell.
 
 Usage:
-  python3 tools/pixelize_sprites.py RAW.png COLS ROWS PALETTE.png OUT.png
+  python3 tools/pixelize_sprites.py RAW.png COLS ROWS PALETTE.png OUT.png [SIZE]
+
+SIZE is optional: the expected art-pixel size in source pixels. Without it the
+size is guessed from the tallest pose, which goes wrong on sheets where nobody
+stands upright (crouches, jumps). Compare head sizes between sheets and pass
+the size explicitly when one comes out larger or smaller than the rest.
 
 PALETTE.png is any image whose colours should be used (for example the
 character's original sprite). The output is a small sheet that can be touched
@@ -112,11 +117,14 @@ def palette_of(path):
     return np.unique(px[px[:, 3] > 0][:, :3], axis=0).astype(np.int32)
 
 
-def pixelize(path, cols, rows, palette):
+def pixelize(path, cols, rows, palette, size=None):
     cells = load_cells(path, cols, rows)
-    tallest = max(np.ptp(np.nonzero((c[..., 3] > 128).any(axis=1))[0]) + 1 for c in cells)
-    guess = tallest / STANDING_HEIGHT
-    sizes = np.arange(guess * 0.9, guess * 1.1, 0.05)
+    if size is None:
+        tallest = max(np.ptp(np.nonzero((c[..., 3] > 128).any(axis=1))[0]) + 1 for c in cells)
+        guess = tallest / STANDING_HEIGHT
+        sizes = np.arange(guess * 0.9, guess * 1.1, 0.05)
+    else:
+        sizes = np.arange(size * 0.97, size * 1.03, 0.02)
     estimates = [best_grid(edge_profile(c, axis), sizes)[0] for c in cells for axis in (0, 1)]
     p = float(np.median(estimates))
 
@@ -139,9 +147,10 @@ def pixelize(path, cols, rows, palette):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 6:
+    if len(sys.argv) not in (6, 7):
         sys.exit(__doc__)
     raw, cols, rows, palette_path, dest = sys.argv[1:6]
-    size, result = pixelize(raw, int(cols), int(rows), palette_of(palette_path))
+    wanted = float(sys.argv[6]) if len(sys.argv) == 7 else None
+    size, result = pixelize(raw, int(cols), int(rows), palette_of(palette_path), wanted)
     result.save(dest)
     print(f"{dest}: art pixel = {size:.2f} source pixels")
