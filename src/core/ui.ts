@@ -90,8 +90,15 @@ export function fadeIn(scene: Phaser.Scene, ms = 250): void {
 export function goTo(scene: Phaser.Scene, key: string, data?: object, ms = 250): void {
   if (leaving.has(scene)) return;
   leaving.add(scene);
+  const keyboard = scene.input.keyboard;
   scene.input.enabled = false;
-  if (scene.input.keyboard) scene.input.keyboard.enabled = false;
+  if (keyboard) keyboard.enabled = false;
+  // Scene objects are reused, so give input back before the scene runs again.
+  scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    leaving.delete(scene);
+    scene.input.enabled = true;
+    if (keyboard) keyboard.enabled = true;
+  });
   const camera = scene.cameras.main;
   camera.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => scene.scene.start(key, data));
   camera.fadeOut(ms, 18, 10, 36);
