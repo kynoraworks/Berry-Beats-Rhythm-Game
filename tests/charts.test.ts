@@ -5,7 +5,14 @@ import { LEVELS } from '../src/core/levels';
 import { getSong } from '../src/core/songs';
 
 /** Audio lengths in seconds, from ffprobe. */
-const DURATION: Record<string, number> = { tutorial: 77.98, level1: 94.85, title: 74.87, menu: 76.43 };
+const DURATION: Record<string, number> = {
+  tutorial: 77.98,
+  level1: 94.85,
+  title: 74.87,
+  menu: 76.43,
+  level_select: 49.87,
+  pause: 87.27,
+};
 
 describe('story charts', () => {
   for (const level of LEVELS) {

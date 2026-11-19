@@ -5,7 +5,7 @@ What it does
   1. Decodes each song in public/assets/audio with ffmpeg (mono, 44.1 kHz float),
      which is the same decode path browsers use for these files.
   2. Measures tempo, drift and the first-beat offset of all six tracks.
-  3. Builds the four story beat maps (public/charts/*.json) from the detected
+  3. Builds the six story beat maps (public/charts/*.json) from the detected
      onsets, following a hand-written section plan per level (who plays when,
      how dense, which lanes). Note positions and lanes come from the audio.
   4. Validates every chart and prints a report. Exits non-zero on a violation.
@@ -423,6 +423,8 @@ class Section:
     notes: target notes per bar for the player; rival_notes for the rival
     bursts: extra sixteenth notes allowed per bar, only on strong odd slots
     doubles: two-lane accents allowed per bar; holds: holds allowed in the section
+    hold_sustain: how long a sound must ring, in beats, to become a hold. Below 1.0
+      (for percussive tracks) such a hold still lasts one beat
     lanes: lanes the pattern may use
     """
 
@@ -437,6 +439,7 @@ class Section:
     doubles: float = 0
     holds: int = 0
     max_hold: float = 2.0
+    hold_sustain: float = 1.0
     lanes: tuple[int, ...] = (0, 1, 2, 3)
     floor: float = 0.30
 
@@ -451,6 +454,9 @@ class Plan:
     max_nps: int  # most notes allowed in any one-second window
     solo_holds: bool  # True: nothing else for that side while it holds a note
     sections: list[Section] = field(default_factory=list)
+    # True: split the lanes at the quartiles of this side's own notes rather than of every
+    # onset in the song, so a chart that leans on low sounds still uses all four lanes.
+    balance_lanes: bool = False
 
 
 PLANS = [
@@ -500,6 +506,51 @@ PLANS = [
             Section(12, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, bursts=2, doubles=1, holds=1),
             Section(16, 24, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=4),
         ],
+    ),
+    Plan(
+        # The Pear starts slow and finishes strong, and so does his chart: sparse trades
+        # over the intro, fuller trades in the groove, a held freeze on the break in
+        # bar 11, then both sides together for the densest bars at the end.
+        "level2", "level_select", "Level 2", "pear", 2, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 2, "trade", grid=2, notes=4, rival_notes=4, unit=1),
+            Section(2, 4, "trade", grid=2, notes=5, rival_notes=4, unit=1),
+            # The groove's off-beat hit (the sixteenth before beat 4) is charted, hence grid=1,
+            # except in bar 7, which would otherwise get the chart's only pair of sixteenths.
+            Section(4, 6, "trade", grid=1, notes=5, rival_notes=5, unit=1),
+            Section(6, 7, "rival", grid=1, rival_notes=5),
+            Section(7, 8, "player", grid=2, notes=5),
+            Section(8, 10, "trade", grid=1, notes=6, rival_notes=6, unit=1, holds=2, hold_sustain=0.6),
+            Section(10, 11, "both", grid=2, notes=6, rival_notes=5),
+            Section(11, 12, "both", grid=2, notes=3, rival_notes=3, holds=2, hold_sustain=0.6),
+            Section(12, 16, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, holds=1, hold_sustain=0.6),
+        ],
+        balance_lanes=True,
+    ),
+    Plan(
+        # Dr. Lemon is erratic. The song runs in four-bar phrases that end on a syncopated
+        # break, so the plan changes hands and density every few bars: solo bursts, a quiet
+        # bar, and breaks charted on the sixteenth grid where the music leaves the beat.
+        "level3", "pause", "Level 3", "lemon", 3, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 2, "trade", grid=2, notes=5, rival_notes=5, unit=1),
+            Section(2, 3, "both", grid=2, notes=5, rival_notes=5),
+            Section(3, 4, "rival", grid=1, rival_notes=6, floor=0.18),
+            Section(4, 6, "both", grid=2, notes=6, rival_notes=5, bursts=1),
+            Section(6, 7, "player", grid=1, notes=7),
+            Section(7, 8, "player", grid=1, notes=6, floor=0.18),
+            Section(8, 10, "trade", grid=1, notes=6, rival_notes=7, unit=1),
+            Section(10, 11, "both", grid=4, notes=3, rival_notes=3),
+            Section(11, 12, "both", grid=2, notes=7, rival_notes=6, bursts=2, holds=1),
+            Section(12, 15, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, floor=0.22),
+            Section(15, 16, "player", grid=4, notes=3, holds=1, floor=0.18),
+            Section(16, 19, "both", grid=1, notes=7, rival_notes=6, doubles=1),
+            Section(19, 20, "rival", grid=1, rival_notes=9),
+            Section(20, 23, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, floor=0.22),
+            Section(23, 24, "both", grid=1, notes=6, rival_notes=5, floor=0.18),
+            Section(24, 28, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=1, floor=0.15),
+        ],
+        balance_lanes=True,
     ),
 ]
 
@@ -643,9 +694,9 @@ class Charter:
         options = []
         for i, n in enumerate(notes):
             s = base + n.slot
-            if s >= g.count or g.tonal[s] < 0.08 or g.sustain[s] < 1.0:
+            if s >= g.count or g.tonal[s] < 0.08 or g.sustain[s] < sec.hold_sustain:
                 continue
-            beats = min(sec.max_hold, np.floor(g.sustain[s] * 2) / 2)
+            beats = min(sec.max_hold, max(1.0, np.floor(g.sustain[s] * 2) / 2))
             length = int(beats * SLOTS_PER_BEAT)
             if n.slot + length > span_end - 2:
                 length = (span_end - 2 - n.slot) // 2 * 2
@@ -706,7 +757,8 @@ class Charter:
 
         def want_lane(n: Note, v: float) -> int:
             k = len(n.allowed)
-            edges = np.percentile(self.song_values, [100 * q / k for q in range(1, k)]) if k > 1 else []
+            ref = values if self.plan.balance_lanes and len(values) >= 8 else self.song_values
+            edges = np.percentile(ref, [100 * q / k for q in range(1, k)]) if k > 1 else []
             b = int(np.searchsorted(edges, v))
             return n.allowed[k - 1 - b if mirror else b]
 
