@@ -192,6 +192,7 @@ describe('EditorDoc', () => {
       charter: 'me',
       difficulty: 3,
       rivalCharacter: 'dancer',
+      stage: 'stage_club',
       notes: [
         { b: 0, l: 0 },
         { b: 1, l: 3, d: 2 },
@@ -201,6 +202,7 @@ describe('EditorDoc', () => {
     const doc = new EditorDoc(source);
     const out = parseChart(JSON.parse(serializeChart(doc.toChart())));
     expect(out).toEqual(parseChart(JSON.parse(serializeChart(source))));
+    expect(out.stage).toBe('stage_club');
     expect(new EditorDoc(source, true).dirty).toBe(true);
   });
 

@@ -7,7 +7,7 @@ Run from the repo root (after tools/build_characters.py):
 Writes public/assets/img/crowd.png: two frames of 100x24 side by side. Each
 frame is a row of heads and shoulders seen from behind, cut from the three
 dancers' back-view frames (frame 22 of each sheet) and filled with the game's
-dark ink colour with a lighter rim along the top edges. In the second frame
+dark ink colour with a lighter outline. In the second frame
 every other head bobs, so alternating the frames on the beat makes the crowd
 bounce. The strip is 100 pixels wide to fit the gap between the two lane
 fields, and its bottom edge sits on the bottom of the screen.
@@ -22,18 +22,18 @@ IMG = ROOT / "public" / "assets" / "img"
 
 WIDTH, HEIGHT = 100, 24
 INK = (0x14, 0x18, 0x2E, 255)
-RIM = (0x33, 0x3A, 0x6B, 255)
+RIM = (0x4A, 0x52, 0x8C, 255)
 BACK_VIEW_FRAME = 22
 
 # (character, x of the head centre, rows the head top sits below the strip's top)
 FIGURES = [
-    ("raspberry", 7, 9),
-    ("blackberry", 22, 4),
-    ("instructor", 37, 10),
-    ("raspberry", 50, 3),
-    ("blackberry", 64, 9),
-    ("instructor", 78, 5),
-    ("blackberry", 93, 10),
+    ("raspberry", 10, 14),
+    ("blackberry", 21, 9),
+    ("instructor", 36, 15),
+    ("raspberry", 50, 8),
+    ("blackberry", 65, 14),
+    ("instructor", 79, 10),
+    ("raspberry", 90, 15),
 ]
 # Second frame: how far each figure moves (negative is up).
 BOB = [-1, 1, -2, 1, -1, 2, -1]
@@ -46,6 +46,19 @@ def back_shape(name: str) -> np.ndarray:
     alpha = np.array(sheet.crop((x, y, x + 64, y + 64)))[..., 3] > 0
     ys, xs = np.nonzero(alpha)
     return alpha[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+
+
+def on_edge(shape: np.ndarray, x: int, y: int) -> bool:
+    """True for the outline pixels of a figure, so overlapping heads stay readable."""
+    if y >= shape.shape[0]:  # the body carried on below the sprite: only its sides are edges
+        y = shape.shape[0] - 1
+        neighbours = ((x - 1, y), (x + 1, y))
+    else:
+        neighbours = ((x, y - 1), (x - 1, y), (x + 1, y))
+    for nx, ny in neighbours:
+        if ny < 0 or nx < 0 or nx >= shape.shape[1] or not shape[ny, nx]:
+            return True
+    return False
 
 
 def draw(offsets: list[int]) -> Image.Image:
@@ -67,8 +80,7 @@ def draw(offsets: list[int]) -> Image.Image:
                 x = left + sx
                 if not solid or not 0 <= x < WIDTH:
                     continue
-                above = sy == 0 or not shape[min(sy - 1, shape.shape[0] - 1)][sx]
-                frame[y, x] = RIM if above else INK
+                frame[y, x] = RIM if on_edge(shape, sx, sy) else INK
     return Image.fromarray(frame)
 
 

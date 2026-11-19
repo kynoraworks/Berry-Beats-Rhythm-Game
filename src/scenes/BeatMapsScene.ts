@@ -444,6 +444,7 @@ export class BeatMapsScene extends Phaser.Scene {
               const chart: Chart = { ...source, notes: source.notes.slice(), rival: (source.rival ?? []).slice() };
               chart.id = newChart(source.song, source.bpm, source.offset).id;
               chart.title = `${level.name} remix`;
+              chart.stage = level.stage;
               delete chart.charter;
               this.openComposer({ chart, dirty: true });
             },
@@ -477,7 +478,11 @@ export class BeatMapsScene extends Phaser.Scene {
       return;
     }
     if (!this.scene.isActive()) return;
-    if (listCustomCharts().some((c) => c.id === chart.id)) chart.id = newChart(chart.song, chart.bpm, chart.offset).id;
+    if (listCustomCharts().some((c) => c.id === chart.id)) {
+      // Same map already here: keep both, and make the copy tell-apart.
+      chart.id = newChart(chart.song, chart.bpm, chart.offset).id;
+      chart.title = `${(chart.title || 'Untitled').slice(0, 70)} (copy)`;
+    }
     if (!saveCustomChart(chart)) {
       showToast(this, 'Import failed: the browser storage is full', CSS.miss, 5000);
       return;

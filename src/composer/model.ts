@@ -25,6 +25,8 @@ export interface ChartMeta {
   readonly offset: number;
   readonly difficulty: number;
   readonly rivalCharacter: RivalKind;
+  /** Stage background key, carried through untouched. */
+  readonly stage?: string;
 }
 
 export interface DocState {
@@ -82,6 +84,7 @@ function metaFromChart(chart: Chart): ChartMeta {
     offset: chart.offset,
     difficulty: chart.difficulty ?? 1,
     rivalCharacter: chart.rivalCharacter ?? 'raspberry',
+    stage: chart.stage,
   };
 }
 
@@ -277,6 +280,7 @@ export class EditorDoc {
       difficulty: meta.difficulty,
     };
     if (meta.charter) chart.charter = meta.charter;
+    if (meta.stage) chart.stage = meta.stage;
     return chart;
   }
 

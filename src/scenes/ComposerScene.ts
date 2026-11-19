@@ -59,6 +59,8 @@ const FIELD_FILL = 0x120a24;
 /** How far ahead of the playhead clicks are handed to the audio clock, in seconds. */
 const CLICK_LOOKAHEAD = 0.12;
 const MIN_HOLD_BEATS = 0.5;
+/** Index into ZOOMS the editor opens at (160 px per second: about four beats of a slow song on screen). */
+const DEFAULT_ZOOM = 2;
 const HEAD_HIT = 9 * NOTE_SCALE + 2;
 
 const MODAL_CODES: Record<string, ModalKey> = {
@@ -107,7 +109,7 @@ export class ComposerScene extends Phaser.Scene {
 
   private pos = 0;
   private playing = false;
-  private zoomIndex = 3;
+  private zoomIndex = DEFAULT_ZOOM;
   private snap: number = 4;
   private rateIndex = 2;
   private tool: Tool = 'draw';
@@ -151,7 +153,7 @@ export class ComposerScene extends Phaser.Scene {
     this.loadToken++;
     this.pos = 0;
     this.playing = false;
-    this.zoomIndex = 3;
+    this.zoomIndex = DEFAULT_ZOOM;
     this.snap = 4;
     this.rateIndex = 2;
     this.tool = 'draw';
@@ -745,9 +747,12 @@ export class ComposerScene extends Phaser.Scene {
       case 'End':
         this.seekTo(this.duration);
         break;
+      // Q and E also work, but the pixel font draws Q like a 9, so the labels show the brackets.
+      case 'BracketLeft':
       case 'KeyQ':
         this.cycleSnap(-1);
         break;
+      case 'BracketRight':
       case 'KeyE':
         this.cycleSnap(1);
         break;
@@ -1120,7 +1125,7 @@ export class ComposerScene extends Phaser.Scene {
       'W / S: step by the snap grid',
       'Page Up / Down: by measure',
       'Home / End: start or end',
-      'Q / E: snap     - / =: zoom',
+      '[ / ]: snap     - / =: zoom',
       'R: speed   C: ticks   M: metronome',
       'T: tap tempo',
       'Ctrl + Z / Ctrl + Y: undo, redo',
@@ -1308,7 +1313,7 @@ export class ComposerScene extends Phaser.Scene {
     this.label(x, 166, 'Speed  (R)');
     const rates = row(RATES.map((r) => `${r}x`), 192, (index) => this.setRate(index));
 
-    this.label(x, 228, 'Snap  (Q / E)');
+    this.label(x, 228, 'Snap  ([ / ])');
     const snaps = row(SNAPS.map(snapLabel), 254, (index) => {
       this.snap = SNAPS[index];
       this.refreshUi();

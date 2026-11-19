@@ -28,6 +28,12 @@ export class PreloadScene extends Phaser.Scene {
     sheet(Tex.blackberry, 'blackberry.png', 64, 64);
     sheet(Tex.raspberry, 'raspberry.png', 64, 64);
     sheet(Tex.dancer, 'dancer.png', 160, 160);
+    sheet(Tex.instructor, 'instructor.png', 64, 64);
+    this.load.image(Tex.stageRaspberry, `${IMG}stage_raspberry.png`);
+    this.load.image(Tex.stageRooftop, `${IMG}stage_rooftop.png`);
+    this.load.image(Tex.stageClub, `${IMG}stage_club.png`);
+    sheet(Tex.crowd, 'crowd.png', 100, 24);
+    sheet(Tex.judgements, 'judgements.png', 96, 32);
     sheet(Tex.notes, 'notes.png', 18, 18);
     this.load.image(Tex.arrowsClassic, `${IMG}arrows_classic.png`);
     this.load.image(Tex.barFrame, `${IMG}bar_frame.png`);

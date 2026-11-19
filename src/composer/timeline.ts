@@ -94,7 +94,10 @@ export class TimelineView {
         const receptor = scene.add.image(laneCenterX(side, lane), PLAYHEAD_Y, Tex.notes, 4 + lane).setScale(NOTE_SCALE).setAlpha(0.45).setDepth(3);
         this.receptors.push(receptor);
       }
-      const tag = addText(scene, (side === 0 ? PLAYER_X : RIVAL_X) + GROUP_W / 2, TOP_H + 18, side === 0 ? 'You' : 'Rival', 16).setDepth(8);
+      // A strip behind the lane title, so notes scrolling past stay readable under it.
+      const left = side === 0 ? PLAYER_X : RIVAL_X;
+      scene.add.rectangle(left + GROUP_W / 2, TOP_H + 16, GROUP_W, 32, 0x150c2b, 0.92).setDepth(7);
+      const tag = addText(scene, left + GROUP_W / 2, TOP_H + 18, side === 0 ? 'You' : 'Rival', 16).setDepth(8);
       this.sideTags.push(tag);
     }
 

@@ -66,12 +66,12 @@ export const Tex = {
   blackberry: 'blackberry', // 51 frames, 64x64, feet at y=62 (layout in tools/build_characters.py)
   raspberry: 'raspberry', // 51 frames, 64x64, same layout as blackberry
   dancer: 'dancer', // 39 frames, 160x160 (the original instructor art, kept as a fallback)
-  instructor: 'instructor', // 51 frames, 64x64, same layout as blackberry (may be missing: check textures.exists)
-  stageRaspberry: 'stage_raspberry', // 256x160 stage backgrounds (may be missing: fall back to room)
+  instructor: 'instructor', // 51 frames, 64x64, same layout as blackberry: the Coach redrawn in the berry style
+  stageRaspberry: 'stage_raspberry', // 256x160 stage backgrounds laid out like room: top band to row 27, platform top at row 137
   stageRooftop: 'stage_rooftop',
   stageClub: 'stage_club',
-  judgements: 'judgements', // optional, 3 frames of 96x32: perfect, good, hit
-  crowd: 'crowd', // optional, 2 frames of 100x24: silhouettes for the gap between the lane fields
+  judgements: 'judgements', // 3 frames of 96x32 stacked vertically: 0 perfect, 1 good, 2 hit (chunky lettering, drawn for 3x scale)
+  crowd: 'crowd', // 2 frames of 100x24 side by side: heads seen from behind, for the bottom of the gap between the lane fields (alternate frames on the beat)
   notes: 'notes', // 8 frames, 18x18: 0-3 coloured notes, 4-7 pale receptors (lane order)
   arrowsClassic: 'arrows_classic', // 128x128 sheet of the older arrow style, 32x32 cells
   barFrame: 'bar_frame', // 128x32, visible area x 8..119, y 11..22
