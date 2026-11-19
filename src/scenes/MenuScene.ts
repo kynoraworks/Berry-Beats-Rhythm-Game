@@ -3,7 +3,7 @@ import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/c
 import { music } from '../core/music';
 import { playSfx } from '../core/sfx';
 import { canFullscreen, hint, onSwipe, toggleFullscreen } from '../core/mobile';
-import { addBackButton, addButton, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { addBackButton, addButton, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
 
 interface MenuItem {
@@ -48,6 +48,8 @@ const ITEMS: MenuItem[] = [
 /** Remembered between visits so backing out of a sub-menu lands on the same item. */
 let lastIndex = 0;
 
+const SYNC_NOTE_KEY = 'berrybeats.syncNote.v1';
+
 export class MenuScene extends Phaser.Scene {
   private index = 0;
   private sliding = false;
@@ -55,6 +57,7 @@ export class MenuScene extends Phaser.Scene {
   private dots: Phaser.GameObjects.Rectangle[] = [];
   private arrowUp!: MenuArrow;
   private arrowDown!: MenuArrow;
+  private syncNote: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super(SceneKeys.Menu);
@@ -65,6 +68,7 @@ export class MenuScene extends Phaser.Scene {
     music.play('menu');
     this.index = lastIndex;
     this.sliding = false;
+    this.syncNote = null;
 
     this.panels = ITEMS.map((item, i) => {
       const label = addText(this, GAME_W / 2, GAME_H / 2 - 20, item.label, 128);
@@ -102,9 +106,41 @@ export class MenuScene extends Phaser.Scene {
       confirm: () => this.confirm(),
       back: toTitle,
     });
+    this.showSyncNoteOnce();
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (dy !== 0) this.change(dy > 0 ? 1 : -1);
     });
+  }
+
+  /**
+   * Timing differs between devices, so the first time the menu opens it points
+   * the player at the offset tool. Shown once per device.
+   */
+  private showSyncNoteOnce(): void {
+    try {
+      if (localStorage.getItem(SYNC_NOTE_KEY)) return;
+      localStorage.setItem(SYNC_NOTE_KEY, '1');
+    } catch {
+      return; // no storage: skip the note rather than show it every time
+    }
+    const box = { x: GAME_W - 476, y: GAME_H - 216, w: 452, h: 150 };
+    const cx = box.x + box.w / 2;
+    const panel = addPanel(this, box.x, box.y, box.w, box.h);
+    const text = addText(this, cx, box.y + 48, 'notes feel early or late?\nmeasure your offset in options', 24, { wrapWidth: box.w - 32 });
+    const open = addButton(this, cx - 90, box.y + 112, 'options', 32, () => goTo(this, SceneKeys.Options), { color: CSS.yellow, hoverColor: CSS.cream });
+    const close = addButton(this, cx + 110, box.y + 112, 'ok', 32, () => this.dismissSyncNote());
+    open.setPadding(12, 10, 12, 10);
+    close.setPadding(24, 10, 24, 10);
+    this.syncNote = this.add.container(0, 0, [panel, text, open, close]).setDepth(10).setAlpha(0);
+    this.tweens.add({ targets: this.syncNote, alpha: 1, delay: 500, duration: 300 });
+  }
+
+  private dismissSyncNote(): void {
+    const note = this.syncNote;
+    if (!note) return;
+    this.syncNote = null;
+    this.tweens.killTweensOf(note);
+    this.tweens.add({ targets: note, alpha: 0, duration: 150, onComplete: () => note.destroy() });
   }
 
   private refreshDots(): void {
@@ -115,6 +151,7 @@ export class MenuScene extends Phaser.Scene {
   private change(dir: number): void {
     if (this.sliding || isLeaving(this)) return;
     this.sliding = true;
+    this.dismissSyncNote();
     (dir < 0 ? this.arrowUp : this.arrowDown).flash();
     playSfx(this.game, 'move');
     const from = this.panels[this.index];

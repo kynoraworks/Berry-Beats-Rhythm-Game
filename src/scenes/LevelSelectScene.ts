@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { Chart } from '../core/chart';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
 import type { PlayData } from '../core/flow';
-import { LEVELS, loadLevelChart } from '../core/levels';
+import { LEVELS, isUnlocked, loadLevelChart } from '../core/levels';
 import { music, type MusicKey } from '../core/music';
 import { getBest } from '../core/saves';
 import { playSfx } from '../core/sfx';
@@ -24,8 +24,28 @@ const POLE_W = 560;
 const WIPE_MS = 300;
 const MAX_DIFFICULTY = 5;
 
+const OPENED_KEY = 'berrybeats.opened.v1';
+
 /** Remembered between visits. */
 let lastIndex = 0;
+
+/** How many levels the player has already been shown as open, or null on a first visit. */
+function readOpened(): number | null {
+  try {
+    const value = Number(localStorage.getItem(OPENED_KEY));
+    return Number.isInteger(value) && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeOpened(count: number): void {
+  try {
+    localStorage.setItem(OPENED_KEY, String(count));
+  } catch {
+    // Without storage the "now open" note simply shows again next time.
+  }
+}
 
 export class LevelSelectScene extends Phaser.Scene {
   private index = 0;
@@ -35,6 +55,8 @@ export class LevelSelectScene extends Phaser.Scene {
   /** Loaded chart per level, or null if loading failed, or undefined while loading. */
   private charts: (Chart | null | undefined)[] = [];
   private preview?: Phaser.Time.TimerEvent;
+  /** Levels that opened since the player last looked. */
+  private fresh = new Set<number>();
 
   private nameText!: Phaser.GameObjects.Text;
   private blurbText!: Phaser.GameObjects.Text;
@@ -47,6 +69,12 @@ export class LevelSelectScene extends Phaser.Scene {
   private left!: MenuArrow;
   private right!: MenuArrow;
   private pole!: Phaser.GameObjects.Container;
+  private rivalText!: Phaser.GameObjects.Text;
+  private playText!: Phaser.GameObjects.Text;
+  private playPulse!: Phaser.Tweens.Tween;
+  private lockShade!: Phaser.GameObjects.Graphics;
+  private lockText!: Phaser.GameObjects.Text;
+  private newText!: Phaser.GameObjects.Text;
 
   constructor() {
     super(SceneKeys.LevelSelect);
@@ -59,6 +87,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.run++;
     this.charts = [];
     this.preview = undefined;
+    this.fresh = new Set();
   }
 
   create(): void {
@@ -72,6 +101,7 @@ export class LevelSelectScene extends Phaser.Scene {
     addPanel(this, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
     const top = PANEL.y;
     this.countText = addText(this, PANEL.x + PANEL.w - 24, top + 30, '', 16, { origin: [1, 0.5], color: CSS.grey, stroke: false });
+    this.rivalText = addText(this, PANEL.x + 24, top + 30, '', 24, { origin: [0, 0.5] });
     this.nameText = addText(this, PANEL_CX, top + 76, '', 64);
     this.blurbText = addText(this, PANEL_CX, top + 134, '', 24, { color: CSS.lilac, wrapWidth: PANEL.w - 40 });
     this.difficultyLabel = addText(this, PANEL.x + 40, top + 190, 'difficulty', 24, { origin: [0, 0.5] });
@@ -79,13 +109,21 @@ export class LevelSelectScene extends Phaser.Scene {
     this.infoText = addText(this, PANEL_CX, top + 234, '', 24, { color: CSS.grey });
     this.bestText = addText(this, PANEL_CX, top + 272, '', 24);
 
-    const play = addText(this, PANEL_CX, top + 316, 'play', 40, { color: CSS.yellow });
+    // Locked levels dim everything above the play line and say what to clear first.
+    this.lockShade = this.add.graphics();
+    this.lockShade.fillStyle(COLORS.night, 0.72);
+    this.lockShade.fillRoundedRect(PANEL.x + 4, PANEL.y + 4, PANEL.w - 8, PANEL.h - 8, 12);
+    this.lockText = addText(this, PANEL_CX, top + 250, '', 32, { color: CSS.yellow, wrapWidth: PANEL.w - 60 });
+    this.newText = addText(this, PANEL_CX, top - 24, 'new stage open!', 32, { color: CSS.yellow });
+    this.tweens.add({ targets: this.newText, scale: 1.1, duration: 420, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+
+    const play = (this.playText = addText(this, PANEL_CX, top + 316, 'play', 40, { color: CSS.yellow }));
     play.setInteractive({ useHandCursor: true });
-    play.on(Phaser.Input.Events.POINTER_OVER, () => play.setColor(CSS.cream));
-    play.on(Phaser.Input.Events.POINTER_OUT, () => play.setColor(CSS.yellow));
+    play.on(Phaser.Input.Events.POINTER_OVER, () => this.isLocked() || play.setColor(CSS.cream));
+    play.on(Phaser.Input.Events.POINTER_OUT, () => this.isLocked() || play.setColor(CSS.yellow));
     play.setPadding(40, 14, 40, 14);
     play.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => pointer.getDistance() < 30 && void this.start());
-    this.tweens.add({ targets: play, scale: 1.08, duration: 500, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+    this.playPulse = this.tweens.add({ targets: play, scale: 1.08, duration: 500, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     this.statusText = addText(this, PANEL_CX, PANEL.y + PANEL.h + 30, '', 24, { color: CSS.miss });
 
@@ -104,6 +142,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
     this.pole = this.buildPole();
     this.loadCharts();
+    this.noteNewlyOpened();
     this.refresh();
 
     menuKeys(this, {
@@ -143,12 +182,45 @@ export class LevelSelectScene extends Phaser.Scene {
     if (index === this.index) this.refresh();
   }
 
+  private isLocked(): boolean {
+    return !isUnlocked(this.index);
+  }
+
+  /** Work out which levels opened since the last visit and announce the first of them. */
+  private noteNewlyOpened(): void {
+    const open = LEVELS.filter((_, i) => isUnlocked(i)).length;
+    const seen = readOpened();
+    writeOpened(open);
+    // A first visit has nothing to compare against, so nothing is announced.
+    if (seen === null || open <= seen) return;
+    for (let i = seen; i < open; i++) this.fresh.add(i);
+    const name = LEVELS[seen].name.toLowerCase();
+    this.time.delayedCall(450, () => {
+      playSfx(this.game, 'bonus');
+      this.statusText.setText(`${name} is now open!`).setColor(CSS.yellow);
+      if (this.index < seen) this.right.flash();
+    });
+  }
+
   private refresh(): void {
     const level = LEVELS[this.index];
     const chart = this.charts[this.index];
+    const locked = this.isLocked();
     this.countText.setText(`${this.index + 1} / ${LEVELS.length}`);
     this.nameText.setText(level.name.toLowerCase());
     this.blurbText.setText(level.blurb.toLowerCase());
+    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName.toLowerCase()}`).setColor(level.battle ? CSS.pink : CSS.lilac);
+
+    this.lockShade.setVisible(locked);
+    this.lockText.setVisible(locked);
+    if (locked) this.lockText.setText(`clear ${LEVELS[this.index - 1].name.toLowerCase()} first`);
+    this.newText.setVisible(!locked && this.fresh.has(this.index));
+    this.playText.setText(locked ? 'locked' : 'play').setColor(locked ? CSS.grey : CSS.yellow);
+    if (locked) this.playPulse.pause();
+    else this.playPulse.resume();
+    if (locked) this.playText.setScale(1);
+    this.infoText.setVisible(!locked);
+    this.bestText.setVisible(!locked);
 
     const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
     this.difficultyLabel.setAlpha(chart ? 1 : 0.4);
@@ -205,12 +277,21 @@ export class LevelSelectScene extends Phaser.Scene {
     });
 
     // The original played each level's song as it came up. Wait a beat so flicking through stays quiet.
+    // A locked level keeps its song a surprise.
     this.preview?.remove();
-    this.preview = this.time.delayedCall(500, () => music.play(LEVELS[next].song as MusicKey, 500));
+    const song = isUnlocked(next) ? (LEVELS[next].song as MusicKey) : 'level_select';
+    this.preview = this.time.delayedCall(500, () => music.play(song, 500));
   }
 
   private async start(): Promise<void> {
     if (this.busy || isLeaving(this)) return;
+    if (this.isLocked()) {
+      playSfx(this.game, 'miss');
+      this.tweens.killTweensOf(this.lockText);
+      this.lockText.setX(PANEL_CX);
+      this.tweens.add({ targets: this.lockText, x: PANEL_CX + 10, duration: 45, yoyo: true, repeat: 3, onComplete: () => this.lockText.setX(PANEL_CX) });
+      return;
+    }
     this.busy = true;
     const run = this.run;
     const level = LEVELS[this.index];

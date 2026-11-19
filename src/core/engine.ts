@@ -17,8 +17,13 @@ export const HOLD_RELEASE_GRACE = 0.15;
 export const SCORE: Record<Judgement, number> = { perfect: 200, good: 125, hit: 100, miss: 0 };
 /** Hits needed at x1, x2 and x3 to reach the next multiplier. */
 export const MULTIPLIER_STEPS = [4, 6, 16] as const;
-const ACCURACY_WEIGHT: Record<Judgement, number> = { perfect: 1, good: 0.8, hit: 0.5, miss: 0 };
-const HEALTH_CHANGE: Record<Judgement, number> = { perfect: 0.012, good: 0.008, hit: 0.004, miss: -0.05 };
+/** How much each grade counts towards accuracy. */
+export const ACCURACY_WEIGHT: Record<Judgement, number> = { perfect: 1, good: 0.8, hit: 0.5, miss: 0 };
+/**
+ * How far each grade moves the tug-of-war bar. Tuned so that hitting about three
+ * notes in four holds the bar level: an average player gains ground, a poor one loses it.
+ */
+export const HEALTH_CHANGE: Record<Judgement, number> = { perfect: 0.014, good: 0.01, hit: 0.006, miss: -0.03 };
 
 export const START_HEALTH = 0.5;
 
@@ -143,6 +148,18 @@ export class Engine {
     }
   }
 
+  /** Move the bar by `delta` for a reason other than this side's own notes (the rival, a bonus). */
+  adjustHealth(delta: number): void {
+    const s = this.stats;
+    s.health = Math.min(1, Math.max(0, s.health + delta));
+    if (s.health <= 0 && !this.noFail) s.failed = true;
+  }
+
+  /** Award bonus points that do not come from a note. */
+  addBonus(points: number): void {
+    this.stats.score += points;
+  }
+
   /** A lane key went down at song time `t`. */
   press(lane: Lane, t: number): JudgeEvent[] {
     const events: JudgeEvent[] = [];
@@ -219,8 +236,7 @@ export class Engine {
         this.multiplierProgress = 0;
       }
     }
-    s.health = Math.min(1, Math.max(0, s.health + HEALTH_CHANGE[judgement]));
-    if (s.health <= 0 && !this.noFail) s.failed = true;
+    this.adjustHealth(HEALTH_CHANGE[judgement]);
     return { note, judgement, delta, part };
   }
 }

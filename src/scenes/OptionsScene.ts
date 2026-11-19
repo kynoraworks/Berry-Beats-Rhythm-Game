@@ -3,7 +3,7 @@ import { COLORS, CSS, GAME_H, GAME_W, LANE_NAMES, SceneKeys, Tex } from '../core
 import { music } from '../core/music';
 import { getSettings, keyLabel, resetSettings, updateSettings, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { hint } from '../core/mobile';
+import { hint, isTouch } from '../core/mobile';
 import { addCover, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { OffsetTest } from '../menus/offsetTest';
 
@@ -31,8 +31,9 @@ interface Row {
 
 const LEFT: Bounds = { x: 50, y: 130, w: 610, h: 450 };
 const RIGHT: Bounds = { x: 690, y: 130, w: 540, h: 450 };
-const ROW_Y = 180;
-const ROW_DY = 58;
+const ROW_Y = 170;
+const ROW_DY = 52;
+const ROW_H = 46;
 const KEY_Y = 244;
 const KEY_DY = 72;
 const SLOT_X = [1010, 1140];
@@ -101,10 +102,15 @@ export class OptionsScene extends Phaser.Scene {
     this.addAction(this.leftRow(4), 'measure offset', 'start', 'tap along to a click to set the audio offset for you', () => this.startTest());
     this.addToggle('hit sounds', 'play a tick whenever you hit a note', 'hitSounds');
     this.addToggle('no fail', 'keep playing when the health bar runs out', 'noFail');
+    this.addToggle('reduce motion', 'turn off screen shakes, flashes and background pulsing', 'reduceMotion');
 
-    addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + 46, 'lane keys', 32, { color: CSS.lilac });
-    LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane));
-    addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 36, 'each lane has two keys', 16, { color: CSS.grey, stroke: false });
+    if (isTouch()) {
+      this.addTouchGuide();
+    } else {
+      addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + 46, 'lane keys', 32, { color: CSS.lilac });
+      LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane));
+      addText(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 36, 'each lane has two keys', 16, { color: CSS.grey, stroke: false });
+    }
 
     const resetBounds: Bounds = { x: 150, y: 612, w: 410, h: 56 };
     this.addAction(resetBounds, 'reset to defaults', '', 'put every option and key back to how it started', () => this.reset(), true);
@@ -144,7 +150,7 @@ export class OptionsScene extends Phaser.Scene {
   // ---------------------------------------------------------------------
 
   private leftRow(index: number): Bounds {
-    return { x: LEFT.x + 16, y: ROW_Y + index * ROW_DY - 25, w: LEFT.w - 32, h: 50 };
+    return { x: LEFT.x + 16, y: ROW_Y + index * ROW_DY - ROW_H / 2, w: LEFT.w - 32, h: ROW_H };
   }
 
   /** Makes a whole row react to the mouse: hovering focuses it, clicking runs `onClick`. */
@@ -190,7 +196,7 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, bounds, refresh: () => value.setText(show(getSettings())), adjust });
   }
 
-  private addToggle(label: string, hint: string, key: 'hitSounds' | 'noFail'): void {
+  private addToggle(label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion'): void {
     const index = this.rows.length;
     const bounds = this.leftRow(index);
     const y = bounds.y + bounds.h / 2;
@@ -217,6 +223,22 @@ export class OptionsScene extends Phaser.Scene {
     if (value) addText(this, 510, y, value, 32, { color: CSS.yellow });
     this.addHitZone(bounds, index, run);
     this.rows.push({ hint, bounds, refresh: () => undefined, confirm: run });
+  }
+
+  /** Phones have no keys to rebind, so the right-hand panel explains the touch controls instead. */
+  private addTouchGuide(): void {
+    const cx = RIGHT.x + RIGHT.w / 2;
+    addText(this, cx, RIGHT.y + 46, 'touch controls', 32, { color: CSS.lilac });
+    // The four columns of the screen, in lane order.
+    const columnW = 110;
+    LANE_NAMES.forEach((name, lane) => {
+      const x = cx + (lane - 1.5) * (columnW + 10);
+      this.add.rectangle(x, RIGHT.y + 170, columnW, 150, COLORS.ink, 0.9).setStrokeStyle(4, COLORS.purple);
+      this.add.image(x, RIGHT.y + 152, Tex.notes, lane).setScale(4);
+      addText(this, x, RIGHT.y + 220, name, 24, { stroke: false });
+    });
+    const lines = ['the screen is four columns', 'tap a column to hit its arrow', 'keep holding for long notes', 'tap the pause button to stop'];
+    lines.forEach((line, i) => addText(this, cx, RIGHT.y + 290 + i * 40, line, 24, { stroke: false, color: i === 0 ? CSS.cream : CSS.lilac }));
   }
 
   private addKeyRow(lane: number): void {

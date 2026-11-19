@@ -123,6 +123,19 @@ def build_icons() -> None:
     icon(180, 6, "apple-touch-icon.png")
 
 
+def build_share() -> None:
+    """Link preview picture (1200x630) for chat apps and social sites: the title art with the logo."""
+    art = Image.open(SPR / "TitleScreen" / "fundo_game.png").convert("RGB")
+    # Scale to the card's width, then keep the band that holds the character and the boombox.
+    art = art.resize((1200, round(art.height * 1200 / art.width)), Image.LANCZOS)
+    top = (art.height - 630) // 2
+    card = art.crop((0, top, 1200, top + 630)).convert("RGBA")
+    logo = Image.open(SPR / "TitleScreen" / "x5.png").convert("RGBA")
+    logo = logo.resize((round(logo.width * 0.8), round(logo.height * 0.8)), Image.LANCZOS).rotate(4, expand=True, resample=Image.BICUBIC)
+    card.alpha_composite(logo, (330, 20))
+    card.convert("RGB").save(ROOT / "public" / "share.png", optimize=True)
+
+
 def build_audio() -> None:
     OUT_AUDIO.mkdir(parents=True, exist_ok=True)
     music = SRC / "Music"
@@ -171,6 +184,7 @@ def build_fonts() -> None:
 if __name__ == "__main__":
     build_images()
     build_icons()
+    build_share()
     build_audio()
     build_fonts()
     print("Assets written to public/assets")
