@@ -205,7 +205,9 @@ const HOT: Skill = [0.8, 0.16, 0.04, 0];
  */
 const CLOSER_SWING = 0.2;
 /** Wild: shortest and longest meltdown, in notes missed in a row. */
-const WILD_MELTDOWN: [number, number] = [3, 5];
+const WILD_MELTDOWN: [number, number] = [3, 6];
+/** Wild: how far a hot streak's length strays from the length that pays for a typical meltdown (0.5 = half to one and a half times). */
+const WILD_SPREAD = 0.5;
 /** Wild: shortest and longest stretch of ordinary play between a streak and a meltdown. */
 const WILD_CALM: [number, number] = [1, 4];
 
@@ -226,8 +228,9 @@ type Form = 'calm' | 'hot' | 'meltdown';
 
 /**
  * The wild rival's form for each note: hot streaks and meltdowns in turn, with
- * a little ordinary play between them. Each streak is sized against its
- * meltdown so the two cancel out and the song as a whole averages the level's skill.
+ * a little ordinary play between them. Streaks are sized so that over a song
+ * they make up for the meltdowns and the whole averages the level's skill, but
+ * any one stretch of it can go well or badly for him.
  */
 function wildForms(count: number, base: Skill, random: () => number): Form[] {
   const between = ([min, max]: [number, number]): number => min + Math.floor(random() * (max - min + 1));
@@ -236,10 +239,13 @@ function wildForms(count: number, base: Skill, random: () => number): Form[] {
   const add = (form: Form, notes: number): void => {
     for (let i = 0; i < notes; i++) forms.push(form);
   };
+  // Notes of streak that make up for one missed note.
+  const ratio = skillAccuracy(base) / gain;
+  const typicalMeltdown = (WILD_MELTDOWN[0] + WILD_MELTDOWN[1]) / 2;
   const meltdownFirst = random() < 0.5;
   while (forms.length < count) {
     const meltdown = between(WILD_MELTDOWN);
-    const streak = Math.round((meltdown * skillAccuracy(base)) / gain);
+    const streak = Math.max(3, Math.round(typicalMeltdown * ratio * (1 - WILD_SPREAD + 2 * WILD_SPREAD * random())));
     add('calm', between(WILD_CALM));
     add(meltdownFirst ? 'meltdown' : 'hot', meltdownFirst ? meltdown : streak);
     add('calm', between(WILD_CALM));

@@ -284,7 +284,7 @@ function simulate(chart: Chart, hitRate: number, sharp = false) {
 }
 
 describe('battle balance on the story levels', () => {
-  for (const id of ['level1', 'bonus-title', 'bonus-menu']) {
+  for (const id of ['level1', 'level2', 'level3', 'bonus-title', 'bonus-menu']) {
     const chart = loadChart(id);
 
     it(`${id}: a perfect player owns the bar and wins`, () => {
@@ -309,6 +309,31 @@ describe('battle balance on the story levels', () => {
 
   it('level 1 can be won by a player who hits 4 notes in 5', () => {
     expect(simulate(loadChart('level1'), 0.8).won).toBe(true);
+  });
+
+  it('level 2: the Pear gets better every round, and 4 notes in 5 still beat him', () => {
+    const run = simulate(loadChart('level2'), 0.8);
+    const his = run.rounds.map((round) => round.rival);
+    expect(his.length).toBeGreaterThanOrEqual(3);
+    for (let i = 1; i < his.length; i++) expect(his[i]).toBeGreaterThan(his[i - 1]);
+    expect(his[0]).toBeLessThan(50);
+    expect(his[his.length - 1]).toBeGreaterThan(75);
+    expect(run.won).toBe(true);
+    // He takes the last round even from a player who misses nothing but is not always dead on.
+    expect(simulate(loadChart('level2'), 1).rivalRounds).toBe(1);
+  });
+
+  it('level 3: the Lemon melts down several times and still plays to the level', () => {
+    const chart = loadChart('level3');
+    const notes = toTimedNotes(chart, chart.rival ?? []).sort((a, b) => a.t - b.t || a.lane - b.lane);
+    const plan = planRival(notes.length, chart.difficulty, chart.id, { personality: 'wild' });
+    const grades = plan.map((p) => (p.judgement === 'miss' ? 'm' : 'x')).join('');
+    expect(grades.match(/m{3,}/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    expect(Math.abs(planAccuracy(plan) - skillAccuracy(rivalSkill(chart.difficulty)))).toBeLessThan(0.06);
+    // A close contest for a player who hits 4 notes in 5: nobody runs away with the rounds.
+    const run = simulate(chart, 0.8);
+    expect(Math.abs(run.playerRounds - run.rivalRounds)).toBeLessThanOrEqual(1);
+    expect(simulate(chart, 0.9).won).toBe(true);
   });
 });
 
