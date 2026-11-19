@@ -54,8 +54,8 @@ interface Recording {
 }
 
 const RATES = [0.5, 0.75, 1] as const;
-const RIVALS: RivalKind[] = ['raspberry', 'dancer', 'none'];
-const RIVAL_LABELS: Record<RivalKind, string> = { raspberry: 'Raspberry', dancer: 'Coach', none: 'None (solo)' };
+const RIVALS: RivalKind[] = ['raspberry', 'pear', 'lemon', 'dancer', 'none'];
+const RIVAL_LABELS: Record<RivalKind, string> = { raspberry: 'Raspberry', pear: 'Pear', lemon: 'Dr. Lemon', dancer: 'Coach', none: 'None (solo)' };
 /** Depth of the toolbars and side panels, above the timeline. */
 const CHROME_DEPTH = 20;
 const HELP_DEPTH = 900;

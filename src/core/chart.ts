@@ -13,7 +13,10 @@ export interface ChartNote {
   d?: number;
 }
 
-export type RivalKind = 'raspberry' | 'dancer' | 'none';
+/** Who dances on the rival's side. 'dancer' is the Coach. */
+export type RivalKind = 'raspberry' | 'pear' | 'lemon' | 'dancer' | 'none';
+
+const RIVAL_KINDS: readonly string[] = ['raspberry', 'pear', 'lemon', 'dancer', 'none'];
 
 export interface Chart {
   format: 1;
@@ -128,7 +131,7 @@ export function parseChart(value: unknown): Chart {
     offset: c.offset,
     notes: cleanNotes(c.notes, 'notes'),
     rival: c.rival === undefined ? [] : cleanNotes(c.rival, 'rival'),
-    rivalCharacter: rival === 'dancer' || rival === 'none' || rival === 'raspberry' ? rival : 'raspberry',
+    rivalCharacter: typeof rival === 'string' && RIVAL_KINDS.includes(rival) ? (rival as RivalKind) : 'raspberry',
   };
   if (typeof c.difficulty === 'number' && Number.isFinite(c.difficulty)) {
     chart.difficulty = Math.min(5, Math.max(1, Math.round(c.difficulty)));

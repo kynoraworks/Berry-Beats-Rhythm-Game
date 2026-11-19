@@ -3,8 +3,9 @@
 
 Run from the repo root:  python3 tools/build_characters.py
 
-Blackberry, Raspberry and the Coach share one frame layout (51 frames, 64x64
-cells, 9 per row) so the game can drive them with the same code:
+Blackberry, Raspberry, the Coach, the Pear and the Lemon share one frame layout
+(51 frames, 64x64 cells, 9 per row) so the game can drive them with the same
+code:
 
    0-2   idle
    3-4   left        5-6   right       7-8   up          9-10  down
@@ -14,8 +15,11 @@ cells, 9 per row) so the game can drive them with the same code:
   27-28  stumble
   29-30  victory     31 defeat         32 hype bounce
   33-34  left (alt)  35-36 right (alt) 37-38 up (alt)    39-40 down (alt)
-  41 dab  42 finger guns  43 high kick  44 freeze
+  41-44  showpieces (the berries and the Coach: dab, finger guns, high kick, freeze)
   45-50  idle dance: centre low, left, left accent, centre high, right, right accent
+
+Every character stages these slots in their own style (see the Pear and the
+Lemon below), but a slot always means the same thing to the game.
 
 Directions are named by where the pose points on screen. (The Unity project
 labelled 11-12 "down right" and 13-14 "down left", the other way round.)
@@ -35,6 +39,53 @@ derived from her first generated sheet with tools/derive_palette.py, and each
 of her sheets was converted with an explicit pixel size so her head stays the
 same size from sheet to sheet:
   a 12.15  b 12.2  c 12.47  d 18.5  e 12.08  f 10.85  g 11.66  h 10.76  i 12.24
+
+The Pear (pear.png) and the Lemon (lemon.png) are rivals made the same way,
+from a design sheet instead of an original sprite. Their palettes
+(palette_pear.png, palette_lemon.png, 14 colours each) were picked by hand from
+their first sheets. All their sheets are 3x2; sheet d holds three frames and
+three spare poses that are not used. Pixel sizes passed to pixelize_sprites.py:
+  pear   a 12.0  b 11.5   c 12.13  d 11.48  e 10.61  f 10.66  g 11.32  h 11.3   i 11.05
+  lemon  a 12.3  b 12.05  c 11.5   d 11.9   e 11.5   f 11.25  g 11.9   h 10.45  i 12.1
+
+The Pear is a b-boy in a pear-shaped beanie. He is taller than the others
+because of the beanie and its stalk (up to 59 pixels).
+   0-2   idle: relaxed stand, bounce down, chin up
+   3-6   left and right: toprock side step, then a low wide stance pointing that way
+   7-8   up: rise on the toes, then both arms thrown up
+   9-10  down: drop to a squat with a hand on the floor, then floor work with a leg kicked out
+  11-14  down diagonals: low lunges with a hand planted on the floor on that side
+  15-18  up diagonals: toprock reach, then a long diagonal stretch on one foot
+  19-20  left-right: wide stance pointing both ways, then a "what?" shrug
+  21-24  spin: backspin (head left), windmill seen from behind, backspin (head right), arms-crossed finish
+  25-26  hold groove: crossed-foot footwork, one side then the other
+  27-28  stumble: foot slips out, then flailing on one leg
+  29-32  victory jump with a fist up, peace sign, defeat sitting slumped, hype hop
+  33-36  left and right (alt): cross step, then a kick step with the heel out
+  37-38  up (alt): crouch, then a split jump touching a toe
+  39-40  down (alt): frog squat with both hands down, then a floor sweep
+  41-44  showpieces: headspin, windmill, baby freeze, one-handed freeze
+  45-50  idle dance: toprock bounce (arms crossed on the high beat)
+  spares in pear_d: 3 backspin from the side, 4 chair freeze, 5 tucked headspin
+
+The Lemon is a mad scientist doctor who dances with a flask of pink liquid.
+   0-2   idle: hunched stand with twitches
+   3-6   left and right: lunge pointing that way, then a deeper lunge thrusting the flask out
+   7-8   up: flask lifted and admired, then flask overhead on tiptoe with a finger up
+   9-10  down: hunched pointing at the floor, then a squat over the flask with wiggling fingers
+  11-14  down diagonals: low lunge pointing at that corner, then thrusting the flask at it
+  15-18  up diagonals: pointing at that corner, then the flask thrust at it on one foot
+  19-20  left-right: finger one way and flask the other, then both arms wide with clawed hands
+  21-24  spin: whirl with the coat flaring (side, back, side), finish adjusting his goggles
+  25-26  hold groove: stirring the flask, then shaking it
+  27-28  stumble: the flask flies out of his hands, then he clutches it on one leg
+  29-32  victory jump, a toast, defeat on his knees by the broken flask, hype hop
+  33-36  left and right (alt): hunched scuttle, then a pointing lunge
+  37-38  up (alt): crouch over the flask, then a leap with the flask overhead
+  39-40  down (alt): bent double pointing at the floor, then a palm slam on one knee
+  41-44  showpieces: "eureka" finger with a spark, shaking two flasks, electric jolt, maniacal laugh
+  45-50  idle dance: twitchy sway (flask jerked up on the left accent, finger up on the high beat)
+  spares in lemon_d: 3 whirl seen from behind, 4 electric jolt, 5 fumbled flask
 """
 from pathlib import Path
 
@@ -81,13 +132,26 @@ INSTRUCTOR |= {33 + i: ("instructor_g", i) for i in range(6)}
 INSTRUCTOR |= {39 + i: ("instructor_h", i) for i in range(6)}
 INSTRUCTOR |= {45 + i: ("instructor_i", i) for i in range(6)}
 
+def standard(prefix: str) -> dict[int, tuple[str, int]]:
+    """Sheets a-c and e-i hold six frames each in order; sheet d holds frames 18-20."""
+    mapping = {}
+    for first, sheet in ((0, "a"), (6, "b"), (12, "c"), (21, "e"), (27, "f"), (33, "g"), (39, "h"), (45, "i")):
+        mapping |= {first + i: (f"{prefix}_{sheet}", i) for i in range(6)}
+    mapping |= {18 + i: (f"{prefix}_d", i) for i in range(3)}
+    return mapping
+
+
+# Both were checked frame by frame: 11-12 point down-left on screen and 13-14 down-right.
+PEAR = standard("pear")
+LEMON = standard("lemon")
+
 # Frames where the character is in the air: how many pixels the feet are off the floor.
 LIFT = {29: 8, 32: 3, 38: 7}
 # Frames that are centred on the feet rather than kept where the model drew them.
 # The idle loops need this: the body sways but the feet must not slide.
 FEET_ANCHORED = {0, 1, 2, 45, 46, 47, 48, 49, 50}
 # Per-frame horizontal nudges, in pixels, where the generated pose sat off-centre.
-NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}, "instructor": {}}
+NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}, "instructor": {}, "pear": {}, "lemon": {}}
 
 
 def cell_of(sheet: Image.Image, index: int) -> Image.Image:
@@ -138,3 +202,5 @@ if __name__ == "__main__":
     build("blackberry", BLACKBERRY, Image.open(ORIGINAL_BLACKBERRY).convert("RGBA"))
     build("raspberry", RASPBERRY, None)
     build("instructor", INSTRUCTOR, None)
+    build("pear", PEAR, None)
+    build("lemon", LEMON, None)

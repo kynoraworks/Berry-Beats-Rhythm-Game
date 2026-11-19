@@ -35,6 +35,16 @@ const MAX_DIFFICULTY = 5;
 const SEATS: Record<LevelDef['rival'], { sit: string; anim: string; stand: string }> = {
   coach: { sit: Tex.coachSit, anim: Anim.coachSit, stand: Tex.instructor },
   raspberry: { sit: Tex.raspberrySit, anim: Anim.raspberrySit, stand: Tex.raspberry },
+  pear: { sit: Tex.pearSit, anim: Anim.pearSit, stand: Tex.pear },
+  lemon: { sit: Tex.lemonSit, anim: Anim.lemonSit, stand: Tex.lemon },
+};
+
+/** Name tag colour per opponent, and whether the name reads better in dark ink on it. */
+const TAGS: Record<LevelDef['rival'], { tint: number; dark: boolean }> = {
+  coach: { tint: COLORS.lilac, dark: true },
+  raspberry: { tint: COLORS.pink, dark: false },
+  pear: { tint: 0x9bd64a, dark: true },
+  lemon: { tint: 0xffe14a, dark: true },
 };
 
 const OPENED_KEY = 'berrybeats.opened.v1';
@@ -236,8 +246,9 @@ export class LevelSelectScene extends Phaser.Scene {
     this.countText.setText(`Stage ${this.index + 1} of ${LEVELS.length}`);
     this.nameText.setText(level.name).setAlpha(locked ? 0.55 : 1);
     this.blurbText.setText(level.blurb).setAlpha(locked ? 0.55 : 1);
-    this.rivalTag.setTint(level.battle ? COLORS.pink : COLORS.lilac);
-    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName}`).setColor(level.battle ? CSS.cream : CSS.ink);
+    const tag = TAGS[level.rival];
+    this.rivalTag.setTint(tag.tint);
+    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName}`).setColor(tag.dark ? CSS.ink : CSS.cream);
 
     this.playButton.setVisible(!locked);
     this.lockedButton.setVisible(locked);

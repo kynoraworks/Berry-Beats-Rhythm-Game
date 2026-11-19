@@ -24,7 +24,7 @@ export interface LevelDef {
   /** A scored battle with rounds, or a lesson where the rival only demonstrates. */
   battle: boolean;
   /** Who sits next to Berry on the train for this stage. */
-  rival: 'coach' | 'raspberry';
+  rival: 'coach' | 'raspberry' | 'pear' | 'lemon';
   /** Conversation before the song. The player advances it line by line. */
   intro: DialogueLine[];
   /** What is said afterwards when the player wins the battle (or finishes the lesson). */
@@ -71,6 +71,44 @@ export const LEVELS: LevelDef[] = [
     ],
     outroWin: [{ who: 'rival', text: "Hmph. Beginner's luck. Meet me on the roof." }],
     outroLose: [{ who: 'rival', text: 'Told you. Come back when you can keep up.', mood: 'bold' }],
+  },
+  {
+    id: 'level2',
+    name: 'Level 2',
+    blurb: 'A b-boy holds the corner',
+    chartUrl: 'charts/level2.json',
+    song: 'level_select',
+    stage: 'stage_street',
+    rivalName: 'Pear',
+    battle: true,
+    rival: 'pear',
+    intro: [
+      { who: 'rival', text: 'Yo. This corner is taken. You want the floor, you earn it.' },
+      { who: 'player', text: 'I can share.' },
+      { who: 'rival', text: 'Heh. I start slow, kid. Do not get comfortable.', mood: 'bold' },
+      { who: 'player', text: 'Show me the finish, then.', mood: 'bold' },
+    ],
+    outroWin: [{ who: 'rival', text: 'Alright, alright. Clean footwork. The corner is yours tonight.' }],
+    outroLose: [{ who: 'rival', text: 'Told you I finish strong. Come back when your legs do too.', mood: 'bold' }],
+  },
+  {
+    id: 'level3',
+    name: 'Level 3',
+    blurb: 'The doctor will see you now',
+    chartUrl: 'charts/level3.json',
+    song: 'pause',
+    stage: 'stage_lab',
+    rivalName: 'Dr. Lemon',
+    battle: true,
+    rival: 'lemon',
+    intro: [
+      { who: 'rival', text: 'A test subject! Splendid! Stand there, on the mark, do not touch the beakers.', mood: 'bold' },
+      { who: 'player', text: 'I was told this was a dance battle.' },
+      { who: 'rival', text: 'It is an EXPERIMENT in rhythm! My results are... unpredictable. That is the science.' },
+      { who: 'player', text: 'Then I will be the control.', mood: 'bold' },
+    ],
+    outroWin: [{ who: 'rival', text: 'Fascinating! The data is conclusive: you have better rhythm. I must recalibrate everything!' }],
+    outroLose: [{ who: 'rival', text: 'Ha HA! The formula works! ...Some of the time. Shall we repeat the trial?', mood: 'bold' }],
   },
   {
     id: 'bonus-title',

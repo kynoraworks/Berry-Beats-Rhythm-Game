@@ -43,7 +43,15 @@ Keys, volume, scroll speed, audio offset and a reduce-motion switch are under Op
 
 ### Story mode
 
-Four stages, each unlocked by clearing the one before: a tutorial with the Coach, then three dance battles against Raspberry in her room, on a rooftop and at the club.
+Six stages, each unlocked by clearing the one before: a tutorial with the Coach, then five dance battles.
+
+| Rival | Where | How they dance and battle |
+| --- | --- | --- |
+| Raspberry | Her room, then the rooftop and the club | An all-rounder |
+| Pear | A street corner | A b-boy: laid-back and heavy, with long freezes. Starts loose and finishes strong |
+| Dr. Lemon | His lab | A mad scientist: jittery and twitchy. Swings between flawless streaks and meltdowns |
+
+Each stage opens and closes with a short conversation. Click, tap or press `Enter` to move it on.
 
 ### How a battle works
 
@@ -129,7 +137,7 @@ Runtime assets are built from the archived originals and committed, so this is o
 ```bash
 pip install pillow fonttools numpy
 python3 tools/prepare_assets.py     # backgrounds, HUD, music, font, icons, share image
-python3 tools/build_characters.py   # Blackberry, Raspberry and Coach sprite sheets
+python3 tools/build_characters.py   # Blackberry, Raspberry, Coach, Pear and Dr. Lemon sprite sheets
 python3 tools/make_crowd.py         # crowd silhouettes, built from the dancers
 ```
 
@@ -156,7 +164,7 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 - Beat maps are JSON measured in beats, instead of binary files tied to the Unity build.
 - Hold notes are single long notes rather than runs of small ones.
 - The rival is scored too, so the tug-of-war bar from the original mockups is a real contest with turns and rounds.
-- Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged. The Coach, the three new stage backgrounds and the judgement lettering were made the same way.
+- Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged. The Coach, the Pear, Dr. Lemon, the new stage backgrounds and the judgement lettering were made the same way.
 - The story levels have new charts for Nicole Yazmin's tracks, generated from the audio by `tools/analyze_audio.py`. The old test levels were timed to a placeholder song that is not part of the game.
 - The menu's "Online" entry, which was never built, is replaced by Beat Maps.
 

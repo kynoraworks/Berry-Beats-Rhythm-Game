@@ -70,6 +70,12 @@ export const Tex = {
   blackberry: 'blackberry', // 51 frames, 64x64, feet at y=62 (layout in tools/build_characters.py)
   raspberry: 'raspberry', // 51 frames, 64x64, same layout as blackberry
   dancer: 'dancer', // 39 frames, 160x160 (the original instructor art, kept as a fallback)
+  pear: 'pear', // 51 frames, 64x64, same layout: the breakdancing Pear (may be missing: check textures.exists)
+  lemon: 'lemon', // 51 frames, 64x64, same layout: the mad scientist Lemon (may be missing)
+  stageStreet: 'stage_street', // optional 256x160 stages for the Pear and the Lemon
+  stageLab: 'stage_lab',
+  pearSit: 'pear_sit', // optional seated sprites for the train, like raspberry_sit
+  lemonSit: 'lemon_sit',
   instructor: 'instructor', // 51 frames, 64x64, same layout as blackberry: the Coach redrawn in the berry style
   stageRaspberry: 'stage_raspberry', // 256x160 stage backgrounds laid out like room: top band to row 27, platform top at row 137
   stageRooftop: 'stage_rooftop',
@@ -108,5 +114,7 @@ export const Anim = {
   berrySit: 'berry-sit-loop',
   raspberrySit: 'raspberry-sit-loop',
   coachSit: 'coach-sit-loop',
+  pearSit: 'pear-sit-loop',
+  lemonSit: 'lemon-sit-loop',
   missSplash: 'miss-splash',
 } as const;
