@@ -84,7 +84,10 @@ export class ResultsScene extends Phaser.Scene {
 
     addText(this, GAME_W / 2, 104, failed ? 'Failed' : 'Results', 64, { color: failed ? CSS.miss : CSS.lilac });
     addText(this, GAME_W / 2, 152, play.chart.title, 24);
-    if (battle) {
+    // A failed run shows the rival celebrating but no round count: the battle was cut short.
+    const scored = battle && !failed ? battle : undefined;
+    if (scored) {
+      const battle = scored;
       const score = `${Math.max(battle.playerRounds, battle.rivalRounds)} to ${Math.min(battle.playerRounds, battle.rivalRounds)}`;
       const rounds = battle.playerRounds + battle.rivalRounds > 1 ? ` ${score}` : '';
       const outcome = battle.won ? `You win${rounds}!` : `${battle.rivalName} wins${rounds}`;
@@ -102,14 +105,15 @@ export class ResultsScene extends Phaser.Scene {
       addText(this, RIGHT, y, value, 32, { origin: [1, 0.5] });
     };
     line(454, 'Max combo', String(stats.maxCombo), CSS.lilac);
-    line(496, battle ? 'You' : 'Accuracy', `${percent.toFixed(1)}%`, battle ? CSS.blue : CSS.lilac);
-    if (battle) line(538, battle.rivalName, `${battle.rivalAccuracy.toFixed(1)}%`, CSS.pink);
+    line(496, scored ? 'You' : 'Accuracy', `${percent.toFixed(1)}%`, scored ? CSS.blue : CSS.lilac);
+    if (scored) line(538, scored.rivalName, `${scored.rivalAccuracy.toFixed(1)}%`, CSS.pink);
 
     // Right column: the rank lands like a stamp, then the score counts up.
     addText(this, RANK_X, 244, 'Rank', 32, { color: CSS.lilac });
     const rankText = addText(this, RANK_X, 326, rank, rank.length > 1 ? 80 : 128, { color: RANK_COLOR[rank] ?? CSS.cream });
+    const jingle = failed || battle?.won === false ? 'lose' : 'win';
     if (calm) {
-      playSfx(this.game, failed ? 'lose' : 'win');
+      playSfx(this.game, jingle);
     } else {
       rankText.setScale(4).setAlpha(0).setAngle(-14);
       this.tweens.add({
@@ -122,7 +126,7 @@ export class ResultsScene extends Phaser.Scene {
         ease: 'Cubic.easeIn',
         onComplete: () => {
           this.cameras.main.shake(140, 0.006);
-          playSfx(this.game, failed || battle?.won === false ? 'lose' : 'win');
+          playSfx(this.game, jingle);
           this.tweens.add({ targets: rankText, scale: 1.12, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
         },
       });

@@ -316,9 +316,10 @@ export class PlayScene extends Phaser.Scene {
     if (this.laneInput) this.laneInput.enabled = false;
 
     let summary: BattleSummary | undefined;
-    if (this.battle && this.rivalEngine && !failed) {
-      const result = this.battle.result();
-      for (let i = this.roundsSettled; i < this.battle.rounds.length; i++) this.hud.setRound(i, this.battle.roundWinner(i));
+    if (this.battle && this.rivalEngine) {
+      // Running out of health hands her the battle whatever the rounds so far say.
+      const result = this.battle.result(failed ? this.roundsSettled : undefined);
+      if (!failed) for (let i = this.roundsSettled; i < this.battle.rounds.length; i++) this.hud.setRound(i, this.battle.roundWinner(i));
       summary = {
         rivalName: this.rivalName,
         rivalTexture: rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry,
@@ -326,7 +327,7 @@ export class PlayScene extends Phaser.Scene {
         rivalRounds: result.rivalRounds,
         rivalAccuracy: result.rivalAccuracy,
         rivalScore: this.rivalEngine.stats.score,
-        won: result.won,
+        won: result.won && !failed,
       };
     }
     const results: ResultsData = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
@@ -344,6 +345,7 @@ export class PlayScene extends Phaser.Scene {
       this.time.delayedCall(1300, () => goTo(this, SceneKeys.Results, results, 400));
     } else {
       if (summary) {
+        playSfx(this.game, summary.won ? 'cheer' : 'round');
         this.hud.callout(summary.won ? 'You win!' : `${this.rivalName} wins!`, summary.won ? CSS.blue : CSS.pink);
         this.stage.flash(summary.won ? COLORS.blue : COLORS.pink, 0.3);
         if (summary.won) this.stage.cheer();
@@ -360,7 +362,6 @@ export class PlayScene extends Phaser.Scene {
     this.touchLanes?.destroy();
     this.touchLanes = null;
     this.stopRotateWatch?.();
-    this.cameras.main.setZoom(1);
     this.conductor?.destroy();
     this.conductor = null;
   }

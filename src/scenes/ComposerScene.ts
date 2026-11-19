@@ -54,6 +54,7 @@ interface Recording {
 
 const RATES = [0.5, 0.75, 1] as const;
 const RIVALS: RivalKind[] = ['raspberry', 'dancer', 'none'];
+const RIVAL_LABELS: Record<RivalKind, string> = { raspberry: 'Raspberry', dancer: 'Coach', none: 'None (solo)' };
 const PANEL_FILL = 0x1c1136;
 const FIELD_FILL = 0x120a24;
 /** How far ahead of the playhead clicks are handed to the audio clock, in seconds. */
@@ -1273,7 +1274,7 @@ export class ComposerScene extends Phaser.Scene {
     const counts = addText(this, x, 730, '', 16, { origin: [0, 0.5], color: CSS.grey, stroke: false, align: 'left' }).setDepth(22).setLineSpacing(8);
     this.refreshers.push(() => {
       stars.forEach((chip, index) => chip.setActive(this.doc.meta.difficulty === index + 1));
-      rival.setText(this.doc.meta.rivalCharacter);
+      rival.setText(RIVAL_LABELS[this.doc.meta.rivalCharacter]);
       counts.setText(`Your notes: ${this.doc.count(0)}\nRival notes: ${this.doc.count(1)}`);
     });
   }
