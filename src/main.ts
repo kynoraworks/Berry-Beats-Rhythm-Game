@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_H, GAME_W } from './core/config';
+import { music } from './core/music';
 import { BootScene } from './scenes/BootScene';
 import { PreloadScene } from './scenes/PreloadScene';
 import { TitleScene } from './scenes/TitleScene';
@@ -26,6 +27,8 @@ const game = new Phaser.Game({
   input: { activePointers: 4 },
   scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene],
 });
+
+music.init(game);
 
 // Handy for debugging and automated tests.
 (window as unknown as { __game: Phaser.Game }).__game = game;

@@ -7,6 +7,7 @@ import { music } from '../core/music';
 import { deleteCustomChart, getBest, listCustomCharts, saveCustomChart } from '../core/saves';
 import { playSfx } from '../core/sfx';
 import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getSong, listCustomAudio, loadSongBuffer, saveCustomAudio } from '../core/songs';
+import { hint } from '../core/mobile';
 import { addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { baseName, disposePicker, downloadText, pickFile, safeFileName } from '../composer/files';
 import { Modal, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
@@ -106,7 +107,7 @@ export class BeatMapsScene extends Phaser.Scene {
       { color: CSS.grey },
     ).setLineSpacing(12);
     this.countText = addText(this, GAME_W - 48, GAME_H - 36, '', 16, { origin: [1, 0.5], color: CSS.grey });
-    addText(this, 48, GAME_H - 36, 'Arrows: move   Enter: choose   Esc: back', 16, { origin: [0, 0.5], color: CSS.grey });
+    addText(this, 48, GAME_H - 36, hint('Arrows: move   Enter: choose   Esc: back', 'Tap a map or a button'), 16, { origin: [0, 0.5], color: CSS.grey });
 
     const key = (action: ModalKey) => () => this.onKey(action);
     menuKeys(this, { up: key('up'), down: key('down'), left: key('left'), right: key('right'), confirm: key('confirm'), back: key('back') });

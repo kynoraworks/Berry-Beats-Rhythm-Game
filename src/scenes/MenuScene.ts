@@ -2,7 +2,8 @@ import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
 import { playSfx } from '../core/sfx';
-import { addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { canFullscreen, hint, onSwipe, toggleFullscreen } from '../core/mobile';
+import { addBackButton, addButton, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
 
 interface MenuItem {
@@ -70,7 +71,8 @@ export class MenuScene extends Phaser.Scene {
       label.setInteractive({ useHandCursor: true });
       label.on(Phaser.Input.Events.POINTER_OVER, () => label.setColor(CSS.yellow));
       label.on(Phaser.Input.Events.POINTER_OUT, () => label.setColor(CSS.cream));
-      label.on(Phaser.Input.Events.POINTER_UP, () => this.confirm());
+      // A swipe that happens to end on the label should not open it.
+      label.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => pointer.getDistance() < 30 && this.confirm());
       const blurb = addText(this, GAME_W / 2, GAME_H / 2 + 90, item.blurb, 32, { color: CSS.lilac });
       const panel = this.add.container(0, 0, [...item.build(this), label, blurb]);
       panel.setVisible(i === this.index);
@@ -83,16 +85,22 @@ export class MenuScene extends Phaser.Scene {
     this.dots = ITEMS.map((_, i) => this.add.rectangle(GAME_W - 56, GAME_H / 2 + (i - 1) * 40, 16, 16, COLORS.cream).setStrokeStyle(4, COLORS.ink));
     this.refreshDots();
 
-    addText(this, 28, GAME_H - 28, 'up/down: choose   enter: select   esc: title', 24, { origin: [0, 0.5] });
+    addText(this, 28, GAME_H - 28, hint('up/down: choose   enter: select   esc: title', 'swipe or tap the arrows, then tap the name'), 24, { origin: [0, 0.5] });
+    const toTitle = () => {
+      playSfx(this.game, 'back');
+      goTo(this, SceneKeys.Title);
+    };
+    addBackButton(this, 20, 44, toTitle, '< title');
+    if (canFullscreen(this)) {
+      addButton(this, GAME_W - 20, 44, 'fullscreen', 32, () => toggleFullscreen(this), { origin: [1, 0.5] }).setPadding(16, 14, 16, 14);
+    }
+    onSwipe(this, { up: () => this.change(1), down: () => this.change(-1) });
 
     menuKeys(this, {
       up: () => this.change(-1),
       down: () => this.change(1),
       confirm: () => this.confirm(),
-      back: () => {
-        playSfx(this.game, 'back');
-        goTo(this, SceneKeys.Title);
-      },
+      back: toTitle,
     });
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (dy !== 0) this.change(dy > 0 ? 1 : -1);

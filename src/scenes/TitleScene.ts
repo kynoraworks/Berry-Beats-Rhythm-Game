@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
 import { playSfx } from '../core/sfx';
+import { hint } from '../core/mobile';
 import { addCover, addText, fadeIn, goTo } from '../core/ui';
 
 export class TitleScene extends Phaser.Scene {
@@ -23,7 +24,7 @@ export class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: logo, scale: 0.66 * 1.1, duration: 830, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     this.add.rectangle(GAME_W / 2, GAME_H - 40, GAME_W, 80, 0x120a24, 0.55);
-    const prompt = addText(this, GAME_W / 2, GAME_H - 132, 'press any key', 48, { color: CSS.yellow });
+    const prompt = addText(this, GAME_W / 2, GAME_H - 132, hint('press any key', 'tap to start'), 48, { color: CSS.yellow });
     this.tweens.add({ targets: prompt, alpha: 0.15, duration: 600, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     addText(this, GAME_W / 2, GAME_H - 52, 'art: maxim volk, salvatore, sainttufa     music: nicole yazmin', 16, { stroke: false });

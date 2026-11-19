@@ -96,7 +96,8 @@ export async function listCustomAudio(): Promise<CustomAudioInfo[]> {
 
 export async function deleteCustomAudio(key: string): Promise<void> {
   await run('readwrite', (store) => store.delete(key.slice(CUSTOM_PREFIX.length)));
-  if (cached?.key === key) cached = null;
+  const index = cache.findIndex((entry) => entry.key === key);
+  if (index >= 0) cache.splice(index, 1);
 }
 
 /** Display name for any song key. */
@@ -111,9 +112,10 @@ export async function songTitle(key: string): Promise<string> {
 // Decoding
 // ---------------------------------------------------------------------------
 
-// Decoded audio is large (about 30 MB per song), so only the latest one is kept.
-let cached: { key: string; buffer: AudioBuffer } | null = null;
-let pending: { key: string; promise: Promise<AudioBuffer> } | null = null;
+// Decoded audio is large (about 30 MB per song), so only the most recent few are kept.
+const CACHE_SIZE = 3;
+const cache: { key: string; buffer: AudioBuffer }[] = [];
+const pending = new Map<string, Promise<AudioBuffer>>();
 
 async function fetchBytes(key: string): Promise<ArrayBuffer> {
   if (key.startsWith(CUSTOM_PREFIX)) {
@@ -130,22 +132,29 @@ async function fetchBytes(key: string): Promise<ArrayBuffer> {
 
 /** Load and decode a song. Rejects with a readable message if the audio is missing or unsupported. */
 export function loadSongBuffer(game: Phaser.Game, key: string): Promise<AudioBuffer> {
-  if (cached?.key === key) return Promise.resolve(cached.buffer);
-  if (pending?.key === key) return pending.promise;
+  const hit = cache.findIndex((entry) => entry.key === key);
+  if (hit >= 0) {
+    const [entry] = cache.splice(hit, 1);
+    cache.push(entry);
+    return Promise.resolve(entry.buffer);
+  }
+  const inFlight = pending.get(key);
+  if (inFlight) return inFlight;
   const ctx = getAudioContext(game);
   const promise = fetchBytes(key)
     .then((bytes) => ctx.decodeAudioData(bytes))
     .then(
       (buffer) => {
-        cached = { key, buffer };
-        if (pending?.promise === promise) pending = null;
+        pending.delete(key);
+        cache.push({ key, buffer });
+        if (cache.length > CACHE_SIZE) cache.shift();
         return buffer;
       },
       (error: unknown) => {
-        if (pending?.promise === promise) pending = null;
+        pending.delete(key);
         throw error instanceof Error && error.message ? error : new Error('This audio file could not be decoded');
       },
     );
-  pending = { key, promise };
+  pending.set(key, promise);
   return promise;
 }

@@ -6,7 +6,8 @@ import { LEVELS, loadLevelChart } from '../core/levels';
 import { music, type MusicKey } from '../core/music';
 import { getBest } from '../core/saves';
 import { playSfx } from '../core/sfx';
-import { addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { hint, onSwipe } from '../core/mobile';
+import { addBackButton, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
 
 interface LevelSelectData {
@@ -82,7 +83,8 @@ export class LevelSelectScene extends Phaser.Scene {
     play.setInteractive({ useHandCursor: true });
     play.on(Phaser.Input.Events.POINTER_OVER, () => play.setColor(CSS.cream));
     play.on(Phaser.Input.Events.POINTER_OUT, () => play.setColor(CSS.yellow));
-    play.on(Phaser.Input.Events.POINTER_UP, () => void this.start());
+    play.setPadding(40, 14, 40, 14);
+    play.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => pointer.getDistance() < 30 && void this.start());
     this.tweens.add({ targets: play, scale: 1.08, duration: 500, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
 
     this.statusText = addText(this, PANEL_CX, PANEL.y + PANEL.h + 30, '', 24, { color: CSS.miss });
@@ -90,7 +92,15 @@ export class LevelSelectScene extends Phaser.Scene {
     this.left = addMenuArrow(this, 60, GAME_H / 2 + 60, 'left', () => this.change(-1));
     this.right = addMenuArrow(this, GAME_W - 60, GAME_H / 2 + 60, 'right', () => this.change(1));
 
-    addText(this, GAME_W - 28, GAME_H - 28, 'left/right: choose   enter: play   esc: menu', 24, { origin: [1, 0.5] });
+    addText(this, GAME_W - 28, GAME_H - 28, hint('left/right: choose   enter: play   esc: menu', 'swipe or tap the arrows, then tap play'), 24, { origin: [1, 0.5] });
+    const toMenu = () => {
+      if (this.busy) return;
+      playSfx(this.game, 'back');
+      music.play('menu');
+      goTo(this, SceneKeys.Menu);
+    };
+    addBackButton(this, 20, GAME_H - 36, toMenu, '< menu');
+    onSwipe(this, { left: () => this.change(1), right: () => this.change(-1) });
 
     this.pole = this.buildPole();
     this.loadCharts();
@@ -100,12 +110,7 @@ export class LevelSelectScene extends Phaser.Scene {
       left: () => this.change(-1),
       right: () => this.change(1),
       confirm: () => void this.start(),
-      back: () => {
-        if (this.busy) return;
-        playSfx(this.game, 'back');
-        music.play('menu');
-        goTo(this, SceneKeys.Menu);
-      },
+      back: toMenu,
     });
   }
 

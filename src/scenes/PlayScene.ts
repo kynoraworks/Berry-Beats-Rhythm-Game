@@ -5,10 +5,12 @@ import { Conductor } from '../core/conductor';
 import { Engine, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { PlayData, ResultsData } from '../core/flow';
 import { LaneInput } from '../core/input';
+import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
+import { TouchLanes } from '../core/touchLanes';
 import { addButton, addDim, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { createPlayer, createRival, type Dancer } from '../play/characters';
 import { Hud } from '../play/Hud';
@@ -22,6 +24,8 @@ const LEAD_IN = 2.4;
 /** Lead-in when starting part-way through a song from the composer. */
 const PRACTICE_LEAD_IN = 1.5;
 const COUNT_STEP = 0.6;
+/** Events that count as a user gesture for unlocking audio (phones need the "up" events). */
+const UNLOCK_EVENTS = ['pointerup', 'touchend', 'click', 'keydown'] as const;
 /** Combos that earn a showpiece move. After the last one it repeats every 50. */
 const COMBO_MILESTONES = [10, 25, 50, 75, 100];
 /** The rival shows off after this many of her own notes. */
@@ -39,6 +43,9 @@ export class PlayScene extends Phaser.Scene {
   private conductor: Conductor | null = null;
   private engine!: Engine;
   private laneInput: LaneInput | null = null;
+  private touchLanes: TouchLanes | null = null;
+  private pauseButton!: Phaser.GameObjects.Image;
+  private stopRotateWatch: (() => void) | null = null;
   private playerField!: NoteField;
   private rivalField: NoteField | null = null;
   private rivalNotes: PlayNote[] = [];
@@ -54,7 +61,6 @@ export class PlayScene extends Phaser.Scene {
   private pauseLayer!: Phaser.GameObjects.Container;
   private pauseItems: PauseItem[] = [];
   private pauseIndex = 0;
-  private readonly touchLanes = new Map<number, Lane>();
   private autoHeld: (PlayNote | null)[] = [null, null, null, null];
   private nextMilestone = COMBO_MILESTONES[0];
   private rivalHits = 0;
@@ -76,7 +82,8 @@ export class PlayScene extends Phaser.Scene {
     this.countIndex = 0;
     this.pauseItems = [];
     this.pauseIndex = 0;
-    this.touchLanes.clear();
+    this.touchLanes = null;
+    this.stopRotateWatch = null;
     this.autoHeld = [null, null, null, null];
     this.nextMilestone = COMBO_MILESTONES[0];
     this.rivalHits = 0;
@@ -116,7 +123,7 @@ export class PlayScene extends Phaser.Scene {
       this.hud.setSolo();
     }
 
-    const pause = this.add.image(14, 18, Tex.pauseButton).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
+    const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
     pause.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       this.pauseGame();
@@ -128,7 +135,10 @@ export class PlayScene extends Phaser.Scene {
     if (this.playData.practice) addText(this, GAME_W / 2, 236, 'Test play', 24, { color: CSS.yellow }).setDepth(Depth.hud);
     if (this.playData.autoplay) addText(this, GAME_W / 2, 236, 'Autoplay', 24, { color: CSS.yellow }).setDepth(Depth.hud);
 
-    if (!this.playData.autoplay) this.showKeyHints();
+    if (!this.playData.autoplay) {
+      if (isTouch()) this.showTouchHint();
+      else this.showKeyHints();
+    }
     this.buildPauseMenu();
     this.setupInput();
 
@@ -151,14 +161,12 @@ export class PlayScene extends Phaser.Scene {
     const ctx = getAudioContext(this.game);
     if (ctx.state !== 'running') {
       // Browsers keep audio locked until the page is clicked or a key is pressed.
-      this.countText.setText('Click to start').setFontSize(48);
+      this.countText.setText(isTouch() ? 'Tap to start' : 'Click to start').setFontSize(48);
       const unlock = () => {
-        window.removeEventListener('pointerdown', unlock);
-        window.removeEventListener('keydown', unlock);
+        for (const type of UNLOCK_EVENTS) window.removeEventListener(type, unlock);
         void ctx.resume().then(() => this.begin(buffer));
       };
-      window.addEventListener('pointerdown', unlock);
-      window.addEventListener('keydown', unlock);
+      for (const type of UNLOCK_EVENTS) window.addEventListener(type, unlock);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, unlock);
       return;
     }
@@ -184,6 +192,7 @@ export class PlayScene extends Phaser.Scene {
     this.state = 'paused';
     this.conductor.pause();
     if (this.laneInput) this.laneInput.enabled = false;
+    this.touchLanes?.setGuideVisible(false);
     this.tweens.pauseAll();
     this.pauseIndex = 0;
     this.refreshPauseMenu();
@@ -193,7 +202,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private resumeGame(): void {
-    if (this.state !== 'paused') return;
+    if (this.state !== 'paused' || isRotateNoticeShown()) return;
     this.state = 'resuming';
     this.pauseLayer.setVisible(false);
     this.tweens.resumeAll();
@@ -210,6 +219,7 @@ export class PlayScene extends Phaser.Scene {
       if (this.state !== 'resuming') return;
       this.countText.setText('');
       if (this.laneInput) this.laneInput.enabled = true;
+      this.touchLanes?.setGuideVisible(true);
       this.conductor?.resume();
       this.state = 'playing';
     });
@@ -228,6 +238,7 @@ export class PlayScene extends Phaser.Scene {
   private finish(failed: boolean): void {
     if (this.state === 'ended') return;
     this.state = 'ended';
+    this.touchLanes?.setGuideVisible(false);
     if (this.laneInput) this.laneInput.enabled = false;
     const results: ResultsData = { play: this.playData, stats: this.engine.stats, failed };
     this.player.finish(!failed);
@@ -248,6 +259,9 @@ export class PlayScene extends Phaser.Scene {
     window.removeEventListener('blur', this.onBlur);
     this.laneInput?.destroy();
     this.laneInput = null;
+    this.touchLanes?.destroy();
+    this.touchLanes = null;
+    this.stopRotateWatch?.();
     this.conductor?.destroy();
     this.conductor = null;
   }
@@ -258,6 +272,23 @@ export class PlayScene extends Phaser.Scene {
 
   private readonly onBlur = (): void => this.pauseGame();
 
+  /** Explains the touch controls until the song starts. */
+  private showTouchHint(): void {
+    const text = 'tap the four coloured columns\nleft  up  down  right';
+    const backing = this.add.rectangle(GAME_W / 2, 600, 760, 110, COLORS.night, 0.8).setDepth(Depth.hud);
+    const hint = addText(this, GAME_W / 2, 600, text, 32, { color: CSS.yellow }).setDepth(Depth.hud);
+    this.tweens.add({
+      targets: [backing, hint],
+      alpha: 0,
+      delay: 4200,
+      duration: 500,
+      onComplete: () => {
+        backing.destroy();
+        hint.destroy();
+      },
+    });
+  }
+
   /** Labels above the receptors showing which keys play each lane, shown until the song starts. */
   private showKeyHints(): void {
     const keys = getSettings().keys;
@@ -267,9 +298,6 @@ export class PlayScene extends Phaser.Scene {
       const label = labels.find((l) => l.length <= 2) ?? labels[0];
       return addText(this, x, RECEPTOR_Y - 84, label, label.length <= 2 ? 32 : 16, { color: CSS.yellow }).setDepth(Depth.hud);
     });
-    if (this.sys.game.device.input.touch) {
-      hints.push(addText(this, GAME_W / 2, RECEPTOR_Y + 44, 'Touch: the screen is split into 4 columns, one per arrow', 16, { color: CSS.yellow }).setDepth(Depth.hud));
-    }
     this.tweens.add({ targets: hints, alpha: 0, delay: 4200, duration: 500, onComplete: () => hints.forEach((h) => h.destroy()) });
   }
 
@@ -296,22 +324,13 @@ export class PlayScene extends Phaser.Scene {
         up: (lane, timeMs) => this.laneUp(lane, timeMs),
       });
 
-      // Touch and mouse: the screen is split into four columns, one per lane.
-      this.input.on(Phaser.Input.Events.POINTER_DOWN, (pointer: Phaser.Input.Pointer) => {
-        if (this.state !== 'playing' || this.touchLanes.has(pointer.id)) return;
-        const lane = Phaser.Math.Clamp(Math.floor((pointer.x / GAME_W) * 4), 0, 3) as Lane;
-        this.touchLanes.set(pointer.id, lane);
-        this.laneDown(lane, pointer.event.timeStamp);
-      });
-      const pointerUp = (pointer: Phaser.Input.Pointer) => {
-        const lane = this.touchLanes.get(pointer.id);
-        if (lane === undefined) return;
-        this.touchLanes.delete(pointer.id);
-        this.laneUp(lane, pointer.event.timeStamp);
-      };
-      this.input.on(Phaser.Input.Events.POINTER_UP, pointerUp);
-      this.input.on(Phaser.Input.Events.POINTER_UP_OUTSIDE, pointerUp);
+      // Touch and mouse: the whole window is split into four columns, one per lane.
+      this.touchLanes = new TouchLanes(
+        { down: (lane, timeMs) => this.laneDown(lane, timeMs), up: (lane, timeMs) => this.laneUp(lane, timeMs) },
+        (event) => this.state !== 'playing' || this.isOverPauseButton(event),
+      );
     }
+    this.stopRotateWatch = onRotateNoticeChange((shown) => shown && this.pauseGame());
 
     menuKeys(this, {
       up: () => this.movePause(-1),
@@ -332,10 +351,18 @@ export class PlayScene extends Phaser.Scene {
     });
   }
 
+  /** True if a browser pointer event landed on the pause button, which handles its own taps. */
+  private isOverPauseButton(event: PointerEvent): boolean {
+    const canvas = this.game.canvas.getBoundingClientRect();
+    const x = ((event.clientX - canvas.left) / canvas.width) * GAME_W;
+    const y = ((event.clientY - canvas.top) / canvas.height) * this.scale.height;
+    return this.pauseButton.getBounds().contains(x, y);
+  }
+
   private laneDown(lane: Lane, timeMs: number): void {
     if (this.state !== 'playing') return;
     this.playerField.setPressed(lane, true);
-    const held = ([0, 1, 2, 3] as Lane[]).filter((l) => l !== lane && (this.laneInput?.isDown(l) || [...this.touchLanes.values()].includes(l)));
+    const held = ([0, 1, 2, 3] as Lane[]).filter((l) => l !== lane && (this.laneInput?.isDown(l) || this.touchLanes?.isDown(l)));
     this.player.dance(lane, held);
     this.handleEvents(this.engine.press(lane, this.eventTime(timeMs)));
   }

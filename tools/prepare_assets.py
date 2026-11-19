@@ -105,6 +105,24 @@ def build_images() -> None:
     title.crop((left, 0, left + crop_w, title.height)).resize((1280, 800), Image.LANCZOS).save(OUT_IMG / "title_bg.jpg", quality=88)
 
 
+def build_icons() -> None:
+    """Home screen icons: the blackberry from the health bar on the game's purple."""
+    out = ROOT / "public" / "icons"
+    out.mkdir(parents=True, exist_ok=True)
+    berry = Image.open(SPR / "progress_bar" / "berries.png").convert("RGBA").crop((0, 0, 24, 24))
+
+    def icon(size: int, scale: int, name: str) -> None:
+        canvas = Image.new("RGBA", (size, size), (122, 79, 214, 255))
+        art = berry.resize((24 * scale, 24 * scale), Image.NEAREST)
+        canvas.alpha_composite(art, ((size - art.width) // 2, (size - art.height) // 2))
+        canvas.convert("RGB").save(out / name, optimize=True)
+
+    icon(192, 6, "icon-192.png")
+    icon(512, 16, "icon-512.png")
+    icon(512, 12, "icon-maskable-512.png")  # extra margin: launchers crop maskable icons
+    icon(180, 6, "apple-touch-icon.png")
+
+
 def build_audio() -> None:
     OUT_AUDIO.mkdir(parents=True, exist_ok=True)
     music = SRC / "Music"
@@ -152,6 +170,7 @@ def build_fonts() -> None:
 
 if __name__ == "__main__":
     build_images()
+    build_icons()
     build_audio()
     build_fonts()
     print("Assets written to public/assets")

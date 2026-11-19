@@ -3,6 +3,7 @@ import { COLORS, CSS, GAME_H, GAME_W, LANE_NAMES, SceneKeys, Tex } from '../core
 import { music } from '../core/music';
 import { getSettings, keyLabel, resetSettings, updateSettings, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
+import { hint } from '../core/mobile';
 import { addCover, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { OffsetTest } from '../menus/offsetTest';
 
@@ -111,7 +112,7 @@ export class OptionsScene extends Phaser.Scene {
     this.addAction(backBounds, 'back', '', 'return to the menu', () => this.leave(), true);
 
     this.hintText = addText(this, GAME_W / 2, 716, '', 24, { color: CSS.lilac, wrapWidth: 1160 });
-    addText(this, GAME_W / 2, GAME_H - 28, 'up/down: move   left/right: change   enter: select   esc: back', 16);
+    addText(this, GAME_W / 2, GAME_H - 28, hint('up/down: move   left/right: change   enter: select   esc: back', 'tap a row to select it, tap the arrows to change it'), 16);
 
     this.rows.forEach((row) => row.refresh());
     this.setFocus(0, false);

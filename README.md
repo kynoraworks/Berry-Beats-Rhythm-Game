@@ -25,7 +25,15 @@ Open the address Vite prints (normally http://localhost:5173).
 | Pause | `Esc` or `P` |
 | Menus | Arrow keys or `WASD`, `Enter` to confirm, `Esc` to go back |
 
-On a touch screen the play field is split into four columns, one per arrow. Keys, volume, scroll speed and audio offset can be changed under Options. If notes feel early or late on your setup (Bluetooth headphones especially), use the calibration tool there.
+### On a phone or tablet
+
+The game runs in mobile browsers in landscape. Hold the device sideways (a notice asks you to rotate it otherwise).
+
+- **Playing:** the whole screen is split into four coloured columns, left, up, down and right. Tap a column to hit that arrow and keep your finger down for hold notes. Several fingers at once work.
+- **Menus:** swipe or tap the yellow arrows to browse, tap an item to open it, and use the back button in the corner.
+- **Fullscreen:** tap "fullscreen" in the main menu (Android and iPad). On iPhone, use Share > Add to Home Screen and launch it from there to hide the browser bars.
+
+The site is installable as a web app from the browser menu. Keys, volume, scroll speed and audio offset can be changed under Options. If notes feel early or late on your setup (Bluetooth headphones especially), use the calibration tool there.
 
 ### How scoring works
 

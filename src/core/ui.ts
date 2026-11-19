@@ -78,6 +78,14 @@ export function addButton(scene: Phaser.Scene, x: number, y: number, label: stri
   return text;
 }
 
+/** A large "back" button in a corner, so every screen can be left without a keyboard. */
+export function addBackButton(scene: Phaser.Scene, x: number, y: number, onBack: () => void, label = '< back'): Phaser.GameObjects.Text {
+  const button = addButton(scene, x, y, label, 32, onBack, { origin: [0, 0.5], sfx: false });
+  // A generous hit area: the text itself is a small target for a thumb.
+  button.setPadding(16, 14, 16, 14);
+  return button;
+}
+
 const leaving = new WeakSet<Phaser.Scene>();
 
 /** Fade the scene in. Call at the start of `create`. */
