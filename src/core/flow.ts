@@ -20,10 +20,28 @@ export interface PlayData {
   autoplay?: boolean;
 }
 
+/** Outcome of a dance battle against a rival who is scored too. */
+export interface BattleSummary {
+  rivalName: string;
+  /** Texture key of the rival's sprite sheet (51-frame berry layout), for the results screen. */
+  rivalTexture: string;
+  playerRounds: number;
+  rivalRounds: number;
+  /** 0..100 */
+  rivalAccuracy: number;
+  rivalScore: number;
+  /** True if the player took more rounds (ties are settled on accuracy). */
+  won: boolean;
+}
+
 export interface ResultsData {
   play: PlayData;
   stats: Stats;
   failed: boolean;
+  /** Present when the level was a scored battle. */
+  battle?: BattleSummary;
+  /** Average timing error of the player's hits in milliseconds (positive = late), if enough notes were hit. */
+  meanErrorMs?: number;
 }
 
 export interface ComposerData {

@@ -17,6 +17,8 @@ export interface Settings {
   hitSounds: boolean;
   /** Keep playing when the health bar is empty. */
   noFail: boolean;
+  /** Turn off camera shakes, flashes and background pulsing. */
+  reduceMotion: boolean;
   /** KeyboardEvent.code values bound to each lane (left, up, down, right). */
   keys: string[][];
 }
@@ -28,6 +30,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scrollSpeed: 1,
   hitSounds: false,
   noFail: false,
+  reduceMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   keys: [
     ['ArrowLeft', 'KeyD'],
     ['ArrowUp', 'KeyF'],
@@ -59,6 +62,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     scrollSpeed: clamp(raw.scrollSpeed, 0.5, 2.5, d.scrollSpeed),
     hitSounds: typeof raw.hitSounds === 'boolean' ? raw.hitSounds : d.hitSounds,
     noFail: typeof raw.noFail === 'boolean' ? raw.noFail : d.noFail,
+    reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),
   };
 }

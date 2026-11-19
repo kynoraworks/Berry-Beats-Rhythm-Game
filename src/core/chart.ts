@@ -30,7 +30,9 @@ export interface Chart {
   /** Notes the rival dances to (auto-played on the right-hand lanes). */
   rival?: ChartNote[];
   rivalCharacter?: RivalKind;
-  /** 1 (easy) to 5 (hard), for display only. */
+  /** Stage background key (see play/stages). Story levels get theirs from core/levels.ts. */
+  stage?: string;
+  /** 1 (easy) to 5 (hard). Shown in menus and used to set the rival's skill. */
   difficulty?: number;
   charter?: string;
 }
@@ -127,6 +129,7 @@ export function parseChart(value: unknown): Chart {
     chart.difficulty = Math.min(5, Math.max(1, Math.round(c.difficulty)));
   }
   if (typeof c.charter === 'string') chart.charter = c.charter.slice(0, 80);
+  if (typeof c.stage === 'string' && /^[a-z0-9_-]{1,40}$/.test(c.stage)) chart.stage = c.stage;
   return chart;
 }
 
