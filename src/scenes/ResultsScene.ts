@@ -102,6 +102,13 @@ export class ResultsScene extends Phaser.Scene {
       if (color !== CSS.grey) this.tweens.add({ targets: badge, scale: 1.12, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
 
+    // Blackberry celebrates or sulks between the buttons.
+    const poses = failed ? [31] : [29, 30];
+    const berry = this.add.sprite(GAME_W / 2, 742, Tex.blackberry, poses[0]).setOrigin(0.5, 63 / 64).setScale(3);
+    if (poses.length > 1) {
+      this.time.addEvent({ delay: 320, loop: true, callback: () => berry.setFrame(poses[berry.frame.name === String(poses[0]) ? 1 : 0]) });
+    }
+
     const entries: [string, () => void][] = [
       ['Retry', () => this.leave(SceneKeys.Play, play)],
       [play.practice ? 'Back to editor' : 'Continue', () => this.leave(play.returnTo.scene, play.returnTo.data)],

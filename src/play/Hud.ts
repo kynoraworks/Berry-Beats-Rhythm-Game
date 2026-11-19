@@ -31,6 +31,7 @@ export class Hud {
   private readonly judgeText: Phaser.GameObjects.Text;
   private readonly comboText: Phaser.GameObjects.Text;
   private readonly missSplash: Phaser.GameObjects.Sprite;
+  private readonly milestoneText: Phaser.GameObjects.Text;
   private readonly progress: Phaser.GameObjects.Rectangle;
   private shownHealth = 0.5;
   private shownScore = 0;
@@ -54,6 +55,7 @@ export class Hud {
     this.comboText = addText(scene, PLAYER_FIELD_CENTER, JUDGE_Y + 50, '', 32).setDepth(JUDGE_DEPTH).setVisible(false);
     this.missSplash = scene.add.sprite(PLAYER_FIELD_CENTER, JUDGE_Y, Tex.missSplash, 0).setScale(1.5).setDepth(JUDGE_DEPTH).setVisible(false);
     this.missSplash.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => this.missSplash.setVisible(false));
+    this.milestoneText = addText(scene, GAME_W / 2, 330, '', 64, { color: CSS.yellow }).setDepth(Depth.hud).setVisible(false);
     this.progress = scene.add.rectangle(0, 0, 0, 6, COLORS.lilac).setOrigin(0).setDepth(Depth.hud);
     this.drawHealth(0.5);
   }
@@ -83,6 +85,15 @@ export class Hud {
     } else {
       this.comboText.setVisible(false);
     }
+  }
+
+  /** Big call-out when the combo reaches a milestone. */
+  showMilestone(combo: number): void {
+    const text = this.milestoneText;
+    this.scene.tweens.killTweensOf(text);
+    text.setText(`${combo} combo!`).setVisible(true).setAlpha(1).setScale(0.4).setAngle(-4);
+    this.scene.tweens.add({ targets: text, scale: 1, angle: 0, duration: 220, ease: 'Back.easeOut' });
+    this.scene.tweens.add({ targets: text, alpha: 0, y: text.y - 30, delay: 700, duration: 300, onComplete: () => text.setVisible(false).setY(330) });
   }
 
   /** `progress` is 0..1 through the song; `beat` drives the berry bounce. */

@@ -63,8 +63,8 @@ export const Tex = {
   room: 'room', // 256x160
   train: 'train', // 25 frames, 256x160
   berrySit: 'berry_sit', // 25 frames, 75x75
-  blackberry: 'blackberry', // 21 frames, 48x48
-  raspberry: 'raspberry', // 48x48 single frame
+  blackberry: 'blackberry', // 45 frames, 64x64, feet at y=62 (layout in tools/build_characters.py)
+  raspberry: 'raspberry', // 45 frames, 64x64, same layout as blackberry
   dancer: 'dancer', // 39 frames, 160x160
   notes: 'notes', // 8 frames, 18x18: 0-3 coloured notes, 4-7 pale receptors (lane order)
   arrowsClassic: 'arrows_classic', // 128x128 sheet of the older arrow style, 32x32 cells

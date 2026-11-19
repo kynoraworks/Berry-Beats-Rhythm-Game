@@ -2,6 +2,8 @@
 """Build the web game's runtime assets from the archived Unity project.
 
 Run from the repo root:  python3 tools/prepare_assets.py
+The two dancers' sheets (blackberry.png, raspberry.png) are packed separately
+by tools/build_characters.py.
 Requires Pillow, fontTools and ffmpeg. Output goes to public/assets and is committed,
 so you only need to run this again if the source art or music changes.
 """
@@ -49,7 +51,6 @@ def build_images() -> None:
 
     # Backgrounds and characters
     copy(SPR / "bb_room.png", "room.png")
-    copy(SPR / "Blackberry Moves.png", "blackberry.png")  # 21 frames, 48x48
     copy(SPR / "Train" / "Berry Sprites" / "berry_spritesheet.png", "berry_sit.png")  # 25 frames, 75x75
     train = [
         Image.open(SPR / "Train" / "Train Sprites" / f"{i:02d}.png").convert("RGBA")
@@ -57,16 +58,6 @@ def build_images() -> None:
     ]
     repack(train, 5, "train.png")  # 25 frames, 256x160
     repack(strip(SPR / "dancer_sprite.png", 160, 160), 8, "dancer.png")  # 39 frames, 160x160
-
-    # Raspberry only exists as concept art: an 8x upscaled pair on a grey checkerboard.
-    pair = Image.open(ROOT / "archive" / "concept-art" / "2021_05_11_21_57_IMG_5678.PNG").convert("RGBA")
-    rasp = pair.crop((384, 0, 768, 384)).resize((48, 48), Image.NEAREST)
-    px = rasp.load()
-    for y in range(48):
-        for x in range(48):
-            if px[x, y][:3] in ((102, 102, 102), (89, 89, 89)):
-                px[x, y] = (0, 0, 0, 0)
-    rasp.save(OUT_IMG / "raspberry.png")
 
     # Notes: row 0 = coloured notes (left, up, down, right), row 1 = pale receptors.
     notes = Image.open(SPR / "buttons.png").convert("RGBA")

@@ -10,7 +10,7 @@ import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { addButton, addDim, addPanel, addText, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { createPlayer, createRival, type Dancer, type PoseDancer } from '../play/characters';
+import { createPlayer, createRival, type Dancer } from '../play/characters';
 import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
@@ -22,6 +22,10 @@ const LEAD_IN = 2.4;
 /** Lead-in when starting part-way through a song from the composer. */
 const PRACTICE_LEAD_IN = 1.5;
 const COUNT_STEP = 0.6;
+/** Combos that earn a showpiece move. After the last one it repeats every 50. */
+const COMBO_MILESTONES = [10, 25, 50, 75, 100];
+/** The rival shows off after this many of her own notes. */
+const RIVAL_SPECIAL_EVERY = 24;
 
 interface PauseItem {
   text: Phaser.GameObjects.Text;
@@ -39,7 +43,7 @@ export class PlayScene extends Phaser.Scene {
   private rivalField: NoteField | null = null;
   private rivalNotes: PlayNote[] = [];
   private rivalCursor = 0;
-  private player!: PoseDancer;
+  private player!: Dancer;
   private rival: Dancer | null = null;
   private hud!: Hud;
   private speed = BASE_SCROLL_SPEED;
@@ -52,6 +56,8 @@ export class PlayScene extends Phaser.Scene {
   private pauseIndex = 0;
   private readonly touchLanes = new Map<number, Lane>();
   private autoHeld: (PlayNote | null)[] = [null, null, null, null];
+  private nextMilestone = COMBO_MILESTONES[0];
+  private rivalHits = 0;
 
   constructor() {
     super(SceneKeys.Play);
@@ -72,6 +78,8 @@ export class PlayScene extends Phaser.Scene {
     this.pauseIndex = 0;
     this.touchLanes.clear();
     this.autoHeld = [null, null, null, null];
+    this.nextMilestone = COMBO_MILESTONES[0];
+    this.rivalHits = 0;
   }
 
   create(): void {
@@ -222,6 +230,8 @@ export class PlayScene extends Phaser.Scene {
     this.state = 'ended';
     if (this.laneInput) this.laneInput.enabled = false;
     const results: ResultsData = { play: this.playData, stats: this.engine.stats, failed };
+    this.player.finish(!failed);
+    this.rival?.finish(failed);
     if (failed) {
       this.conductor?.pause();
       playSfx(this.game, 'fail');
@@ -229,7 +239,7 @@ export class PlayScene extends Phaser.Scene {
       this.countText.setText('Failed').setColor(CSS.miss).setAlpha(1).setScale(1);
       this.time.delayedCall(1300, () => goTo(this, SceneKeys.Results, results, 400));
     } else {
-      this.time.delayedCall(500, () => goTo(this, SceneKeys.Results, results, 400));
+      this.time.delayedCall(1400, () => goTo(this, SceneKeys.Results, results, 400));
     }
   }
 
@@ -343,12 +353,20 @@ export class PlayScene extends Phaser.Scene {
         // A missed hold reports its head and tail together: show it once.
         if (part === 'holdEnd' && note.state === 'missed') continue;
         this.hud.showJudgement('miss', 0);
-        this.player.stumble(this);
+        this.player.stumble();
         playSfx(this.game, 'miss');
+        this.nextMilestone = COMBO_MILESTONES[0];
       } else {
         this.hud.showJudgement(judgement, this.engine.stats.combo);
         this.playerField.hitFx(note.lane, judgement === 'perfect' ? 1 : judgement === 'good' ? 0.6 : 0.3);
         if (getSettings().hitSounds && part !== 'holdEnd') playSfx(this.game, 'tick');
+        const combo = this.engine.stats.combo;
+        if (combo >= this.nextMilestone) {
+          this.hud.showMilestone(this.nextMilestone);
+          this.player.special();
+          const index = COMBO_MILESTONES.indexOf(this.nextMilestone);
+          this.nextMilestone = index >= 0 && index < COMBO_MILESTONES.length - 1 ? COMBO_MILESTONES[index + 1] : this.nextMilestone + 50;
+        }
       }
     }
   }
@@ -384,6 +402,10 @@ export class PlayScene extends Phaser.Scene {
     this.playerField.update(time, this.speed);
     this.rivalField?.update(time, this.speed);
     if (this.state !== 'paused') {
+      if (this.state === 'playing') {
+        this.player.setHolding(([0, 1, 2, 3] as Lane[]).some((lane) => this.engine.heldNote(lane) !== null));
+        this.player.setHype(this.engine.stats.multiplier >= 4);
+      }
       this.player.update(dt, beat);
       this.rival?.update(dt, beat);
       this.hud.update(this.engine.stats, time / conductor.duration, beat, dt);
@@ -405,6 +427,7 @@ export class PlayScene extends Phaser.Scene {
 
   private updateRival(time: number): void {
     const notes = this.rivalNotes;
+    let holding = false;
     for (let i = this.rivalCursor; i < notes.length; i++) {
       const note = notes[i];
       if (note.t > time) break;
@@ -413,14 +436,17 @@ export class PlayScene extends Phaser.Scene {
         this.rivalField?.hitFx(note.lane, 0.5);
         this.rivalField?.setPressed(note.lane, true);
         this.rival?.dance(note.lane);
+        if (++this.rivalHits % RIVAL_SPECIAL_EVERY === 0) this.rival?.special();
         if (!note.isHold) this.time.delayedCall(90, () => this.rivalField?.setPressed(note.lane, false));
       }
       if (note.state === 'holding' && time >= note.end) {
         note.state = 'done';
         this.rivalField?.setPressed(note.lane, false);
       }
+      if (note.state === 'holding') holding = true;
       if (note.state === 'done' && i === this.rivalCursor) this.rivalCursor++;
     }
+    this.rival?.setHolding(holding);
   }
 
   /** Plays every note perfectly. Used for demos and automated tests. */
