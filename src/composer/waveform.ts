@@ -3,6 +3,8 @@ export interface Peaks {
   /** Peak absolute amplitude (0..1) per bucket. */
   values: Float32Array;
   bucketsPerSecond: number;
+  /** Loudest value in the song, for scaling the drawing. */
+  max: number;
 }
 
 /** Works on raw channel data so it can run without an AudioBuffer (tests). */
@@ -23,7 +25,18 @@ export function computePeaks(channels: readonly Float32Array[], sampleRate: numb
       values[i] = peak;
     }
   }
-  return { values, bucketsPerSecond };
+  let max = 0;
+  for (let i = 0; i < count; i++) if (values[i] > max) max = values[i];
+  return { values, bucketsPerSecond, max };
+}
+
+/**
+ * Bar length (0..1) for drawing a peak: scaled to the loudest moment of the
+ * song, with quiet parts pushed down so that beats stand out.
+ */
+export function displayLevel(peaks: Peaks, value: number): number {
+  if (peaks.max <= 0) return 0;
+  return Math.pow(Math.min(1, value / peaks.max), 1.6);
 }
 
 export function peaksFromBuffer(buffer: AudioBuffer, bucketsPerSecond = 250): Peaks {

@@ -3,7 +3,7 @@ import { newChart, parseChart, serializeChart, type Chart } from '../src/core/ch
 import { History } from '../src/composer/history';
 import { EditorDoc, noteAt, notesInRange, overlaps } from '../src/composer/model';
 import { formatBeat, formatTime, gridLines, measureOf, snapBeat, tapTempo } from '../src/composer/grid';
-import { computePeaks, peakBetween } from '../src/composer/waveform';
+import { computePeaks, displayLevel, peakBetween } from '../src/composer/waveform';
 
 function blank(): Chart {
   return newChart('tutorial', 120, 0.5, 'Test');
@@ -226,5 +226,9 @@ describe('waveform', () => {
     expect(peakBetween(peaks, 0, 1)).toBeCloseTo(0.8);
     expect(peakBetween(peaks, -5, -1)).toBe(0);
     expect(peakBetween(peaks, 2, 3)).toBe(0);
+    expect(peaks.max).toBeCloseTo(0.8);
+    expect(displayLevel(peaks, 0.8)).toBeCloseTo(1);
+    expect(displayLevel(peaks, 0.4)).toBeLessThan(0.5);
+    expect(displayLevel(computePeaks([new Float32Array(10)], 10, 1), 0)).toBe(0);
   });
 });

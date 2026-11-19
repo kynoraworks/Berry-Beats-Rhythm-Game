@@ -14,6 +14,7 @@ import { baseName, disposePicker, pickFile } from '../composer/files';
 import { BEATS_PER_MEASURE, SNAPS, ZOOMS, clamp, formatBeat, formatTime, snapBeat, snapLabel, tapTempo } from '../composer/grid';
 import {
   GROUP_W,
+  LANE_W,
   LEFT_W,
   MINIMAP_W,
   MINIMAP_X,
@@ -134,7 +135,6 @@ export class ComposerScene extends Phaser.Scene {
   private loadingText!: Phaser.GameObjects.Text;
   private playIcon!: Phaser.GameObjects.Image;
   private lastReadout = '';
-  private lastUiState: unknown = null;
 
   constructor() {
     super(SceneKeys.Composer);
@@ -169,7 +169,6 @@ export class ComposerScene extends Phaser.Scene {
     this.help = [];
     this.refreshers = [];
     this.lastReadout = '';
-    this.lastUiState = null;
     this.laneCodes = new Map();
     getSettings().keys.forEach((codes, lane) => codes.forEach((code) => this.laneCodes.set(code, lane as Lane)));
   }
@@ -204,7 +203,7 @@ export class ComposerScene extends Phaser.Scene {
       void songTitle(this.doc.meta.song).then((name) => {
         if (token !== this.loadToken) return;
         this.songName = name;
-        this.refreshUi(true);
+        this.refreshUi();
       });
     }
   }
@@ -260,7 +259,7 @@ export class ComposerScene extends Phaser.Scene {
     this.conductor.setRate(RATES[this.rateIndex]);
     this.loadingText.setVisible(false);
     this.ready = true;
-    this.refreshUi(true);
+    this.refreshUi();
   }
 
   /** Pick a new audio file for a map whose audio is missing on this device. */
@@ -646,8 +645,8 @@ export class ComposerScene extends Phaser.Scene {
           for (const note of this.doc.notes) {
             const t = beatToSec(meta, note.b);
             if (t < t0 || t > t1) continue;
-            const laneLeft = (note.side === 0 ? PLAYER_X : RIVAL_X) + note.l * 56;
-            if (laneLeft + 56 > left && laneLeft < right) this.selection.add(note.id);
+            const laneLeft = (note.side === 0 ? PLAYER_X : RIVAL_X) + note.l * LANE_W;
+            if (laneLeft + LANE_W > left && laneLeft < right) this.selection.add(note.id);
           }
         }
         break;
@@ -1162,7 +1161,7 @@ export class ComposerScene extends Phaser.Scene {
   private buildTopBar(): void {
     this.add.rectangle(GAME_W / 2, TOP_H / 2, GAME_W, TOP_H, PANEL_FILL).setDepth(20);
     this.add.rectangle(GAME_W / 2, TOP_H - 2, GAME_W, 4, COLORS.ink).setDepth(20);
-    this.chip(52, 28, 'Back', () => this.requestExit(), 80, 24).bg.setName('back');
+    this.chip(52, 28, 'Back', () => this.requestExit(), 80, 24);
     const title = addText(this, 108, 28, '', 24, { origin: [0, 0.5] }).setDepth(22);
     this.statusText = addText(this, 0, 28, '', 16, { origin: [0, 0.5] }).setDepth(22);
     this.refreshers.push(() => {
@@ -1385,10 +1384,7 @@ export class ComposerScene extends Phaser.Scene {
   }
 
   /** Bring every chip, label and readout in line with the current state. */
-  private refreshUi(force = false): void {
-    const state = this.doc.state;
-    void force;
-    this.lastUiState = state;
+  private refreshUi(): void {
     for (const refresh of this.refreshers) refresh();
     this.lastReadout = '';
   }

@@ -164,7 +164,7 @@ class Tempo:
     drift_ms: float  # grid drift from the first to the last onset
     jitter_ms: float  # spread of on-grid onsets around the grid
     on_grid: float  # share of mid/high onsets within 20 ms of the sixteenth grid
-    bar_period: float  # how much stronger the 8-pulse repeat is than the 4-pulse one
+    bar_period: float  # autocorrelation of the rhythm at 8 pulses minus that at 4 pulses
     offset: float = 0.0
     confidence: str = ""
 
@@ -234,7 +234,7 @@ def measure_tempo(track: Track) -> Tempo:
     def autocorr(lag: int) -> float:
         return float(np.dot(strength[:-lag], strength[lag:]) / np.dot(strength, strength))
 
-    bar_period = autocorr(16) / max(autocorr(8), 1e-6)
+    bar_period = autocorr(16) - autocorr(8)
 
     return Tempo(
         name=track.name,
@@ -268,13 +268,15 @@ def settle_offsets(tracks: dict[str, Track], tempos: dict[str, Tempo]) -> float:
             tempo.offset = 0.0
             tempo.confidence = "high (loop cut on the grid)"
             continue
-        # The music starts on beat 1: the first beat is the grid line at the first transient.
+        # The music starts on beat 1, so the first sound is the first beat. Use its time
+        # when it agrees with the grid found from the whole track, else trust the grid.
         grid = tempo.grid_phase + lead
         k = round((track.first_transient - grid) / period)
-        tempo.offset = round(grid + k * period, 3)
-        gap = abs(track.first_transient - tempo.offset) * 1000
+        from_grid = grid + k * period
+        gap = abs(track.first_transient - from_grid) * 1000
+        tempo.offset = round(track.first_transient if gap < 8 else from_grid, 3)
         solid = tempo.on_grid > 0.6 and tempo.drift_ms < 10 and gap < 8
-        tempo.confidence = "high" if solid else "medium"
+        tempo.confidence = f"{'high' if solid else 'medium'} (grid and first sound differ by {gap:.1f} ms)"
     return lead
 
 
@@ -509,6 +511,7 @@ class Note:
     length: int = 0  # hold length in slots, 0 for a tap
     score: float = 0.0
     partner: bool = False  # second note of a double
+    allowed: tuple[int, ...] = (0, 1, 2, 3)
 
 
 class Charter:
@@ -559,7 +562,7 @@ class Charter:
         chosen = {s: sc for sc, s in candidates[:count]}
         if section.bursts:
             # Sixteenth notes only where the music clearly has one between two chosen eighths.
-            odd = [(score[s], s) for s in range(1, BAR_SLOTS, 2) if ok[s] and score[s] >= 0.62 and (s - 1) in chosen and (s + 1) % BAR_SLOTS in chosen | {0}]
+            odd = [(score[s], s) for s in range(1, BAR_SLOTS, 2) if ok[s] and score[s] >= 0.62 and (s - 1) in chosen and ((s + 1) in chosen or s + 1 == BAR_SLOTS)]
             odd.sort(key=lambda c: (-c[0], c[1]))
             taken: list[int] = []
             for sc, s in odd:
@@ -579,6 +582,10 @@ class Charter:
             p, r = self._section(section)
             player += p
             rival += r
+        # Echo sections arrive with lanes already set; everything else is laned in one
+        # pass per side so the playability rules also hold across section boundaries.
+        self._lanes(player, 0)
+        self._lanes(rival, 0, mirror=True)
         player = self._finish(player, is_player=True)
         rival = self._finish(rival, is_player=False)
         return player, rival
@@ -587,16 +594,20 @@ class Charter:
         player: list[Note] = []
         rival: list[Note] = []
         rival_count = sec.rival_notes if sec.rival_notes is not None else sec.notes
+
+        def make(bar: int, voice: str, count: int, section: Section) -> list[Note]:
+            return [Note(bar * BAR_SLOTS + s, score=sc, allowed=sec.lanes) for s, sc in self.pick(bar, section, voice, count)]
+
         if sec.mode == "echo":
             for start in range(sec.start, sec.end, sec.unit * 2):
                 pattern: list[Note] = []  # slots relative to the start of the call
                 for u in range(sec.unit):
                     call, answer = start + u, start + sec.unit + u
                     for s, sc in self.pick(answer, sec, "lead", sec.notes, also_bar=call):
-                        pattern.append(Note(u * BAR_SLOTS + s, score=sc))
+                        pattern.append(Note(u * BAR_SLOTS + s, score=sc, allowed=sec.lanes))
                 answer_base = (start + sec.unit) * BAR_SLOTS
-                pattern = self._add_holds(pattern, sec, answer_base, limit=1 if sec.holds else 0, span_end=sec.unit * BAR_SLOTS)
-                self._lanes(pattern, sec.lanes, answer_base)
+                pattern = self._add_holds(pattern, sec, answer_base, limit=sec.holds, span_end=sec.unit * BAR_SLOTS)
+                self._lanes(pattern, answer_base)
                 for n in pattern:
                     rival.append(Note(start * BAR_SLOTS + n.slot, n.lane, n.length, n.score))
                     player.append(Note(answer_base + n.slot, n.lane, n.length, n.score))
@@ -606,25 +617,21 @@ class Charter:
             for start in range(sec.start, sec.end, sec.unit * 2):
                 for u in range(sec.unit):
                     if start + u < sec.end:
-                        rival += [Note((start + u) * BAR_SLOTS + s, score=sc) for s, sc in self.pick(start + u, sec, "lead", rival_count)]
+                        rival += make(start + u, "lead", rival_count, sec)
                     if start + sec.unit + u < sec.end:
-                        b = start + sec.unit + u
-                        player += [Note(b * BAR_SLOTS + s, score=sc) for s, sc in self.pick(b, sec, "lead", sec.notes)]
+                        player += make(start + sec.unit + u, "lead", sec.notes, sec)
         else:
+            plain = Section(sec.start, sec.end, sec.mode, grid=sec.grid, floor=sec.floor)
             for bar in range(sec.start, sec.end):
                 if sec.mode in ("both", "player"):
-                    player += [Note(bar * BAR_SLOTS + s, score=sc) for s, sc in self.pick(bar, sec, "lead", sec.notes)]
+                    player += make(bar, "lead", sec.notes, sec)
                 if sec.mode in ("both", "rival"):
-                    voice = "bass" if sec.mode == "both" else "lead"
-                    plain = Section(sec.start, sec.end, sec.mode, grid=sec.grid, floor=sec.floor)
-                    rival += [Note(bar * BAR_SLOTS + s, score=sc) for s, sc in self.pick(bar, plain, voice, rival_count)]
+                    rival += make(bar, "bass" if sec.mode == "both" else "lead", rival_count, plain)
 
         span_end = sec.end * BAR_SLOTS
         player = self._add_holds(player, sec, 0, limit=sec.holds, span_end=span_end)
         rival = self._add_holds(rival, sec, 0, limit=max(0, sec.holds - 1), span_end=span_end)
         player = self._add_doubles(player, sec)
-        self._lanes(player, sec.lanes, 0)
-        self._lanes(rival, sec.lanes, 0, mirror=True)
         return player, rival
 
     def _add_holds(self, notes: list[Note], sec: Section, base: int, limit: int, span_end: int) -> list[Note]:
@@ -636,7 +643,7 @@ class Charter:
         options = []
         for i, n in enumerate(notes):
             s = base + n.slot
-            if s >= g.count or g.tonal[s] < 0.10 or g.sustain[s] < 1.0:
+            if s >= g.count or g.tonal[s] < 0.08 or g.sustain[s] < 1.0:
                 continue
             beats = min(sec.max_hold, np.floor(g.sustain[s] * 2) / 2)
             length = int(beats * SLOTS_PER_BEAT)
@@ -647,11 +654,12 @@ class Charter:
             options.append((g.sustain[s] * g.tonal[s], i, length))
         options.sort(key=lambda o: (-o[0], o[1]))
         held: list[tuple[int, int]] = []
+        spacing = BAR_SLOTS if self.plan.solo_holds else 2 * BAR_SLOTS
         for _, i, length in options:
             if len(held) >= limit:
                 break
             start = notes[i].slot
-            if any(abs(start - h) < 2 * BAR_SLOTS for h, _ in held):
+            if any(abs(start - h) < spacing for h, _ in held):
                 continue
             notes[i].length = length
             held.append((start, length))
@@ -668,7 +676,7 @@ class Charter:
         bars = sorted({n.slot // BAR_SLOTS for n in notes})
         budget = 0.0
         for bar in bars:
-            budget += sec.doubles
+            budget = min(budget + sec.doubles, 2.0)
             options = []
             for n in notes:
                 if n.slot // BAR_SLOTS != bar or n.length or n.slot % 4 != 0:
@@ -680,66 +688,62 @@ class Charter:
             for accent, n in options:
                 if budget < 1:
                     break
-                out.append(Note(n.slot, score=n.score + 1, partner=True))
+                out.append(Note(n.slot, score=n.score + 1, partner=True, allowed=n.allowed))
                 budget -= 1
         return out
 
     # -- lanes -------------------------------------------------------------
 
-    def _lanes(self, notes: list[Note], allowed: tuple[int, ...], base: int, mirror: bool = False) -> None:
-        """Give every note a lane that follows the pitch contour and stays playable."""
-        if not notes:
-            return
+    def _lanes(self, notes: list[Note], base: int, mirror: bool = False) -> None:
+        """Give every unlaned note a lane that follows the pitch contour and stays playable.
+
+        `base` maps note slots to grid slots (echo patterns are laned before they are placed).
+        """
         g = self.grid
         notes.sort(key=lambda n: (n.slot, n.partner))
         mains = [n for n in notes if not n.partner]
         values = [g.contour(min(base + n.slot, g.count - 1)) for n in mains]
-        if len(allowed) == 1:
-            for n in notes:
-                n.lane = allowed[0]
-            return
-        lo, hi = np.percentile(self.song_values, [10, 90]) if len(self.song_values) > 3 else (min(values), max(values) + 1)
-        span = max(hi - lo, 1.0)
-        k = len(allowed)
 
-        def bin_of(v: float) -> int:
-            b = int(np.clip((v - lo) / span, 0, 0.999) * k)
-            return k - 1 - b if mirror else b
+        def want_lane(n: Note, v: float) -> int:
+            k = len(n.allowed)
+            edges = np.percentile(self.song_values, [100 * q / k for q in range(1, k)]) if k > 1 else []
+            b = int(np.searchsorted(edges, v))
+            return n.allowed[k - 1 - b if mirror else b]
 
-        idx = [bin_of(v) for v in values]
-        sign = -1 if mirror else 1
+        want = [m.lane if m.lane >= 0 else want_lane(m, v) for m, v in zip(mains, values)]
+        fixed = [m.lane >= 0 for m in mains]
+
         # Runs of 3+ notes moving in one direction become stair patterns across the lanes.
         i = 0
         while i < len(mains):
             j = i
             direction = 0
-            while j + 1 < len(mains) and mains[j + 1].slot - mains[j].slot <= 2:
+            while j + 1 < len(mains) and mains[j + 1].slot - mains[j].slot <= 2 and not fixed[j + 1] and len(mains[j + 1].allowed) == 4:
                 step = values[j + 1] - values[j]
                 d = 1 if step > 0.5 else -1 if step < -0.5 else 0
                 if d == 0 or (direction and d != direction):
                     break
                 direction = d
                 j += 1
-            run = j - i + 1
-            if run >= 3 and direction:
-                for part in range(i, j + 1, k):
-                    n_part = min(k, j + 1 - part)
-                    d = direction * sign
-                    start = int(np.clip(idx[part], 0, k - n_part)) if d > 0 else int(np.clip(idx[part], n_part - 1, k - 1))
-                    for q in range(n_part):
-                        idx[part + q] = start + d * q
+            if j - i + 1 >= 3 and direction and not fixed[i] and len(mains[i].allowed) == 4:
+                d = -direction if mirror else direction
+                for part in range(i, j + 1, 4):
+                    size = min(4, j + 1 - part)
+                    start = int(np.clip(want[part], 0, 4 - size)) if d > 0 else int(np.clip(want[part], size - 1, 3))
+                    for q in range(size):
+                        want[part + q] = start + d * q
                 i = j + 1
             else:
                 i += 1
 
         # Playability: no same-lane repeat a sixteenth apart, at most two in a row at eighth speed.
         # A lane that holds a long note stays free until half a beat after it ends.
-        busy_until = {lane: -1 for lane in range(k)}
-        prev: list[tuple[int, int]] = []  # (slot, lane index) of earlier notes, newest last
+        busy_until = [-1, -1, -1, -1]
+        prev: list[tuple[int, int]] = []  # (slot, lane) of earlier notes, newest last
         for pos, n in enumerate(mains):
-            want = idx[pos]
             rising = pos > 0 and values[pos] >= values[pos - 1]
-            order = sorted(range(k), key=lambda c: (abs(c - want), -c if (rising != mirror) else c))
+            up_first = rising != mirror
+            order = sorted(n.allowed, key=lambda c: (abs(c - want[pos]), -c if up_first else c))
 
             def fine(c: int) -> bool:
                 if busy_until[c] >= n.slot:
@@ -753,25 +757,28 @@ class Charter:
                         return False
                 return True
 
-            choice = next((c for c in order if fine(c)), None)
-            if choice is None:
-                choice = next(c for c in order if busy_until[c] < n.slot)
-            idx[pos] = choice
-            n.lane = allowed[choice]
-            prev.append((n.slot, choice))
+            if not fixed[pos] and len(n.allowed) > 1:
+                choice = next((c for c in order if fine(c)), None)
+                if choice is None:
+                    choice = next((c for c in order if busy_until[c] < n.slot), order[0])
+                n.lane = choice
+            elif not fixed[pos]:
+                n.lane = n.allowed[0]
+            prev.append((n.slot, n.lane))
             if n.length:
-                busy_until[choice] = n.slot + n.length + 2
+                busy_until[n.lane] = n.slot + n.length + 2
+
         # Doubles: pair each accent with the mirror lane when it is free.
         by_slot = {n.slot: n for n in mains}
         hold_spans = [(n.slot, n.slot + n.length + 2, n.lane) for n in mains if n.length]
         for n in notes:
-            if not n.partner:
+            if not n.partner or n.lane >= 0:
                 continue
             main = by_slot[n.slot]
             taken = {lane for a, b, lane in hold_spans if a <= n.slot <= b} | {main.lane}
-            before = [m.lane for m in mains if 0 < n.slot - m.slot <= 1]
-            options = [3 - main.lane] + [c for c in allowed if abs(c - main.lane) >= 2] + list(allowed)
-            n.lane = next((c for c in options if c in allowed and c not in taken and c not in before), -1)
+            near = {m.lane for m in mains if 0 < abs(n.slot - m.slot) <= 1}
+            options = [3 - main.lane] + [c for c in n.allowed if abs(c - main.lane) >= 2] + list(n.allowed)
+            n.lane = next((c for c in options if c in n.allowed and c not in taken and c not in near), -1)
         notes[:] = [n for n in notes if n.lane >= 0]
 
     # -- clean-up ----------------------------------------------------------
@@ -893,7 +900,7 @@ def validate(chart: dict, grid: Grid, plan: Plan) -> tuple[list[str], dict]:
             problems.append(f"{side}: {longest} notes in a row in one lane at eighth speed")
         counts = [int(((times >= t) & (times < t + 1.0)).sum()) for t in times]
         bar_len = beat * BEATS_PER_BAR
-        active_bars = {int(n["b"] // BEATS_PER_BAR) for n in notes} | {int((n["b"] + n.get("d", 0) - 1e-6) // BEATS_PER_BAR) for n in notes}
+        active_bars = {int(n["b"] // BEATS_PER_BAR) for n in notes} | {int((n["b"] + n["d"] - 1e-6) // BEATS_PER_BAR) for n in notes if n.get("d")}
         per_section = []
         for start in range(0, grid.bars + 1, 8):
             inside = [n for n in notes if start * BEATS_PER_BAR <= n["b"] < (start + 8) * BEATS_PER_BAR]
@@ -1006,12 +1013,12 @@ def main() -> int:
     lead["low"] = -float(np.mean(low_errs))
 
     print("Tempo and beat grid")
-    print("  track         bpm   (pulse)  offset   drift   jitter  on-grid  8/4-pulse  first sound  confidence")
+    print("  track         bpm   (pulse)  offset   drift   jitter  on-grid  8-vs-4 pulse  first sound  confidence")
     for name in TRACKS:
         t = tempos[name]
         print(
             f"  {name:12s} {t.bpm:6.2f} ({t.pulse_bpm:6.2f})  {t.offset:5.3f}s  {t.drift_ms:4.1f}ms  {t.jitter_ms:4.1f}ms"
-            f"   {t.on_grid * 100:4.0f}%    {t.bar_period:5.2f}     {tracks[name].first_transient * 1000:5.1f}ms     {t.confidence}"
+            f"   {t.on_grid * 100:4.0f}%      {t.bar_period:+5.2f}       {tracks[name].first_transient * 1000:5.1f}ms     {t.confidence}"
         )
     print(f"  detector lead: mid/high {lead_fast * 1000:.1f} ms, low {lead['low'] * 1000:.1f} ms")
 

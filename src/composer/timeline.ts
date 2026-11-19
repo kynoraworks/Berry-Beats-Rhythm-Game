@@ -24,7 +24,7 @@ import {
   type TimeView,
 } from './layout';
 import type { ChartMeta, EditorNote, Side } from './model';
-import { peakBetween, type Peaks } from './waveform';
+import { displayLevel, peakBetween, type Peaks } from './waveform';
 
 export interface TimelineFrame extends TimeView {
   notes: readonly EditorNote[];
@@ -120,7 +120,7 @@ export class TimelineView {
       // Row 0 is the end of the song: the overview runs bottom to top like the timeline.
       const t1 = duration * (1 - row / height);
       const t0 = duration * (1 - (row + 2) / height);
-      const half = Math.max(1, Math.round(peakBetween(peaks, t0, t1) * (MINIMAP_W / 2 - 2)));
+      const half = Math.max(1, Math.round(displayLevel(peaks, peakBetween(peaks, t0, t1)) * (MINIMAP_W / 2 - 2)));
       g.fillRect(center - half, top + row, half * 2, 2);
     }
     this.minimapNotesFor = null;
@@ -174,7 +174,7 @@ export class TimelineView {
       for (let y = TOP_H; y < GAME_H; y += 2) {
         const t = timeOfY(frame, y + 2);
         if (t + secPerRow < 0 || t > frame.duration) continue;
-        const half = Math.round(peakBetween(this.peaks, t, t + secPerRow) * (WAVE_W / 2 - 2));
+        const half = Math.round(displayLevel(this.peaks, peakBetween(this.peaks, t, t + secPerRow)) * (WAVE_W / 2 - 2));
         if (half > 0) g.fillRect(center - half, y, half * 2, 2);
       }
     }
