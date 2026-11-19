@@ -18,7 +18,7 @@ export const SCORE: Record<Judgement, number> = { perfect: 200, good: 125, hit: 
 /** Hits needed at x1, x2 and x3 to reach the next multiplier. */
 export const MULTIPLIER_STEPS = [4, 6, 16] as const;
 const ACCURACY_WEIGHT: Record<Judgement, number> = { perfect: 1, good: 0.8, hit: 0.5, miss: 0 };
-const HEALTH_CHANGE: Record<Judgement, number> = { perfect: 0.03, good: 0.02, hit: 0.01, miss: -0.06 };
+const HEALTH_CHANGE: Record<Judgement, number> = { perfect: 0.012, good: 0.008, hit: 0.004, miss: -0.05 };
 
 export const START_HEALTH = 0.5;
 
@@ -121,6 +121,26 @@ export class Engine {
   /** The hold currently being held in a lane, if any. */
   heldNote(lane: Lane): PlayNote | null {
     return this.holding[lane];
+  }
+
+  /** The next note in a lane that has not been hit or missed yet. */
+  peek(lane: Lane): PlayNote | undefined {
+    return this.byLane[lane][this.cursor[lane]];
+  }
+
+  /**
+   * Drop every note that starts before `t` without judging it, for starting
+   * part-way through a song. Call before play begins.
+   */
+  skipBefore(t: number): void {
+    for (let lane = 0; lane < 4; lane++) {
+      const list = this.byLane[lane];
+      while (this.cursor[lane] < list.length && list[this.cursor[lane]].t < t) {
+        const note = list[this.cursor[lane]++];
+        note.state = 'done';
+        this.stats.total -= note.isHold ? 2 : 1;
+      }
+    }
   }
 
   /** A lane key went down at song time `t`. */

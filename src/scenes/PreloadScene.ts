@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
+import { parseChart } from '../core/chart';
 import { LEVELS, loadLevelChart } from '../core/levels';
 import { addText } from '../core/ui';
 import type { PlayData } from '../core/flow';
@@ -74,7 +75,8 @@ export class PreloadScene extends Phaser.Scene {
 
   /**
    * Normally goes to the title screen. For development and automated tests the
-   * URL can jump straight to a scene: `?scene=Menu`, or `?scene=Play&level=tutorial&autoplay=1`.
+   * URL can jump straight to a scene: `?scene=Menu`, or `?scene=Play&level=tutorial&autoplay=1`
+   * (`&chart=charts/some.json` plays any chart file, `&at=30` starts 30 seconds in).
    */
   private async startFirstScene(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
@@ -82,8 +84,9 @@ export class PreloadScene extends Phaser.Scene {
     const known = Object.values(SceneKeys) as string[];
     if (requested === SceneKeys.Play) {
       const level = LEVELS.find((l) => l.id === params.get('level')) ?? LEVELS[0];
+      const chartUrl = params.get('chart');
       try {
-        const chart = await loadLevelChart(level);
+        const chart = chartUrl ? parseChart(await (await fetch(chartUrl)).json()) : await loadLevelChart(level);
         const data: PlayData = {
           chart,
           returnTo: { scene: SceneKeys.LevelSelect },
