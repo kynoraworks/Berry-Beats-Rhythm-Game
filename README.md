@@ -120,7 +120,7 @@ Project layout:
 | --- | --- |
 | `src/core` | Shared code: chart format, scoring engine, battle rules, audio clock, settings, saves, UI helpers |
 | `src/scenes` | One file per screen: title, menu, level select, options, play, results, beat maps, composer |
-| `src/play` | Play field rendering: notes, dancers, HUD, stage effects |
+| `src/play` | Play field rendering: notes, dancers, rival profiles, HUD, dialogue, stage effects |
 | `src/composer` | Beat map editor logic and widgets |
 | `public/assets` | Art, music and font used at runtime (generated, see below) |
 | `public/charts` | Story mode beat maps |

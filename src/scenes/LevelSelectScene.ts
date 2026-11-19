@@ -43,7 +43,7 @@ const SEATS: Record<LevelDef['rival'], { sit: string; anim: string; stand: strin
 const TAGS: Record<LevelDef['rival'], { tint: number; dark: boolean }> = {
   coach: { tint: COLORS.lilac, dark: true },
   raspberry: { tint: COLORS.pink, dark: false },
-  pear: { tint: 0x9bd64a, dark: true },
+  pear: { tint: 0xa8d84a, dark: true },
   lemon: { tint: 0xffe14a, dark: true },
 };
 

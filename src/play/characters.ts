@@ -50,8 +50,9 @@ interface DanceStyle {
   /** Showpieces stay on the floor and land with a squash instead of a hop. */
   grounded: boolean;
   /**
-   * Phrase endings: after a run of at least `run` moves, a pause of `gap` beats
-   * is filled with one of the showpieces in `picks` (indexes as for `special`).
+   * Phrase endings: after a run of at least `run` landed moves, a pause of `gap`
+   * beats is filled with one of the showpieces in `picks` (0 is the spin, 1 and
+   * up the single poses).
    */
   phraseEnd?: { run: number; gap: number; picks: number[] };
   /** Every this many moves in an unbroken run, a showpiece from `picks` replaces the move. */
@@ -109,8 +110,8 @@ const PEAR_STYLE: DanceStyle = {
   specialLock: 0.55,
   bounce: 1,
   grounded: true,
-  phraseEnd: { run: 4, gap: 1.5, picks: [3, 4] },
-  streamBreak: { every: 9, picks: [0, 1, 2] },
+  phraseEnd: { run: 3, gap: 1.5, picks: [3, 4] },
+  streamBreak: { every: 7, picks: [0, 1, 2] },
 };
 
 /**
@@ -121,8 +122,8 @@ const PEAR_STYLE: DanceStyle = {
  */
 const LEMON_STYLE: DanceStyle = {
   ...STANDARD,
-  poseHold: 0.12,
-  poseMax: 0.32,
+  poseHold: 0.16,
+  poseMax: 0.38,
   poseFrameTime: 0.06,
   stepsPerBeat: 4,
   altChance: 0.25,
@@ -334,7 +335,6 @@ export class Dancer {
   stumble(): void {
     if (this.mode === 'final') return;
     this.pending = null;
-    this.run = 0;
     this.sprite.setTint(0xff8090);
     this.scene.time.delayedCall(140, () => this.sprite.clearTint());
     if (this.frames.stumble) this.start('stumble', this.frames.stumble, STUMBLE_TIME / 2, STUMBLE_TIME);
@@ -442,7 +442,8 @@ export class Dancer {
       const flip = random() < 0.35;
       const side = random() < 0.5 ? -1 : 1;
       const size = 1 + Math.floor(random() * 2);
-      this.nextTwitch = beat + wait;
+      // Counted from when it was due, not from this frame, so frame timing never adds up.
+      this.nextTwitch += wait;
       if (free && !this.calm) {
         if (flip) {
           sprite.setFlipX(true);
@@ -457,7 +458,7 @@ export class Dancer {
     // An outburst that comes due while he is busy bursts out as soon as he is free.
     if (outburst && beat >= this.nextOutburst && this.grooving && free && !this.holding && this.frames.spin) {
       const random = this.outburstRandom;
-      this.nextOutburst = beat + Phaser.Math.Linear(outburst.beats[0], outburst.beats[1], random());
+      this.nextOutburst += Phaser.Math.Linear(outburst.beats[0], outburst.beats[1], random());
       this.showpiece(outburst.picks[Math.floor(random() * outburst.picks.length)]);
     }
 
