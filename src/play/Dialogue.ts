@@ -18,6 +18,11 @@ const TEXT_SIZE = 32;
 const TYPE_SPEED = 48;
 /** A blip is played once per this many letters. */
 const BLIP_EVERY = 6;
+/**
+ * The body font joins "fi", "fl" and "ff" into single glyphs that read badly at this
+ * size ("first" looks like "Arst"). A zero-width non-joiner after the f keeps them apart.
+ */
+const LIGATURE = /(f)(?=[fijl])/g;
 /** Presses this soon after a line appears are ignored, so one tap cannot skip two lines. */
 const GUARD_MS = 140;
 
@@ -170,7 +175,7 @@ export class Dialogue {
     this.setPortrait(speaker, line.mood === 'bold', portraitX + PORTRAIT_BOX / 2, !onLeft);
 
     // Wrap the whole line up front, so words do not jump to the next row as they type out.
-    this.full = this.body.getWrappedText(line.text).join('\n');
+    this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
 
     this.nameText.setText(speaker.name);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;

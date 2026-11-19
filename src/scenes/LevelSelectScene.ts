@@ -244,7 +244,7 @@ export class LevelSelectScene extends Phaser.Scene {
     if (locked) this.lockedZone.setInteractive();
     else this.lockedZone.disableInteractive();
     this.lockText.setVisible(locked);
-    if (locked) this.lockText.setText(`Clear ${LEVELS[this.index - 1].name} first`);
+    if (locked) this.lockText.setText(`Clear ${LEVELS[this.index - 1].name} to open`);
     this.newTag.setVisible(!locked && this.fresh.has(this.index));
     this.infoText.setVisible(!locked);
     this.bestText.setVisible(!locked);

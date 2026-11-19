@@ -127,7 +127,7 @@ export class OptionsScene extends Phaser.Scene {
       scrollSpeed: step(s.scrollSpeed, d, 0.1, 0.5, 2.5),
     }));
     this.addToggle(RIGHT, rightY(1), 'No fail', 'Keep playing when the bar runs out.', 'noFail');
-    this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, flashes and background pulsing.', 'reduceMotion');
+    this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, bright bursts and background pulsing.', 'reduceMotion');
 
     const controlsY = rightY(2) + 56;
     if (isTouch()) {
