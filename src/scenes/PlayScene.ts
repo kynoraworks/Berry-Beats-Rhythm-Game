@@ -200,6 +200,11 @@ export class PlayScene extends Phaser.Scene {
 
     this.countText = addText(this, GAME_W / 2, 390, 'Loading...', 64).setDepth(Depth.overlay);
     const credit = addText(this, GAME_W / 2, 290, chart.artist ? `${chart.title}\n${chart.artist}` : chart.title, 32, { color: CSS.lilac }).setDepth(Depth.overlay);
+    // The song credit waits for the versus card to clear, then shows through the count-in.
+    if (this.introTime > 0) {
+      credit.setAlpha(0);
+      this.tweens.add({ targets: credit, alpha: 1, delay: this.introTime * 1000, duration: 200 });
+    }
     this.tweens.add({ targets: credit, alpha: 0, delay: 2600 + this.introTime * 1000, duration: 500 });
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
     if (tag) addText(this, 104, 54, tag, 24, { origin: [0, 0], color: CSS.yellow }).setDepth(Depth.hud);
