@@ -11,6 +11,7 @@ import { playSfx } from '../core/sfx';
 import { UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { formatScore } from '../menus/kit';
 import { Doors } from '../explore/doors';
+import { rivalIcon } from '../play/rivals';
 import { CAST, portraitFrame } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { arrivalPlace, crewAt, lookHotspots, type ExploreData } from '../story/places';
@@ -339,7 +340,14 @@ export class LevelSelectScene extends Phaser.Scene {
 
     const chart = this.charts[this.index];
     const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
-    this.pips.forEach((pip, i) => pip.setAlpha(i < difficulty && open ? 1 : 0.35).setTint(i < difficulty ? 0xffffff : 0x6a5a86));
+    // Difficulty is counted in the stop's own fruit (the same icon as on the battle bar).
+    const icon = rivalIcon(this, stop.fruit);
+    this.pips.forEach((pip, i) =>
+      pip
+        .setTexture(icon.key, icon.frame)
+        .setAlpha(i < difficulty && open ? 1 : 0.35)
+        .setTint(i < difficulty ? 0xffffff : 0x6a5a86),
+    );
     this.infoText.setText(!open ? '' : chart ? `${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM` : chart === null ? 'This stop is not ready yet' : 'Loading...');
 
     const best = getBest(stop.chartId);
