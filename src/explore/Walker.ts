@@ -3,11 +3,11 @@ import { PX } from '../core/config';
 import type { SheetLayout } from '../story/types';
 
 /**
- * Someone who walks along the floor of a station or street. Nobody has a walk
- * cycle drawn yet, so walking borrows the idle dance: the berry layout's sway
- * (frames 45 to 50) or a lite sheet's idle frames, sped up, with a one-pixel
- * bob and a flip to face the way they are going. A real walk cycle can replace
- * `WALK` once it is drawn (see docs/EXPLORE_ART.md).
+ * Someone who walks along the floor of a station or street. With a drawn walk
+ * cycle (Berry's berry_walk: six frames walking right, flipped for left) it
+ * plays that; anyone without one borrows the idle dance instead: the berry
+ * layout's sway (frames 45 to 50) or a lite sheet's idle frames, sped up,
+ * with a one-pixel bob.
  */
 
 type Layout = SheetLayout | 'npc';
@@ -27,11 +27,17 @@ const IDLE: Record<Layout, number[]> = {
 /** Art pixels per second. */
 const SPEED = 64;
 const WALK_FPS = 10;
+/** Frames of a drawn walk cycle, and how fast it steps. */
+const CYCLE = [0, 1, 2, 3, 4, 5];
+const CYCLE_FPS = 9;
 const IDLE_FPS = 3;
 
 export class Walker {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly layout: Layout;
+  private readonly texture: string;
+  /** A drawn walk cycle, if this walker has one. */
+  private readonly walkTexture: string | null;
   private readonly floorY: number;
   private target: number | null = null;
   private onArrive: (() => void) | null = null;
@@ -41,8 +47,10 @@ export class Walker {
   private min = 0;
   private max = Number.POSITIVE_INFINITY;
 
-  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floorRow: number) {
+  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floorRow: number, walkTexture?: string) {
     this.layout = layout;
+    this.texture = texture;
+    this.walkTexture = walkTexture && scene.textures.exists(walkTexture) ? walkTexture : null;
     this.floorY = (floorRow + 1) * PX;
     this.sprite = scene.add.sprite(artX * PX, this.floorY, texture, IDLE[layout][0]).setOrigin(0.5, 63 / 64).setScale(PX);
   }
@@ -121,6 +129,14 @@ export class Walker {
         this.moving = true;
       }
     }
+    if (this.moving && this.walkTexture) {
+      const frame = CYCLE[Math.floor(this.clock * CYCLE_FPS) % CYCLE.length];
+      if (this.sprite.texture.key !== this.walkTexture) this.sprite.setTexture(this.walkTexture, frame);
+      else this.sprite.setFrame(frame);
+      this.sprite.setY(this.floorY);
+      return;
+    }
+    if (this.sprite.texture.key !== this.texture) this.sprite.setTexture(this.texture);
     const frames = this.moving ? WALK[this.layout] : IDLE[this.layout];
     const fps = this.moving ? WALK_FPS : IDLE_FPS;
     const index = Math.floor(this.clock * fps) % frames.length;

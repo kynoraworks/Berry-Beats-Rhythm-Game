@@ -90,8 +90,19 @@ export function isOutdoors(stop: number, setting: Setting): boolean {
   return !INDOORS[setting].includes(stop);
 }
 
+/**
+ * Art that already carries its own time of day strongly, so the grade stays
+ * light there instead of doubling up: the rooftop is painted at sunset.
+ */
+const PAINTED: Partial<Record<Setting, readonly number[]>> = {
+  station: [8],
+  street: [8],
+  battle: [8],
+};
+
 /** How much of the grade a scene gets: indoor light is mostly the room's own. */
 export function gradeStrength(stop: number, setting: Setting): number {
+  if (PAINTED[setting]?.includes(stop)) return 0.45;
   return isOutdoors(stop, setting) ? 1 : 0.5;
 }
 
@@ -157,8 +168,8 @@ export function gradeAt(time: TimeOfDay, strength: number, x: number, y: number,
   const { glow } = grade;
   const towardGlow = glow.from === 'left' ? 1 - x : glow.from === 'right' ? x : y;
   const lift = glow.alpha * Math.max(0, Math.min(1, towardGlow));
-  const shade = mixColor(mixColor(grade.shade.top, grade.shade.bottom, y), glow.color, lift * 0.6);
-  const alpha = grade.shade.alpha * strength * share * (1 - lift * 0.5);
+  const shade = mixColor(mixColor(grade.shade.top, grade.shade.bottom, y), glow.color, lift * 0.3);
+  const alpha = grade.shade.alpha * strength * share * (1 - lift * 0.8);
   return mixColor(0xffffff, shade, Math.max(0, Math.min(1, alpha)));
 }
 

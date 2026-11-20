@@ -26,6 +26,8 @@ const REACH = 18;
 const FOLLOW_GAP = 22;
 const DEPTH = { world: 0, people: 10, marker: 20, ui: 100, dialogue: 200, doors: 300 } as const;
 const TITLE_Y = 44;
+/** Berry's drawn walk cycle (core/assets.ts), used when it is loaded. */
+const BERRY_WALK = 'berry_walk';
 
 /**
  * Berry on foot: his room, a station or a street. He walks left and right
@@ -116,7 +118,7 @@ export class ExploreScene extends Phaser.Scene {
     for (const prop of placeProps(this, place)) this.world.add(this.add.image(prop.x * PX, prop.y * PX, prop.key).setOrigin(0).setScale(PX));
 
     const max = place.width - 10;
-    this.berry = new Walker(this, characterSheet(this, 'berry').texture, 'berry', place.startX, place.floor).setBounds(10, max);
+    this.berry = new Walker(this, characterSheet(this, 'berry').texture, 'berry', place.startX, place.floor, BERRY_WALK).setBounds(10, max);
     this.world.add(this.berry.sprite.setDepth(DEPTH.people + 2));
 
     // The crew walks with him (in the depart beat, only Raspberry has joined).
