@@ -134,7 +134,7 @@ describe('rival personalities', () => {
       expect(planRival(6000, difficulty, 'closer', { personality: 'closer' })).toEqual(plan);
     });
 
-    it(`wild at difficulty ${difficulty}: streaks and meltdowns that average the level's skill`, () => {
+    it(`wild at difficulty ${difficulty}: streaks and meltdowns that land near the level's skill`, () => {
       const plan = planRival(6000, difficulty, 'wild', { personality: 'wild' });
       expect(planAccuracy(plan)).toBeCloseTo(target, 1);
       // Misses come in runs of three or more, never one at a time out of a streak.
@@ -330,10 +330,11 @@ describe('battle balance on the story levels', () => {
     const grades = plan.map((p) => (p.judgement === 'miss' ? 'm' : 'x')).join('');
     expect(grades.match(/m{3,}/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(Math.abs(planAccuracy(plan) - skillAccuracy(rivalSkill(chart.difficulty)))).toBeLessThan(0.06);
-    // A close contest for a player who hits 4 notes in 5: nobody runs away with the rounds.
+    // A player who hits 4 notes in 5 wins but drops a round to a hot streak; 7 in 10 is not enough.
     const run = simulate(chart, 0.8);
-    expect(Math.abs(run.playerRounds - run.rivalRounds)).toBeLessThanOrEqual(1);
-    expect(simulate(chart, 0.9).won).toBe(true);
+    expect(run.won).toBe(true);
+    expect(run.rivalRounds).toBeGreaterThanOrEqual(1);
+    expect(simulate(chart, 0.7).won).toBe(false);
   });
 });
 

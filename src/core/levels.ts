@@ -156,9 +156,13 @@ export function levelForChart(chartId: string): LevelDef | undefined {
   return LEVELS.find((level) => level.id === chartId);
 }
 
-/** A level opens once the one before it has been cleared. The first is always open. */
+/**
+ * A level opens once the one before it has been cleared. The first is always
+ * open, and a level the player has already cleared stays open even if new
+ * levels are later added in front of it.
+ */
 export function isUnlocked(index: number): boolean {
-  return index <= 0 || getBest(LEVELS[index - 1].id) !== null;
+  return index <= 0 || getBest(LEVELS[index - 1].id) !== null || getBest(LEVELS[index].id) !== null;
 }
 
 const cache = new Map<string, Chart>();

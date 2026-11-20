@@ -208,6 +208,11 @@ const CLOSER_SWING = 0.2;
 const WILD_MELTDOWN: [number, number] = [3, 6];
 /** Wild: how far a hot streak's length strays from the length that pays for a typical meltdown (0.5 = half to one and a half times). */
 const WILD_SPREAD = 0.5;
+/**
+ * Wild: hot streaks run this fraction of the length that would fully pay for
+ * the meltdowns, so over a song he lands a few points under the level's skill.
+ */
+const WILD_PAYBACK = 0.75;
 /** Wild: shortest and longest stretch of ordinary play between a streak and a meltdown. */
 const WILD_CALM: [number, number] = [1, 4];
 
@@ -229,8 +234,8 @@ type Form = 'calm' | 'hot' | 'meltdown';
 /**
  * The wild rival's form for each note: hot streaks and meltdowns in turn, with
  * a little ordinary play between them. Streaks are sized so that over a song
- * they make up for the meltdowns and the whole averages the level's skill, but
- * any one stretch of it can go well or badly for him.
+ * they nearly make up for the meltdowns and the whole lands just under the
+ * level's skill, but any one stretch of it can go well or badly for him.
  */
 function wildForms(count: number, base: Skill, random: () => number): Form[] {
   const between = ([min, max]: [number, number]): number => min + Math.floor(random() * (max - min + 1));
@@ -245,7 +250,7 @@ function wildForms(count: number, base: Skill, random: () => number): Form[] {
   const meltdownFirst = random() < 0.5;
   while (forms.length < count) {
     const meltdown = between(WILD_MELTDOWN);
-    const streak = Math.max(3, Math.round(typicalMeltdown * ratio * (1 - WILD_SPREAD + 2 * WILD_SPREAD * random())));
+    const streak = Math.max(3, Math.round(typicalMeltdown * ratio * WILD_PAYBACK * (1 - WILD_SPREAD + 2 * WILD_SPREAD * random())));
     add('calm', between(WILD_CALM));
     add(meltdownFirst ? 'meltdown' : 'hot', meltdownFirst ? meltdown : streak);
     add('calm', between(WILD_CALM));

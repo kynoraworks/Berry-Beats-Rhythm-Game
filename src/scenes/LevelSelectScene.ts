@@ -47,26 +47,26 @@ const TAGS: Record<LevelDef['rival'], { tint: number; dark: boolean }> = {
   lemon: { tint: 0xffe14a, dark: true },
 };
 
-const OPENED_KEY = 'berrybeats.opened.v1';
+const OPENED_KEY = 'berrybeats.opened.v2';
 
 /** Remembered between visits. */
 let lastIndex = 0;
 
-/** How many levels the player has already been shown as open, or null on a first visit. */
-function readOpened(): number | null {
+/** Ids of the levels the player has already been shown as open, or null on a first visit. */
+function readOpened(): Set<string> | null {
   try {
-    const value = Number(localStorage.getItem(OPENED_KEY));
-    return Number.isInteger(value) && value > 0 ? value : null;
+    const value: unknown = JSON.parse(localStorage.getItem(OPENED_KEY) ?? 'null');
+    return Array.isArray(value) ? new Set(value.filter((id): id is string => typeof id === 'string')) : null;
   } catch {
     return null;
   }
 }
 
-function writeOpened(count: number): void {
+function writeOpened(ids: string[]): void {
   try {
-    localStorage.setItem(OPENED_KEY, String(count));
+    localStorage.setItem(OPENED_KEY, JSON.stringify(ids));
   } catch {
-    // Without storage the "now open" note simply shows again next time.
+    // Storage is unavailable: the announcement simply repeats next time.
   }
 }
 
@@ -224,17 +224,20 @@ export class LevelSelectScene extends Phaser.Scene {
 
   /** Work out which levels opened since the last visit and announce the first of them. */
   private noteNewlyOpened(): void {
-    const open = LEVELS.filter((_, i) => isUnlocked(i)).length;
+    const open = LEVELS.map((_, i) => i).filter((i) => isUnlocked(i));
     const seen = readOpened();
-    writeOpened(open);
+    writeOpened(open.map((i) => LEVELS[i].id));
     // A first visit has nothing to compare against, so nothing is announced.
-    if (seen === null || open <= seen) return;
-    for (let i = seen; i < open; i++) this.fresh.add(i);
-    const name = LEVELS[seen].name;
+    if (seen === null) return;
+    const opened = open.filter((i) => !seen.has(LEVELS[i].id));
+    if (opened.length === 0) return;
+    for (const i of opened) this.fresh.add(i);
+    const first = opened[0];
+    const name = LEVELS[first].name;
     this.time.delayedCall(450, () => {
       playSfx(this.game, 'bonus');
       this.statusText.setText(`${name} is now open!`).setColor(CSS.yellow);
-      if (this.index < seen) this.right.flash();
+      if (this.index < first) this.right.flash();
     });
   }
 
