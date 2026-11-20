@@ -5,6 +5,7 @@ import { FLOOR_ROWS, FLOOR_W, floorColors, paintFloor } from '../src/play/hypeFl
 import {
   HYPE_CAP_BEATS,
   HYPE_FACTOR,
+  HYPE_GRACE_BEATS,
   HYPE_STREAK_MAX,
   HYPE_STREAK_MIN,
   HypeTracker,
@@ -16,7 +17,7 @@ import {
 import { FAR_SCALE, FIELD_DEPTH, FieldProjection, depthScale, screenRise, snapNoteScale } from '../src/play/Projection';
 import { NOTE_SCALE, PLAYER_LANES, RECEPTOR_Y, RIVAL_LANES } from '../src/play/layout';
 
-const TIMING: HypeTiming = { streak: 5, cap: 8, cooldown: 4, gap: 3 };
+const TIMING: HypeTiming = { streak: 5, cap: 8, grace: 2, cooldown: 4, gap: 3 };
 
 /** Feeds `count` hits a second apart from `from`, returning what changed on each. */
 function hits(tracker: HypeTracker, from: number, count: number, combo0 = 0): (string | null)[] {
@@ -36,8 +37,11 @@ describe('hype timing', () => {
     expect(hypeStreak(0)).toBe(30);
   });
 
-  it('measures the cap and cooldown in beats of the chart', () => {
+  it('measures the cap, grace and cooldown in beats of the chart', () => {
+    expect(HYPE_CAP_BEATS).toBe(32);
+    expect(HYPE_GRACE_BEATS).toBe(8);
     expect(hypeTiming(120, 100).cap).toBeCloseTo(HYPE_CAP_BEATS * 0.5);
+    expect(hypeTiming(120, 100).grace).toBeCloseTo(HYPE_GRACE_BEATS * 0.5);
     expect(hypeTiming(77, 100).cap).toBeCloseTo((HYPE_CAP_BEATS * 60) / 77);
     expect(hypeTiming(77, 100).cooldown).toBeLessThan(hypeTiming(77, 100).cap);
   });
@@ -54,10 +58,17 @@ describe('HypeTracker', () => {
     expect(tracker.triggers).toBe(1);
   });
 
-  it('ends on the first miss', () => {
+  it('shrugs off a miss in its first grace beats, then ends on the first miss', () => {
     const tracker = new HypeTracker(TIMING);
     hits(tracker, 0, 5);
-    expect(tracker.judge(5, true, 0, 6)).toBe('miss');
+    // Started at 4: one second in, still inside the 2 s grace.
+    expect(tracker.tick(5, 5, 6, false)).toBeNull();
+    expect(tracker.judge(5, true, 0, 6)).toBeNull();
+    expect(tracker.active).toBe(true);
+    expect(tracker.factor).toBe(HYPE_FACTOR);
+    // Past the grace, the next miss ends it.
+    expect(tracker.tick(6.5, 1, 7, false)).toBeNull();
+    expect(tracker.judge(6.5, true, 0, 7)).toBe('miss');
     expect(tracker.active).toBe(false);
     expect(tracker.factor).toBe(1);
   });
@@ -69,11 +80,20 @@ describe('HypeTracker', () => {
     expect(tracker.tick(4 + TIMING.cap, 13, 14, false)).toBe('cap');
   });
 
-  it('ends when the player has nothing to play for a while, unless a hold is held', () => {
+  it("holds through the rival's turn: its clock stops while the player has nothing to play", () => {
     const tracker = new HypeTracker(TIMING);
     hits(tracker, 0, 5);
-    expect(tracker.tick(5, 5, 5 + TIMING.gap + 1, true)).toBeNull();
-    expect(tracker.tick(5, 5, 5 + TIMING.gap + 1, false)).toBe('out');
+    expect(tracker.tick(6, 5, 7, false)).toBeNull();
+    const before = tracker.secondsLeft();
+    expect(before).toBeCloseTo(TIMING.cap - 2);
+    // A long rival solo: the next player note is far away, so nothing is used up and nothing ends.
+    for (let t = 7; t <= 30; t++) expect(tracker.tick(t, 5, 40, false)).toBeNull();
+    expect(tracker.frozen).toBe(true);
+    expect(tracker.secondsLeft()).toBeCloseTo(before);
+    // A held note keeps the clock running even with the next tap far away.
+    tracker.tick(31, 5, 40, true);
+    expect(tracker.frozen).toBe(false);
+    expect(tracker.secondsLeft()).toBeCloseTo(before - 1);
     expect(new HypeTracker(TIMING).end(1, 0)).toBeNull();
   });
 
@@ -88,15 +108,17 @@ describe('HypeTracker', () => {
   it('waits out the cooldown and needs a whole new streak after a hype', () => {
     const tracker = new HypeTracker(TIMING);
     hits(tracker, 0, 5);
+    for (let t = 5; t < 12; t++) tracker.tick(t, t + 1, t + 1, false);
     expect(tracker.tick(12, 13, 13, false)).toBe('cap');
     // Combo is still 13: no hype until five more hits, and not inside the cooldown.
     expect(tracker.judge(13, false, 18, 14)).toBeNull();
     expect(tracker.judge(16.5, false, 18, 17)).toBe('start');
     const missed = new HypeTracker(TIMING);
     hits(missed, 0, 5);
-    missed.judge(5, true, 0, 6);
-    expect(missed.judge(6, false, 5, 7)).toBeNull();
-    expect(missed.judge(9, false, 5, 10)).toBe('start');
+    missed.tick(7, 7, 8, false);
+    expect(missed.judge(7, true, 0, 8)).toBe('miss');
+    expect(missed.judge(8, false, 5, 9)).toBeNull();
+    expect(missed.judge(11, false, 5, 12)).toBe('start');
   });
 });
 

@@ -7,7 +7,7 @@ import { music } from '../core/music';
 import { submitScore } from '../core/saves';
 import { getSettings, updateSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
+import { FocusGroup, UiButton, addBody, addBox, addDim, addIcon, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
 import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
@@ -104,7 +104,14 @@ export class ResultsScene extends Phaser.Scene {
       const score = `${Math.max(battle.playerRounds, battle.rivalRounds)} to ${Math.min(battle.playerRounds, battle.rivalRounds)}`;
       const rounds = battle.playerRounds + battle.rivalRounds > 1 ? ` ${score}` : '';
       const outcome = battle.won ? `You win${rounds}!` : `${battle.rivalName} wins${rounds}`;
-      addText(this, GAME_W / 2, 192, outcome, 32, { color: battle.won ? CSS.blue : rivalCss });
+      const outcomeText = addText(this, GAME_W / 2, 192, outcome, 32, { color: battle.won ? CSS.blue : rivalCss });
+      // The rounds each side took, as stars either side of the line, like the battle's fighter card.
+      if (battle.playerRounds + battle.rivalRounds > 1) {
+        const edge = outcomeText.width / 2 + 34;
+        for (let i = 0; i < battle.playerRounds; i++) addIcon(this, GAME_W / 2 - edge - i * 32, 192, 'icon_star', 3).setTint(0x9fb4ff);
+        const rivalTint = rivalProfile(play.chart.rivalCharacter).color;
+        for (let i = 0; i < battle.rivalRounds; i++) addIcon(this, GAME_W / 2 + edge + i * 32, 192, 'icon_star', 3).setTint(rivalTint);
+      }
     }
 
     // Left column: hit counts and accuracy.

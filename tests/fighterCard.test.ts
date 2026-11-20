@@ -114,7 +114,7 @@ describe('effectCards', () => {
     expect(cards[2].left).toBe(0.5);
   });
 
-  it('says when hype is held through the rival's turn', () => {
+  it("says when hype is held through the rival's turn", () => {
     const card = effectCards({ ...none, hype: { left: 0.7, beats: 1, streak: 40, frozen: true } })[0];
     expect(card.detail).toBe('held, 1 beat left');
   });
