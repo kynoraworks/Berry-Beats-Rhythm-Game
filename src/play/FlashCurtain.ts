@@ -23,13 +23,17 @@ export class FlashCurtain {
   private next = 0;
   private warned = -1;
   private readonly onWarn: () => void;
+  private readonly height: number;
+  private readonly project: ((flatY: number) => number) | null;
 
-  constructor(scene: Phaser.Scene, left: number, width: number, windows: readonly TimedWindow[], smoke: boolean, accent: number, onWarn: () => void) {
+  /** `project` maps a flat y to where it is drawn, so the glare hides the same stretch of the fall under the hype camera. */
+  constructor(scene: Phaser.Scene, left: number, width: number, windows: readonly TimedWindow[], smoke: boolean, accent: number, onWarn: () => void, project?: (flatY: number) => number) {
     this.scene = scene;
     this.windows = windows;
     this.smoke = smoke;
     this.onWarn = onWarn;
-    const height = RECEPTOR_Y * FLASH_COVER;
+    const height = (this.height = RECEPTOR_Y * FLASH_COVER);
+    this.project = project ?? null;
     const color = smoke ? COLORS.night : 0xfff2fa;
     this.cover = scene.add.graphics().setDepth(Depth.effects + 2).setAlpha(0);
     this.cover.fillStyle(color, 1).fillRect(left, 0, width, height - EDGE);
@@ -61,6 +65,7 @@ export class FlashCurtain {
     if (time >= window.start && time < window.end) alpha = Math.min(1, (time - window.start) / FADE_IN);
     else if (time >= window.end) alpha = Math.max(0, 1 - (time - window.end) / FADE_OUT);
     this.cover.setAlpha(alpha * (this.smoke ? 0.94 : 0.97));
+    if (this.project && alpha > 0) this.cover.setScale(1, this.project(this.height) / this.height);
   }
 
   /** Hide everything (for the end of the song). */

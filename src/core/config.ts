@@ -94,7 +94,7 @@ export const Tex = {
   instructor: 'instructor', // 51 frames, 64x64, same layout as blackberry: the Coach redrawn in the berry style
   stageRooftop: 'stage_rooftop', // 256x160 stage backgrounds laid out like room: top band to row 27, platform top at row 137
   stageClub: 'stage_club',
-  judgements: 'judgements', // 3 frames of 96x32 stacked vertically: 0 perfect, 1 good, 2 hit (chunky lettering, drawn for 3x scale)
+  judgements: 'judgements', // 4 frames of 96x32 stacked vertically: 0 perfect, 1 good, 2 hit, 3 hype (chunky lettering, drawn for 3x scale; 3 from tools/make_hype_lettering.py)
   crowd: 'crowd', // 2 frames of 100x24 side by side: heads seen from behind, for the bottom of the gap between the lane fields (alternate frames on the beat)
   notes: 'notes', // 8 frames, 18x18: 0-3 coloured notes, 4-7 pale receptors (lane order)
   barFrame: 'bar_frame', // 128x32, visible area x 8..119, y 11..22

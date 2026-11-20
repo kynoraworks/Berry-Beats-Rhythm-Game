@@ -110,7 +110,7 @@ export class BattleEffects {
     if (rules.gimmick === 'flash') {
       const left = PLAYER_LANES[0] - 55;
       const width = PLAYER_LANES[3] - PLAYER_LANES[0] + 110;
-      this.curtain = new FlashCurtain(scene, left, width, flashSchedule(chart, engine.notes), setup.calm, setup.rivalColor, () => setup.hooks.sfx('warn'));
+      this.curtain = new FlashCurtain(scene, left, width, flashSchedule(chart, engine.notes), setup.calm, setup.rivalColor, () => setup.hooks.sfx('warn'), (y) => field.projectY(y));
     } else {
       this.curtain = null;
     }

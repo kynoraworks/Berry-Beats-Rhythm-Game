@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, GAME_H, LANE_COLORS, Tex, type Lane } from '../core/config';
 import type { PlayNote } from '../core/engine';
 import { Depth, NOTE_SCALE, RECEPTOR_Y } from './layout';
+import type { FieldProjection } from './Projection';
 
 const SPARK_KEY = 'spark';
 const HOLD_WIDTH = 34;
@@ -37,6 +38,9 @@ export class NoteField {
   private readonly dim: boolean;
   private readonly shade: Phaser.GameObjects.Rectangle;
   private effects: FieldEffects = {};
+  private readonly backing: Phaser.GameObjects.Rectangle;
+  /** The hype camera's tilt, when there is one. */
+  private projection: FieldProjection | null = null;
 
   /** `dim` draws the field slightly faded, used for the rival's side. */
   constructor(scene: Phaser.Scene, lanes: number[], notes: PlayNote[], dim = false) {
@@ -54,7 +58,7 @@ export class NoteField {
 
     const left = lanes[0] - 55;
     const width = lanes[3] - lanes[0] + 110;
-    scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, dim ? 0.22 : 0.34).setOrigin(0).setDepth(Depth.lanes);
+    this.backing = scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, dim ? 0.22 : 0.34).setOrigin(0).setDepth(Depth.lanes);
     // Drawn over the notes to push the whole field back while it is the other dancer's turn.
     this.shade = scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, 1).setOrigin(0).setDepth(Depth.effects + 1).setAlpha(0);
 
@@ -90,6 +94,15 @@ export class NoteField {
 
   setEffects(effects: FieldEffects): void {
     this.effects = effects;
+  }
+
+  setProjection(projection: FieldProjection | null): void {
+    this.projection = projection;
+  }
+
+  /** Where a flat y is drawn right now (it moves while the hype camera is tilted). */
+  projectY(flatY: number): number {
+    return this.projection ? this.projection.screenY(flatY) : flatY;
   }
 
   /** Fade the field back (it stays readable) or bring it forward again. */
@@ -142,6 +155,8 @@ export class NoteField {
     }
 
     this.holdGfx.clear();
+    const projection = this.projection?.active ? this.projection : null;
+    if (this.projection) this.backing.setAlpha(1 - this.projection.amount);
     for (let i = this.first; i < notes.length; i++) {
       const note = notes[i];
       if (note.t - time > ahead) break;
@@ -162,7 +177,9 @@ export class NoteField {
       }
       const alpha = (note.state === 'missed' ? 0.35 : 1) * (this.dim ? 0.85 : 1);
 
-      if (note.isHold) {
+      if (note.isHold && projection) {
+        projection.drawHold(this.holdGfx, x, headY, RECEPTOR_Y - (note.end - time) * speed, note.lane, alpha, holding);
+      } else if (note.isHold) {
         const tailY = RECEPTOR_Y - (note.end - time) * speed;
         const top = Math.min(tailY, headY);
         const height = Math.max(0, headY - top);
@@ -182,7 +199,8 @@ export class NoteField {
         sprite.setFrame(note.lane).setVisible(true);
         this.active.set(note.id, sprite);
       }
-      sprite.setPosition(x, headY).setAlpha(alpha);
+      if (this.projection) this.projection.placeNote(sprite, x, headY, alpha);
+      else sprite.setPosition(x, headY).setAlpha(alpha);
     }
   }
 
