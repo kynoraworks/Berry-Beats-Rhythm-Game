@@ -100,6 +100,13 @@ export class EditorDoc {
   private nextId = 1;
 
   constructor(chart: Chart, startDirty = false) {
+    this.working = { notes: this.adopt(chart.notes, chart.rival), meta: metaFromChart(chart) };
+    this.history = new History(this.working);
+    this.saved = startDirty ? null : this.working;
+  }
+
+  /** Turn chart notes into editor notes with fresh ids. */
+  private adopt(player: readonly ChartNote[] | undefined, rival: readonly ChartNote[] | undefined): EditorNote[] {
     const notes: EditorNote[] = [];
     const load = (list: readonly ChartNote[] | undefined, side: Side) => {
       for (const n of list ?? []) {
@@ -108,12 +115,9 @@ export class EditorDoc {
         if (!conflict(notes, note)) notes.push(note);
       }
     };
-    load(chart.notes, 0);
-    load(chart.rival, 1);
-    notes.sort(order);
-    this.working = { notes, meta: metaFromChart(chart) };
-    this.history = new History(this.working);
-    this.saved = startDirty ? null : this.working;
+    load(player, 0);
+    load(rival, 1);
+    return notes.sort(order);
   }
 
   get state(): DocState {
@@ -252,6 +256,16 @@ export class EditorDoc {
     }
     if (added.length > 0) this.apply(notes.sort(order), false);
     return added;
+  }
+
+  /**
+   * Swap in a whole new set of notes, with any chart properties that go with
+   * them, as a single undo step.
+   */
+  replaceNotes(player: readonly ChartNote[], rival: readonly ChartNote[], meta: Partial<ChartMeta> = {}): void {
+    this.cancel();
+    this.working = { notes: this.adopt(player, rival), meta: { ...this.working.meta, ...meta } };
+    this.history.push(this.working);
   }
 
   setMeta(patch: Partial<ChartMeta>): void {

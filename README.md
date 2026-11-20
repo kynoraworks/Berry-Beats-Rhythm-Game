@@ -70,6 +70,12 @@ Choose **Beat Maps** in the main menu to create, edit, play, import and export m
 
 Maps are stored in the browser's local storage. Use Export to save a map as a `.berrybeat.json` file and Import to load one. "Remix a story level" opens a copy of a story chart for editing.
 
+### Auto chart
+
+**Auto chart** in the composer (or `G`) drafts a map from the audio: it finds the tempo and first beat, detects where notes start, and places arrows on them for the difficulty you pick, with or without turns for the rival. It replaces the notes in the map as one step, so undo brings the old map back. A five minute song takes a few seconds.
+
+Treat the result as a first draft to edit. It needs music with a steady tempo and clear attacks: live recordings that drift, free-time intros, and soft music without drums chart badly or not at all, and it says so when the tempo is unclear. In that case tap the tempo yourself (`T`), set the first beat, and run it again with "Keep". A tempo may also come out at double or half of what you would count, which only changes the bar lines.
+
 ### Composer controls
 
 | Area | Controls |
@@ -78,7 +84,7 @@ Maps are stored in the browser's local storage. Use Export to save a map as a `.
 | Transport | `Space` play or pause, `Enter` test play from the playhead, `W` `S` step by the snap grid, `PageUp` `PageDown` by measure, `Home` `End` |
 | Lane keys | Arrows or `D` `F` `J` `K` place a note at the playhead. While the song plays they record, and holding a key makes a hold. `Tab` switches between your lanes and the rival's |
 | Tools | `1` draw, `2` select, `3` erase, `Delete` removes the selection, `,` `.` nudge it, Ctrl+`A` `C` `V` |
-| Settings | `[` `]` snap (1/1 to 1/8), `-` `=` zoom, `R` speed, `C` note ticks, `M` metronome, `T` tap tempo |
+| Settings | `[` `]` snap (1/1 to 1/8), `-` `=` zoom, `R` speed, `C` note ticks, `M` metronome, `T` tap tempo, `G` auto chart |
 | File | Ctrl+`Z` `Y` undo and redo, Ctrl+`S` save, `H` help, `Esc` exit |
 
 The editor is built for mouse and keyboard. It runs on a phone, but the labels are small.
@@ -107,7 +113,7 @@ The editor is built for mouse and keyboard. It runs on a phone, but the labels a
 
 ```bash
 npm run dev        # dev server with hot reload
-npm test           # unit tests (scoring, battles, chart format, composer logic, shipped charts)
+npm test           # unit tests (scoring, battles, chart format, composer logic, auto chart, shipped charts)
 npm run test:e2e   # build, then a browser smoke test (needs Chromium: npx playwright install chromium)
 npm run typecheck  # TypeScript only
 npm run build      # type-check and build to dist/
@@ -141,7 +147,7 @@ python3 tools/build_characters.py   # Blackberry, Raspberry, Coach, Pear and Dr.
 python3 tools/make_crowd.py         # crowd silhouettes, built from the dancers
 ```
 
-Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat, places notes on detected onsets and validates the result:
+Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat, places notes on detected onsets and validates the result. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
 
 ```bash
 pip install numpy scipy

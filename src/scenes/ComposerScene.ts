@@ -9,6 +9,8 @@ import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getAudioContext, getSong, loadSongBuffer, saveCustomAudio, songTitle } from '../core/songs';
 import { UiButton, addBody, addBox, addDim, addText, fadeIn, goTo, isLeaving } from '../core/ui';
+import { LOW_CONFIDENCE, autoChart, type AutoChartResult } from '../composer/autochart';
+import { AutoChartDialog, type AutoChartChoice } from '../composer/autochartDialog';
 import { scheduleClick } from '../composer/clicks';
 import { MAX_AUDIO_BYTES, baseName, disposePicker, pickFile } from '../composer/files';
 import { isFirstComposerVisit } from '../composer/firstUse';
@@ -29,7 +31,7 @@ import {
   yOfTime,
   type TimeView,
 } from '../composer/layout';
-import { EditorDoc, noteAt, type EditorNote, type Side } from '../composer/model';
+import { EditorDoc, noteAt, type ChartMeta, type EditorNote, type Side } from '../composer/model';
 import { TimelineView } from '../composer/timeline';
 import { UiFrame, registerUiFrames } from '../composer/uiAtlas';
 import { peaksFromBuffer } from '../composer/waveform';
@@ -84,6 +86,12 @@ interface StashedSession {
  * parked here in between so undo history and editor settings survive the trip.
  */
 let stashed: StashedSession | null = null;
+
+/** Anything that takes over the keyboard while it is open. */
+interface Dialog {
+  handleKey(key: ModalKey): void;
+  close(): void;
+}
 
 const MODAL_CODES: Record<string, ModalKey> = {
   ArrowUp: 'up',
@@ -150,7 +158,11 @@ export class ComposerScene extends Phaser.Scene {
   private songName = '';
   private startPosition = 0;
 
-  private modal: Modal | null = null;
+  private modal: Dialog | null = null;
+  private buffer: AudioBuffer | null = null;
+  /** The auto chart run in progress, so it can be told to stop. */
+  private autoJob: { cancelled: boolean } | null = null;
+  private hintAutoChart = false;
   private help: { destroy(): void }[] = [];
   private refreshers: (() => void)[] = [];
   private timeText!: Phaser.GameObjects.Text;
@@ -193,6 +205,9 @@ export class ComposerScene extends Phaser.Scene {
     this.tapTimes = [];
     this.songName = getSong(source.song)?.title ?? '';
     this.modal = null;
+    this.buffer = null;
+    this.autoJob = null;
+    this.hintAutoChart = !resumed;
     this.help = [];
     this.refreshers = [];
     this.lastReadout = '';
@@ -245,6 +260,9 @@ export class ComposerScene extends Phaser.Scene {
     closeTextInput(false);
     disposePicker();
     this.modal?.close();
+    if (this.autoJob) this.autoJob.cancelled = true;
+    this.autoJob = null;
+    this.buffer = null;
     this.conductor?.destroy();
     this.conductor = null;
     this.playing = false;
@@ -280,6 +298,7 @@ export class ComposerScene extends Phaser.Scene {
     if (token !== this.loadToken) return;
     this.conductor?.destroy();
     this.conductor = new Conductor(getAudioContext(this.game), buffer, getSettings().musicVolume);
+    this.buffer = buffer;
     this.duration = buffer.duration;
     this.timeline.setPeaks(peaksFromBuffer(buffer), buffer.duration);
     this.pos = clamp(this.startPosition, 0, this.duration);
@@ -288,6 +307,8 @@ export class ComposerScene extends Phaser.Scene {
     this.loadingText.setVisible(false);
     this.ready = true;
     this.refreshUi();
+    if (this.hintAutoChart && this.doc.notes.length === 0) showToast(this, 'Empty map: press G or Auto chart to draft notes from the audio', CSS.cream, 7000);
+    this.hintAutoChart = false;
   }
 
   /** Pick a new audio file for a map whose audio is missing on this device. */
@@ -835,6 +856,9 @@ export class ComposerScene extends Phaser.Scene {
       case 'KeyH':
         if (!event.repeat) this.toggleHelp();
         break;
+      case 'KeyG':
+        if (!event.repeat) this.openAutoChart();
+        break;
       default:
         handled = false;
     }
@@ -1150,6 +1174,98 @@ export class ComposerScene extends Phaser.Scene {
     goTo(this, SceneKeys.BeatMaps, { select: this.doc.meta.id });
   }
 
+  // ---------------------------------------------------------------------------
+  // Auto chart
+  // ---------------------------------------------------------------------------
+
+  private openAutoChart(): void {
+    if (!this.ready || !this.buffer || this.modal || isLeaving(this)) return;
+    this.pause();
+    this.finishRecordings();
+    closeTextInput(true);
+    if (this.help.length > 0) this.toggleHelp();
+    const meta = this.doc.meta;
+    const count = this.doc.notes.length;
+    // A built-in song's tempo is known, and a tempo the player has set or charted to is theirs to keep.
+    // Only a fresh map on imported audio still has the placeholder tempo, which is worth replacing.
+    const placeholder = getSong(meta.song) === undefined && meta.bpm === 120 && meta.offset === 0;
+    const dialog = new AutoChartDialog(
+      this,
+      {
+        // A new map's difficulty is only the default of 1, which makes a very sparse first draft.
+        difficulty: count === 0 ? Math.max(2, meta.difficulty) : meta.difficulty,
+        rival: meta.rivalCharacter !== 'none',
+        detect: count === 0 && placeholder,
+        existingNotes: count,
+        bpm: meta.bpm,
+        onGenerate: (choice) => void this.runAutoChart(choice, dialog),
+        onCancel: () => {
+          if (this.autoJob) this.autoJob.cancelled = true;
+        },
+      },
+      () => {
+        if (this.modal === dialog) this.modal = null;
+      },
+    );
+    this.modal = dialog;
+  }
+
+  private async runAutoChart(choice: AutoChartChoice, dialog: AutoChartDialog): Promise<void> {
+    const buffer = this.buffer;
+    if (!buffer || this.autoJob) return;
+    const token = this.loadToken;
+    const job = { cancelled: false };
+    this.autoJob = job;
+    dialog.setProgress(0);
+    const meta = this.doc.meta;
+    const channels: Float32Array[] = [];
+    for (let c = 0; c < Math.min(2, buffer.numberOfChannels); c++) channels.push(buffer.getChannelData(c));
+    let result: AutoChartResult | null = null;
+    try {
+      result = await autoChart(
+        channels,
+        buffer.sampleRate,
+        { difficulty: choice.difficulty, rival: choice.rival ? 'trade' : 'none', ...(choice.detect ? {} : { bpm: meta.bpm, offset: meta.offset }) },
+        { onProgress: (fraction) => dialog.setProgress(fraction), isCancelled: () => job.cancelled || token !== this.loadToken },
+      );
+    } catch (error) {
+      console.error(error);
+    }
+    if (this.autoJob === job) this.autoJob = null;
+    if (token !== this.loadToken || job.cancelled || result?.cancelled) return;
+    dialog.close();
+    if (!result) {
+      showToast(this, 'Auto chart could not read this audio', CSS.miss, 5000);
+      return;
+    }
+    const unsure = result.confidence < LOW_CONFIDENCE;
+    if (result.notes.length === 0) {
+      const advice = choice.detect ? 'No steady beat found. Tap the tempo (T), set the first beat, then use Keep.' : 'No notes fit this tempo. Check BPM and offset, or let it detect them.';
+      showToast(this, advice, CSS.good, 8000);
+      return;
+    }
+    const patch: { -readonly [K in keyof ChartMeta]?: ChartMeta[K] } = { difficulty: choice.difficulty };
+    if (choice.detect) {
+      patch.bpm = result.bpm;
+      patch.offset = result.offset;
+    }
+    if (choice.rival && meta.rivalCharacter === 'none') patch.rivalCharacter = 'raspberry';
+    this.drag = null;
+    this.box = null;
+    this.doc.replaceNotes(result.notes, result.rival, patch);
+    this.selection.clear();
+    playSfx(this.game, 'bonus');
+    this.refreshUi();
+    const counts = `${result.notes.length} notes${result.rival.length ? ` and ${result.rival.length} for the rival` : ''}`;
+    if (!unsure) {
+      showToast(this, `Drafted ${counts} at ${Math.round(result.bpm * 100) / 100} bpm. Undo brings the old map back.`, CSS.cream, 6000);
+    } else if (choice.detect) {
+      showToast(this, `Tempo unclear (guess: ${Math.round(result.bpm * 10) / 10} bpm), only ${counts} fit. Try tapping it (T), then Keep.`, CSS.good, 9000);
+    } else {
+      showToast(this, `This tempo fits the audio poorly: only ${counts} placed. Check BPM and offset.`, CSS.good, 9000);
+    }
+  }
+
   private openModal(config: ModalConfig): void {
     this.modal?.close();
     closeTextInput(true);
@@ -1183,7 +1299,7 @@ export class ComposerScene extends Phaser.Scene {
       'Home / End: start or end',
       '[ / ]: snap     - / =: zoom',
       'R: speed   C: ticks   M: metronome',
-      'T: tap tempo',
+      'T: tap tempo     G: auto chart',
       'Ctrl + Z / Ctrl + Y: undo, redo',
       'Ctrl + S: save',
       'H: this help     Esc: exit',
@@ -1253,6 +1369,7 @@ export class ComposerScene extends Phaser.Scene {
     this.chip(1220, 28, 'Help', () => this.toggleHelp(), 88, 24);
     this.chip(1088, 28, 'Test play', () => this.testPlay(), 152, 24);
     this.chip(956, 28, 'Save', () => this.save(), 88, 24);
+    this.chip(816, 28, 'Auto chart', () => this.openAutoChart(), 168, 24);
   }
 
   private field(x: number, y: number, width: number, read: () => string, edit: { maxLength: number; numeric?: boolean; value: () => string; commit: (value: string) => void } | null): void {
