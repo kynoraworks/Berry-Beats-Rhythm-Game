@@ -166,8 +166,18 @@ const DELTA_RANGE: Record<Exclude<Judgement, 'miss'>, [number, number]> = {
   hit: [0.096, 0.128],
 };
 
+/**
+ * The rival's mix for a level from 1 to 5. Whole levels are the table's rows;
+ * a level in between (the story's own curve, 2.5 say) blends its two neighbours.
+ */
 export function rivalSkill(difficulty: number | undefined): Skill {
-  return SKILL[Math.min(5, Math.max(1, Math.round(difficulty ?? 2)))];
+  const level = Math.min(5, Math.max(1, difficulty ?? 2));
+  const low = Math.floor(level);
+  const share = level - low;
+  if (share === 0) return SKILL[low];
+  const from = SKILL[low];
+  const to = SKILL[low + 1];
+  return from.map((value, i) => value + (to[i] - value) * share) as Skill;
 }
 
 /** Small deterministic random generator, so a level always plays out the same way. */

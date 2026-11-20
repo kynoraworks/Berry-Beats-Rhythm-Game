@@ -60,10 +60,6 @@ export function listCustomCharts(): Chart[] {
   return charts;
 }
 
-export function getCustomChart(id: string): Chart | null {
-  return listCustomCharts().find((c) => c.id === id) ?? null;
-}
-
 /** Insert or replace a beat map. Returns false if the browser refused to store it. */
 export function saveCustomChart(chart: Chart): boolean {
   const charts = listCustomCharts().filter((c) => c.id !== chart.id);

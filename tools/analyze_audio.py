@@ -7,16 +7,15 @@ What it does
   2. Measures tempo, drift and the first-beat offset of all six tracks.
   3. Builds the beat maps in public/charts from the detected onsets, following
      a hand-written section plan per chart (who plays when, how dense, which
-     lanes). Note positions and lanes come from the audio. The twelve story
-     stops are stop01 to stop12; the older charts (tutorial, level1 to level3,
-     bonus-title, bonus-menu) are kept as they were.
+     lanes). Note positions and lanes come from the audio. The charts are the
+     Coach's tutorial and the twelve story stops, stop01 to stop12.
   4. Validates every chart and prints a report. Exits non-zero on a violation.
 
 Run from the repo root:
     python3 tools/analyze_audio.py                 # analyse, write charts, report
     python3 tools/analyze_audio.py --clicks DIR    # also write click-track wavs to DIR
     python3 tools/analyze_audio.py --no-write      # report only
-    python3 tools/analyze_audio.py --show level1   # print an ASCII view of a chart
+    python3 tools/analyze_audio.py --show stop01   # print an ASCII view of a chart
     python3 tools/analyze_audio.py --only stop04   # build and report only these charts
 
 Needs: Python 3.10+, numpy, scipy, and ffmpeg on the PATH.
@@ -32,7 +31,7 @@ import json
 import subprocess
 import sys
 import wave
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -505,8 +504,15 @@ PLANS = [
             Section(20, 24, "echo", grid=2, notes=4, holds=2),
         ],
     ),
+]
+
+
+# The twelve stops of the story (docs/STORY_BIBLE.md). Each chart shows its fruit's
+# gimmick where the gimmick lives in the chart; the visual ones come from the game.
+PLANS += [
+    # Stop 1, Raspberry: an even chart with no gimmick, the first boss.
     Plan(
-        "level1", "level1", "Level 1", "raspberry", 2, max_nps=4, solo_holds=False,
+        "stop01", "level1", "Stop 1", "raspberry", 2, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 4, "trade", grid=4, notes=4, rival_notes=4, unit=2),
             Section(4, 12, "trade", grid=2, notes=5, rival_notes=5, unit=2, holds=2),
@@ -515,31 +521,23 @@ PLANS = [
             Section(24, 29, "both", grid=2, notes=7, rival_notes=5, doubles=0.5, holds=2),
         ],
     ),
+    # Stop 2, Banana: an easy warm-up. His notes slide in from the next lane in the game,
+    # so the chart reads slowly: no doubles and no lane twice within a beat.
     Plan(
-        "bonus-title", "title", "Bonus 1: Title Theme", "raspberry", 3, max_nps=4, solo_holds=False,
+        "stop02", "tutorial", "Stop 2", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
         sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=6),
-            Section(1, 8, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, holds=3),
-            Section(8, 12, "both", grid=2, notes=8, rival_notes=6, bursts=1, doubles=1, holds=2),
-            Section(12, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, bursts=1, doubles=1, holds=1),
-            Section(16, 24, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=3),
+            Section(0, 4, "trade", grid=4, notes=3, rival_notes=3, unit=1),
+            Section(4, 12, "trade", grid=4, notes=4, rival_notes=4, unit=2, holds=1),
+            Section(12, 20, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=1),
+            Section(20, 24, "both", grid=4, notes=4, rival_notes=3),
         ],
-    ),
-    Plan(
-        "bonus-menu", "menu", "Bonus 2: Main Menu", "raspberry", 4, max_nps=4, solo_holds=False,
-        sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=6),
-            Section(1, 4, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=1, holds=1),
-            Section(4, 12, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=3),
-            Section(12, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, bursts=2, doubles=1, holds=1),
-            Section(16, 24, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, holds=4),
-        ],
+        rank_lanes=True,
     ),
     Plan(
         # The Pear starts slow and finishes strong, and so does his chart: sparse trades
         # over the intro, fuller trades in the groove, a held freeze on the break in
         # bar 11, then both sides together for the densest bars at the end.
-        "level2", "level_select", "Level 2", "pear", 2, max_nps=4, solo_holds=False,
+        "stop03", "level_select", "Stop 3", "pear", 2, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 2, "trade", grid=2, notes=4, rival_notes=4, unit=1),
             Section(2, 4, "trade", grid=2, notes=5, rival_notes=4, unit=1),
@@ -555,11 +553,23 @@ PLANS = [
         ],
         balance_lanes=True,
     ),
+    # Stop 4, Grape: notes arrive in pairs, on both sides, chords on the strong beats.
+    Plan(
+        "stop04", "menu", "Stop 4", "grape", 3, max_nps=6, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=5, rival_doubles=2, double_accent=0.6),
+            Section(1, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, doubles=2, rival_doubles=2, double_accent=0.6),
+            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+            Section(12, 16, "both", grid=2, notes=6, rival_notes=5, doubles=2, rival_doubles=1, double_accent=0.6),
+            Section(16, 24, "trade", grid=2, notes=7, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+        ],
+        rank_lanes=True,
+    ),
     Plan(
         # Dr. Lemon is erratic. The song runs in four-bar phrases that end on a syncopated
         # break, so the plan changes hands and density every few bars: solo bursts, a quiet
         # bar, and breaks charted on the sixteenth grid where the music leaves the beat.
-        "level3", "pause", "Level 3", "lemon", 3, max_nps=4, solo_holds=False,
+        "stop05", "pause", "Stop 5", "lemon", 3, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 2, "trade", grid=2, notes=5, rival_notes=5, unit=1),
             Section(2, 3, "both", grid=2, notes=5, rival_notes=5),
@@ -580,49 +590,6 @@ PLANS = [
         ],
         balance_lanes=True,
     ),
-]
-
-
-
-def _reuse(source: str, chart_id: str, title: str, rival: str) -> Plan:
-    """A story stop that plays the same notes as an earlier chart under its own id."""
-    plan = next(p for p in PLANS if p.chart_id == source)
-    return replace(plan, chart_id=chart_id, title=title, rival=rival)
-
-
-# The twelve stops of the story (docs/STORY_BIBLE.md). Each chart shows its fruit's
-# gimmick where the gimmick lives in the chart; the visual ones come from the game.
-PLANS += [
-    # Stop 1, Raspberry: an even chart with no gimmick, the first boss. Level 1's notes.
-    _reuse("level1", "stop01", "Stop 1", "raspberry"),
-    # Stop 2, Banana: an easy warm-up. His notes slide in from the next lane in the game,
-    # so the chart reads slowly: no doubles and no lane twice within a beat.
-    Plan(
-        "stop02", "tutorial", "Stop 2", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
-        sections=[
-            Section(0, 4, "trade", grid=4, notes=3, rival_notes=3, unit=1),
-            Section(4, 12, "trade", grid=4, notes=4, rival_notes=4, unit=2, holds=1),
-            Section(12, 20, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=1),
-            Section(20, 24, "both", grid=4, notes=4, rival_notes=3),
-        ],
-        rank_lanes=True,
-    ),
-    # Stop 3, Pear: slow start, strong finish. Level 2's notes.
-    _reuse("level2", "stop03", "Stop 3", "pear"),
-    # Stop 4, Grape: notes arrive in pairs, on both sides, chords on the strong beats.
-    Plan(
-        "stop04", "menu", "Stop 4", "grape", 3, max_nps=6, solo_holds=False,
-        sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=5, rival_doubles=2, double_accent=0.6),
-            Section(1, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, doubles=2, rival_doubles=2, double_accent=0.6),
-            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
-            Section(12, 16, "both", grid=2, notes=6, rival_notes=5, doubles=2, rival_doubles=1, double_accent=0.6),
-            Section(16, 24, "trade", grid=2, notes=7, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
-        ],
-        rank_lanes=True,
-    ),
-    # Stop 5, Dr. Lemon: erratic. Level 3's notes.
-    _reuse("level3", "stop05", "Stop 5", "lemon"),
     # Stop 6, Plum: long rests and patient patterns. Every phrase leaves the player at
     # least a bar of quiet, and some bars nobody plays at all.
     Plan(

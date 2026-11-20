@@ -14,7 +14,8 @@ edges hard and avoids in-between colours.
 repeats the edge row to fill the gap. The game expects the top band to end at
 row 27 and the centre platform's top edge at row 137, where the dancers stand.
 
-The three shipped stages were made with:
+The first stages were made with (Raspberry's bedroom is kept in
+archive/generated-sprites; the story no longer dances there):
   stage_raspberry.png  --colors 32 --shift-rows 2
   stage_rooftop.png    --colors 32 --shift-rows 2
   stage_club.png       --colors 32

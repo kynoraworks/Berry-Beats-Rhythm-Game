@@ -17,7 +17,7 @@ import {
   slidePlan,
   slideProgress,
 } from '../src/story/gimmicks';
-import { STOPS } from '../src/story/stops';
+import { STOPS, rivalLevelFor } from '../src/story/stops';
 
 const note = (t: number, lane: 0 | 1 | 2 | 3, end = t) => ({ t, end, lane });
 
@@ -248,8 +248,21 @@ describe('lemon meltdowns', () => {
   it('happen on the real stop, as planned for him', () => {
     const chart = loadChart('stop05');
     const rival = new Engine(toTimedNotes(chart, chart.rival ?? []), { noFail: true });
-    const plan = planRival(rival.notes.length, chart.difficulty, chart.id, { personality: rivalPersonality('lemon'), notes: rival.notes });
-    expect(meltdownWindows(rival.notes, plan, chart.bpm).length).toBeGreaterThanOrEqual(2);
+    const plan = planRival(rival.notes.length, rivalLevelFor(chart), chart.id, { personality: rivalPersonality('lemon'), notes: rival.notes });
+    const firstNote = Math.min(...toTimedNotes(chart, chart.notes).map((note) => note.t));
+    const windows = meltdownWindows(rival.notes, plan, chart.bpm, firstNote);
+    expect(windows.length).toBeGreaterThanOrEqual(2);
+    // None is announced in the count-in, before the player has anything to play.
+    for (const window of windows) expect(window.warn).toBeGreaterThanOrEqual(firstNote);
+  });
+
+  it('are left out when warned before a given time', () => {
+    const notes = [1, 2, 3, 4, 10, 11, 12].map((t, id) => ({ id, t, end: t, lane: 0 as const, isHold: false, state: 'pending' as const }) satisfies PlayNote);
+    const miss: PlannedHit = { judgement: 'miss', delta: 0 };
+    const hit: PlannedHit = { judgement: 'perfect', delta: 0 };
+    const plan = [miss, miss, miss, hit, miss, miss, miss];
+    expect(meltdownWindows(notes, plan, 60)).toHaveLength(2);
+    expect(meltdownWindows(notes, plan, 60, 5)).toHaveLength(1);
   });
 
   it('jitter stays inside the lane and is the same for the same moment', () => {

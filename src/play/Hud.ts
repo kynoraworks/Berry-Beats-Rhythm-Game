@@ -165,6 +165,12 @@ export class Hud {
     if (this.queue.length < 4) this.queue.push({ text, color });
   }
 
+  /** The song is over: take down the turn label and drop call-outs still waiting their turn. */
+  endOfSong(): void {
+    this.turnText.setVisible(false);
+    this.queue.length = 0;
+  }
+
   /** Say whose turn it is. The label stays up until the next change. */
   setTurn(label: string, color: string): void {
     this.turnText.setText(label).setColor(color).setVisible(true);

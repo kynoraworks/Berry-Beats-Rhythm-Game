@@ -77,6 +77,14 @@ export function segmentAt(ref: StoryRef | undefined): { stop: StopDef; segment: 
   return segment ? { stop, segment, last: ref.segment === segments.length - 1 } : null;
 }
 
+/**
+ * Riding back to a cleared stop 1 is a rematch with Raspberry: the train goes
+ * straight to her battle, past the room, the neighbour and the lesson.
+ */
+export function rideStraightToBattle(stop: StopDef, cleared: boolean): boolean {
+  return cleared && segmentsFor(stop).some((segment) => segment.kind === 'lesson');
+}
+
 /** First segment to play when a stop is chosen. A cleared stop 1 skips straight past the lesson. */
 export function firstSegment(stop: StopDef, cleared: boolean): number {
   const segments = segmentsFor(stop);

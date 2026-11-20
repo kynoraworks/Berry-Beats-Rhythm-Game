@@ -15,7 +15,9 @@ import { CAST, portraitFrame } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { arrivalPlace, crewAt, lookHotspots, type ExploreData } from '../story/places';
 import { characterSheet } from '../story/placeholders';
-import { crewOnBoard, hasInspected, hasSeen, isCleared, isStopOpen, nextStopIndex } from '../story/progress';
+import { crewOnBoard, hasInspected, hasSeen, isCleared, isStopOpen, isStoryComplete, nextStopIndex } from '../story/progress';
+import { firstSegment, rideStraightToBattle } from '../story/flow';
+import { playSegment } from '../story/run';
 import { ROLE_LABELS, STOPS, stopTeaser, type StopDef } from '../story/stops';
 import type { FruitId, TimeOfDay } from '../story/types';
 
@@ -315,6 +317,14 @@ export class LevelSelectScene extends Phaser.Scene {
       node.badge.setVisible(cleared);
       node.number.setColor(i === this.index ? CSS.yellow : available ? CSS.cream : CSS.grey);
     });
+    // The story is done: the last stop gets a star and the map says so.
+    const complete = isStoryComplete();
+    const last = this.nodes[STOPS.length - 1];
+    if (last) {
+      last.badge.setFrame(complete ? 'icon_star' : 'icon_check');
+      last.number.setText(complete ? 'The End' : String(STOPS.length));
+      if (complete) last.number.setColor(CSS.yellow);
+    }
     this.current.setVisible(next < STOPS.length).setX(nodeX(Math.min(next, STOPS.length - 1)));
     this.cursor.setX(nodeX(this.index));
 
@@ -322,7 +332,8 @@ export class LevelSelectScene extends Phaser.Scene {
     this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}`);
     this.nameText.setText(open ? stop.station : '? ? ?').setFontSize(48).setAlpha(open ? 1 : 0.6);
     for (let size = 44; this.nameText.width > 500 && size >= 28; size -= 4) this.nameText.setFontSize(size);
-    this.blurbText.setText(open ? stopTeaser(stop) : `Win at ${STOPS[this.index - 1].station} to ride on`);
+    const teaser = stop.role === 'final' && isStoryComplete() ? 'The crew won. Dance it again?' : stopTeaser(stop);
+    this.blurbText.setText(open ? teaser : `Win at ${STOPS[this.index - 1].station} to ride on`);
     this.rivalTag.setTint(open ? fruit.tag : 0x3a3458);
     this.rivalText.setText(open ? `vs ${fruit.name}` : 'vs ? ? ?').setColor(open && fruit.darkTag ? CSS.ink : CSS.cream);
 
@@ -395,8 +406,15 @@ export class LevelSelectScene extends Phaser.Scene {
     this.tweens.addCounter({ from: 1, to: 0.05, duration: quick ? 1 : 900, ease: 'Quad.easeOut', onUpdate: (tween) => void (anim.timeScale = tween.getValue() ?? 1) });
     if (!quick) this.time.delayedCall(850, () => this.cameras.main.shake(180, 0.004));
     const sub = stop.number === 1 ? 'Home' : `Stop ${stop.number}`;
-    this.time.delayedCall(quick ? 50 : 1000, () =>
-      this.doors.close(stop.station, sub, () => this.time.delayedCall(300, () => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)))),
-    );
+    // A cleared stop 1 is a rematch with Raspberry: the room, the neighbour and the lesson are behind him.
+    const rematch = rideStraightToBattle(stop, isCleared(stop.id));
+    const arrive = () => {
+      if (!rematch) {
+        this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id));
+        return;
+      }
+      playSegment(this, { stop: stop.id, segment: firstSegment(stop, true) }).catch(() => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)));
+    };
+    this.time.delayedCall(quick ? 50 : 1000, () => this.doors.close(stop.station, sub, () => this.time.delayedCall(300, arrive)));
   }
 }

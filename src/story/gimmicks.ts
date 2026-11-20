@@ -164,8 +164,10 @@ const MELTDOWN_MAX = 3;
  * Stretches of song when Dr. Lemon is melting down: runs of three or more of
  * his notes missed in a row, from a beat before the first to a beat after the
  * last (capped at a few seconds). `notes` are his notes in plan order.
+ * Meltdowns warned before `from` (the player's first note) are left out: they
+ * would land in the count-in, on top of "Round 1", with nothing of yours to shake.
  */
-export function meltdownWindows(notes: readonly PlayNote[], plan: readonly PlannedHit[], bpm: number): TimedWindow[] {
+export function meltdownWindows(notes: readonly PlayNote[], plan: readonly PlannedHit[], bpm: number, from = Number.NEGATIVE_INFINITY): TimedWindow[] {
   const beat = 60 / bpm;
   const windows: TimedWindow[] = [];
   let run: PlayNote[] = [];
@@ -173,7 +175,8 @@ export function meltdownWindows(notes: readonly PlayNote[], plan: readonly Plann
     if (run.length >= MELTDOWN_RUN) {
       const start = run[0].t - beat * 0.5;
       const end = Math.min(run[run.length - 1].t + beat, start + MELTDOWN_MAX);
-      windows.push({ warn: start - beat * 0.5, start, end });
+      const warn = start - beat * 0.5;
+      if (warn >= from) windows.push({ warn, start, end });
     }
     run = [];
   };

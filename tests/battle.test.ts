@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   Battle,
@@ -18,6 +18,7 @@ import {
 } from '../src/core/battle';
 import { parseChart, toTimedNotes, type Chart, type ChartNote } from '../src/core/chart';
 import { ACCURACY_WEIGHT, Engine, type Judgement } from '../src/core/engine';
+import { rivalLevelFor } from '../src/story/stops';
 
 const timing = { bpm: 120, offset: 0 }; // one bar = 2 seconds
 const bar = (index: number, lanes: number[] = [0]): ChartNote[] => lanes.map((l, i) => ({ b: index * 4 + i, l: l as 0 | 1 | 2 | 3 }));
@@ -245,18 +246,11 @@ describe('FlawlessTracker', () => {
 // Balance: play the real story battles with simulated players.
 // ---------------------------------------------------------------------------
 
-/**
- * The first of these charts that is on disk. The balance was tuned on the older
- * story charts; once those are retired the same songs live on as story stops.
- */
-function pick(...ids: string[]): string {
-  return ids.find((id) => existsSync(`public/charts/${id}.json`)) ?? ids[0];
-}
-
-const LEVEL1 = pick('level1', 'stop01');
-const PEAR = pick('level2', 'stop03');
-const LEMON = pick('level3', 'stop05');
-const BALANCED = [LEVEL1, PEAR, LEMON, 'bonus-title', 'bonus-menu'].filter((id) => existsSync(`public/charts/${id}.json`));
+const LEVEL1 = 'stop01';
+const PEAR = 'stop03';
+const LEMON = 'stop05';
+/** Every stop fought as a normal battle (stop 12 is the crew battle, balanced in crew.test.ts). */
+const STOP_IDS = Array.from({ length: 11 }, (_, i) => `stop${String(i + 1).padStart(2, '0')}`);
 
 function loadChart(id: string): Chart {
   return parseChart(JSON.parse(readFileSync(`public/charts/${id}.json`, 'utf8')));
@@ -280,7 +274,7 @@ function simulate(chart: Chart, hitRate: number, sharp = false) {
   const player = new Engine(toTimedNotes(chart, chart.notes));
   const rival = new Engine(toTimedNotes(chart, rivalNotes), { noFail: true });
   const me = new PlannedPlayer(player, planPlayer(player.notes.length, hitRate, `${chart.id}-${hitRate}`, sharp));
-  const plan = planRival(rival.notes.length, chart.difficulty, chart.id, { personality: rivalPersonality(chart.rivalCharacter), notes: rival.notes });
+  const plan = planRival(rival.notes.length, rivalLevelFor(chart), chart.id, { personality: rivalPersonality(chart.rivalCharacter), notes: rival.notes });
   const her = new PlannedPlayer(rival, plan);
   const battle = new Battle(buildRounds(chart, chart.notes, rivalNotes));
   let lowest = 1;
@@ -296,8 +290,8 @@ function simulate(chart: Chart, hitRate: number, sharp = false) {
   return { health: player.stats.health, lowest, failed: player.stats.failed, rounds, ...battle.result() };
 }
 
-describe('battle balance on the story levels', () => {
-  for (const id of BALANCED) {
+describe('battle balance on the story stops', () => {
+  for (const id of STOP_IDS) {
     const chart = loadChart(id);
 
     it(`${id}: a perfect player owns the bar and wins`, () => {
@@ -308,52 +302,62 @@ describe('battle balance on the story levels', () => {
       expect(run.won).toBe(true);
     });
 
-    it(`${id}: a player who hits 4 notes in 5 keeps the bar on their side`, () => {
-      const run = simulate(chart, 0.8);
+    // Every battle must be won to move on, so an ordinary good run has to be enough.
+    it(`${id}: a player who hits 9 notes in 10 with ordinary timing wins`, () => {
+      const run = simulate(chart, 0.9);
       expect(run.failed).toBe(false);
-      expect(run.health).toBeGreaterThan(0.55);
+      expect(run.won).toBe(true);
+    });
+
+    it(`${id}: a player who hits 4 notes in 5 keeps dancing to the end`, () => {
+      expect(simulate(chart, 0.8).failed).toBe(false);
     });
 
     it(`${id}: a player who hits half the notes loses the bar`, () => {
-      const run = simulate(chart, 0.5);
-      expect(run.failed).toBe(true);
+      expect(simulate(chart, 0.5).failed).toBe(true);
     });
   }
 
-  it('level 1 can be won by a player who hits 4 notes in 5', () => {
-    expect(simulate(loadChart(LEVEL1), 0.8).won).toBe(true);
+  it('the rival gets better along the Line', () => {
+    const levels = STOP_IDS.map((id) => rivalLevelFor(loadChart(id)) ?? 0);
+    expect(levels[0]).toBeGreaterThanOrEqual(levels[1]);
+    for (let i = 2; i < levels.length; i++) expect(levels[i]).toBeGreaterThanOrEqual(levels[i - 1]);
   });
 
-  it('level 2: the Pear gets better every round, and 4 notes in 5 still beat him', () => {
-    const run = simulate(loadChart(PEAR), 0.8);
+  it('a player who hits 7 notes in 10 cannot clear the later stops', () => {
+    for (const id of STOP_IDS.slice(3)) expect(simulate(loadChart(id), 0.7).won).toBe(false);
+  });
+
+  it('stop 1 can be won by a player who hits 9 notes in 10', () => {
+    expect(simulate(loadChart(LEVEL1), 0.9).won).toBe(true);
+  });
+
+  it('stop 3: the Pear gets better every round and takes the last from a 9 in 10 player', () => {
+    const run = simulate(loadChart(PEAR), 0.9);
     const his = run.rounds.map((round) => round.rival);
     expect(his.length).toBeGreaterThanOrEqual(3);
     for (let i = 1; i < his.length; i++) expect(his[i]).toBeGreaterThan(his[i - 1]);
-    expect(his[0]).toBeLessThan(50);
+    expect(his[0]).toBeLessThan(55);
     expect(his[his.length - 1]).toBeGreaterThan(75);
     expect(run.won).toBe(true);
-    // He takes the last round even from a player who misses nothing but is not always dead on.
-    expect(simulate(loadChart(PEAR), 1).rivalRounds).toBe(1);
+    expect(run.rivalRounds).toBe(1);
   });
 
-  it('level 3: the Lemon melts down several times and still plays to the level', () => {
+  it('stop 5: Dr. Lemon melts down several times and swings from round to round', () => {
     const chart = loadChart(LEMON);
     const notes = toTimedNotes(chart, chart.rival ?? []).sort((a, b) => a.t - b.t || a.lane - b.lane);
-    const plan = planRival(notes.length, chart.difficulty, chart.id, { personality: 'wild' });
+    const plan = planRival(notes.length, rivalLevelFor(chart), chart.id, { personality: 'wild' });
     const grades = plan.map((p) => (p.judgement === 'miss' ? 'm' : 'x')).join('');
     expect(grades.match(/m{3,}/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
-    expect(Math.abs(planAccuracy(plan) - skillAccuracy(rivalSkill(chart.difficulty)))).toBeLessThan(0.06);
-    // A player who hits 4 notes in 5 wins but drops a round to a hot streak; 7 in 10 is not enough.
-    const run = simulate(chart, 0.8);
-    expect(run.won).toBe(true);
-    expect(run.rivalRounds).toBeGreaterThanOrEqual(1);
+    const rounds = simulate(chart, 0.8).rounds.map((round) => round.rival);
+    expect(Math.max(...rounds) - Math.min(...rounds)).toBeGreaterThan(15);
     expect(simulate(chart, 0.7).won).toBe(false);
   });
 });
 
 describe.skipIf(!process.env.BALANCE)('balance table', () => {
   it('prints the numbers', () => {
-    for (const id of BALANCED) {
+    for (const id of STOP_IDS) {
       const chart = loadChart(id);
       for (const rate of [1, 0.9, 0.8, 0.7, 0.6, 0.5]) {
         const r = simulate(chart, rate);

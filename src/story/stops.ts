@@ -34,6 +34,12 @@ export interface StopDef {
   streetBg: string | null;
   time: TimeOfDay;
   gimmick: GimmickId;
+  /**
+   * How well the stop's fruit dances (1 to 5, fractions blend; see rivalSkill in
+   * core/battle.ts). Every battle must be won, so this climbs gently and the
+   * charts and gimmicks carry most of the difficulty.
+   */
+  rivalLevel: number;
   /** The fruit who joins Berry's crew after this stop's win, if any. */
   joins?: FruitId;
   script: StopScript;
@@ -171,6 +177,13 @@ const SEEDS: StopSeed[] = [
   },
 ];
 
+/**
+ * Rival skill per stop, 1 to 11 (stop 12 is the crew battle, with its own per round).
+ * In accuracy this runs from about 60% to 72%, so a player who hits nine notes in
+ * ten with ordinary timing can win every stop, and one who hits seven in ten cannot.
+ */
+const RIVAL_LEVELS = [2, 1.5, 2.2, 2.4, 2.6, 2.6, 2.8, 2.8, 3, 3, 3.1, 4];
+
 /** Allies join the crew when their stop is won. */
 const ALLIES: Partial<Record<FruitId, true>> = { raspberry: true, pear: true, lemon: true, watermelon: true };
 
@@ -199,6 +212,7 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
     streetBg: seed.street === false ? null : (seed.stage ?? `street_${seed.slug}`),
     time: timeOfDay(number),
     gimmick: CAST[seed.fruit].gimmick ?? 'even',
+    rivalLevel: RIVAL_LEVELS[i],
     joins: ALLIES[seed.fruit] ? seed.fruit : undefined,
     script,
   };
@@ -209,6 +223,11 @@ export const TUTORIAL = { id: 'tutorial', chartUrl: 'charts/tutorial.json', song
 
 export function stopById(id: string | undefined): StopDef | undefined {
   return STOPS.find((stop) => stop.id === id);
+}
+
+/** How well the rival dances a chart: its stop's level in the story, else the chart's own difficulty. */
+export function rivalLevelFor(chart: { id: string; difficulty?: number }): number | undefined {
+  return stopForChart(chart.id)?.rivalLevel ?? chart.difficulty;
 }
 
 /** The stop whose battle uses this chart. */

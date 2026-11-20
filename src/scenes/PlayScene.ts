@@ -44,7 +44,7 @@ import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
-import { stopById, stopForChart } from '../story/stops';
+import { rivalLevelFor, stopById, stopForChart } from '../story/stops';
 import { crewLineup, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
@@ -231,7 +231,7 @@ export class PlayScene extends Phaser.Scene {
     if (hasRival) {
       this.rivalEngine = new Engine(toTimedNotes(chart, rivalChart), { noFail: true });
       const notes = this.rivalEngine.notes;
-      rivalPlan = planRival(notes.length, chart.difficulty, chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
+      rivalPlan = planRival(notes.length, rivalLevelFor(chart), chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
       this.rivalDriver = new PlannedPlayer(this.rivalEngine, rivalPlan);
       this.turns = buildTurns(chart, chart.notes, rivalChart);
     }
@@ -607,6 +607,8 @@ export class PlayScene extends Phaser.Scene {
       };
     }
     this.effects?.finish();
+    // The turn label and any queued call-outs belong to the song, not to what follows it.
+    this.hud.endOfSong();
     const results: FlairResults = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
     if (this.effects && this.rules.ability) {
       results.flairUsed = this.effects.flairUsed;

@@ -3,7 +3,7 @@ import { COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
 import { playSfx } from '../core/sfx';
-import { UiButton, addBody, addText, addUiButton, isLeaving } from '../core/ui';
+import { UiButton, addBody, addIcon, addText, addUiButton, isLeaving } from '../core/ui';
 import { breathStrength, gradeAt, gradeStrength, lampStrength, leafCount, type Setting } from '../core/atmosphere';
 import { BreathPuffs, LampPool, LeafFall, gradeBackdrop, gradePerson } from '../core/atmosphereFx';
 import { getSettings } from '../core/settings';
@@ -147,7 +147,7 @@ export class ExploreScene extends Phaser.Scene {
         let step = 0;
         this.time.addEvent({ delay: 320, loop: true, callback: () => fruit.setFrame(idle[++step % idle.length]) });
       }
-      this.spots.push({ hotspot, marker: this.addMarker(hotspot) });
+      this.spots.push({ hotspot, ...this.addMarker(hotspot) });
     }
     this.addAtmosphere();
     this.refreshMarkers();
@@ -186,15 +186,20 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   /** A bobbing tag over a hotspot: a speech mark for people, an eye for things, an arrow for exits. */
-  private addMarker(hotspot: Hotspot): Phaser.GameObjects.Container {
+  private addMarker(hotspot: Hotspot): { marker: Phaser.GameObjects.Container; locked?: Phaser.GameObjects.Image } {
     const cx = (hotspot.x + hotspot.w / 2) * PX;
-    const top = Math.max(60, hotspot.y * PX - 34);
+    // An exit's tag sits in its doorway: the painted EXIT sign above it says the rest.
+    const top = hotspot.kind === 'exit' ? (hotspot.y + hotspot.h * 0.42) * PX : Math.max(60, hotspot.y * PX - 34);
     const symbol = hotspot.kind === 'exit' ? '>' : hotspot.kind === 'look' ? '?' : '!';
     const color = hotspot.kind === 'fruit' ? CAST[this.stop.fruit].color : hotspot.kind === 'exit' ? COLORS.perfect : COLORS.yellow;
     const bubble = this.add.rectangle(0, 0, 40, 40, COLORS.ink).setStrokeStyle(4, color);
     const mark = addText(this, 0, 0, symbol, 28, { color: CSS.cream, stroke: false });
     const name = addBody(this, 0, -40, hotspot.kind === 'fruit' ? CAST[this.stop.fruit].name : hotspot.label, 20, { stroke: true, bold: true }).setVisible(false);
-    const marker = this.add.container(cx, top, [bubble, mark, name]).setDepth(DEPTH.marker);
+    const parts: Phaser.GameObjects.GameObject[] = [bubble, mark, name];
+    // A closed exit shows a padlock in place of its arrow until the clue has been heard.
+    const locked = hotspot.kind === 'exit' ? addIcon(this, 0, 0, 'icon_lock', 3).setVisible(false) : undefined;
+    if (locked) parts.push(locked);
+    const marker = this.add.container(cx, top, parts).setDepth(DEPTH.marker);
     this.world.add(marker);
     this.tweens.add({ targets: marker, y: top - 8, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     // The thing itself answers taps too.
@@ -205,20 +210,23 @@ export class ExploreScene extends Phaser.Scene {
       event.stopPropagation();
       this.goToSpot(hotspot);
     });
-    return marker;
+    return { marker, locked };
   }
 
   /** Marker states: a looked-at thing dims, a locked exit shows grey until the clue is heard. */
   private refreshMarkers(): void {
-    for (const { hotspot, marker } of this.spots) {
+    for (const { hotspot, marker, locked } of this.spots) {
       const bubble = marker.list[0] as Phaser.GameObjects.Rectangle;
+      const mark = marker.list[1] as Phaser.GameObjects.Text;
       const name = marker.list[2] as Phaser.GameObjects.Text;
       if (hotspot.kind === 'look') marker.setAlpha(hasInspected(this.lookKey(hotspot)) ? 0.45 : 1);
       if (hotspot.kind === 'clue') marker.setAlpha(hasTalked(talkKey(this.stop.id)) ? 0.45 : 1);
       if (hotspot.kind === 'exit') {
         const open = this.exitOpen();
         bubble.setStrokeStyle(4, open ? COLORS.perfect : 0x6a6488);
-        marker.setAlpha(open ? 1 : 0.6);
+        mark.setVisible(open);
+        locked?.setVisible(!open);
+        marker.setAlpha(open ? 1 : 0.8);
       }
       name.setVisible(this.near === hotspot);
     }

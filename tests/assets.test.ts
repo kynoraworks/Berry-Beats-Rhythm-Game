@@ -6,7 +6,7 @@ import { STOPS } from '../src/story/stops';
 const IMG = 'public/assets/img/';
 
 /** Stages that already ship with the game and are always loaded. */
-const BUILT_IN = new Set(['room', 'stage_raspberry', 'stage_street', 'stage_lab', 'stage_club', 'stage_rooftop']);
+const BUILT_IN = new Set(['room', 'stage_street', 'stage_lab', 'stage_club', 'stage_rooftop']);
 
 /** Every optional background a stop can use. */
 const KNOWN_IMAGES = [...new Set([...STOPS.flatMap((stop) => [stop.stage, stop.stationBg, stop.streetBg ?? '']), 'trio_photo'])].filter((key) => key !== '' && !BUILT_IN.has(key));

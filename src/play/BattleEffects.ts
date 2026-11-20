@@ -96,7 +96,8 @@ export class BattleEffects {
       this.widget = null;
     }
 
-    this.meltdowns = rules.gimmick === 'meltdown' ? meltdownWindows(setup.rivalNotes, setup.rivalPlan, chart.bpm) : [];
+    const firstNote = engine.notes.reduce((first, note) => Math.min(first, note.t), Number.POSITIVE_INFINITY);
+    this.meltdowns = rules.gimmick === 'meltdown' ? meltdownWindows(setup.rivalNotes, setup.rivalPlan, chart.bpm, firstNote) : [];
     const slides = rules.gimmick === 'slide' ? slidePlan(engine.notes, chart.id) : undefined;
     // Eureka's own scramble can come from any backup chosen later, so Lemon's or not, keep it wired.
     const scrambles = rules.gimmick === 'meltdown' || this.meter !== null;

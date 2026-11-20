@@ -243,7 +243,5 @@ describe('the twelve story stops', () => {
     expect(scores.get('stop12')).toBe(Math.max(...all));
     const hardestFour = Math.max(...STOPS.filter((s) => s.difficulty === 4).map((s) => scores.get(s.id)!));
     expect(scores.get('stop11')!).toBeGreaterThan(hardestFour);
-    // The final stop is at least as hard as the old hardest chart.
-    expect(scores.get('stop12')!).toBeGreaterThanOrEqual(effort(charts.get('bonus-menu')!));
   });
 });

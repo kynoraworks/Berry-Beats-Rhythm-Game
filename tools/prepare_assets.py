@@ -77,7 +77,6 @@ def build_images() -> None:
             px[x, y] = (min(255, v), min(255, v + 4), min(255, v + 14), a)
     sheet.paste(pale, (0, 18))
     sheet.save(OUT_IMG / "notes.png")
-    copy(SPR / "Arrows.png", "arrows_classic.png")
 
     # HUD
     copy(SPR / "progress_bar" / "bar.png", "bar_frame.png")

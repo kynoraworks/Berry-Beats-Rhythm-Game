@@ -39,7 +39,6 @@ export class PreloadScene extends Phaser.Scene {
     sheet(Tex.instructor, 'instructor.png', 64, 64);
     sheet(Tex.pear, 'pear.png', 64, 64);
     sheet(Tex.lemon, 'lemon.png', 64, 64);
-    this.load.image(Tex.stageRaspberry, `${IMG}stage_raspberry.png`);
     this.load.image(Tex.stageRooftop, `${IMG}stage_rooftop.png`);
     this.load.image(Tex.stageClub, `${IMG}stage_club.png`);
     this.load.image(Tex.stageStreet, `${IMG}stage_street.png`);
@@ -47,7 +46,6 @@ export class PreloadScene extends Phaser.Scene {
     sheet(Tex.crowd, 'crowd.png', 100, 24);
     sheet(Tex.judgements, 'judgements.png', 96, 32);
     sheet(Tex.notes, 'notes.png', 18, 18);
-    this.load.image(Tex.arrowsClassic, `${IMG}arrows_classic.png`);
     this.load.image(Tex.barFrame, `${IMG}bar_frame.png`);
     this.load.image(Tex.barBlue, `${IMG}bar_blue.png`);
     this.load.image(Tex.barPink, `${IMG}bar_pink.png`);
@@ -130,6 +128,11 @@ export class PreloadScene extends Phaser.Scene {
       try {
         const chart = chartUrl ? parseChart(await (await fetch(chartUrl)).json()) : await loadLevelChart(level);
         const stop = chartUrl ? undefined : stopForChart(level.id);
+        // The Grand Stage is a crew battle: its story path starts at the lineup.
+        if (stop?.role === 'final' && params.get('story') === '1') {
+          this.scene.start(SceneKeys.Lineup, { intro: true, autoplay: params.get('autoplay') === '1' });
+          return;
+        }
         const data: PlayData = {
           chart,
           returnTo: { scene: SceneKeys.LevelSelect, data: stop ? { levelId: stop.id } : undefined },

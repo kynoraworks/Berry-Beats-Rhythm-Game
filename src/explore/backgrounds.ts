@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { FONT, Tex } from '../core/config';
 import { seededRandom } from '../core/battle';
 import { CAST } from '../story/cast';
-import { FLOOR, STATION_LAYOUT, TRIO_PHOTO, type Hotspot, type PlaceDef, type PropKind } from '../story/places';
+import { STATION_LAYOUT, TRIO_PHOTO, type Hotspot, type PlaceDef, type PropKind } from '../story/places';
 import { stopById } from '../story/stops';
 import type { TimeOfDay } from '../story/types';
 
@@ -389,6 +389,3 @@ export function npcSheet(scene: Phaser.Scene, scarf: number): string {
 
 /** Feet row of the generic NPC and the dancers, as an origin. */
 export const FEET_ORIGIN_Y = 63 / 64;
-
-/** Exposed so the place layout and the art agree on where people stand. */
-export const PLACE_FLOOR = FLOOR;
