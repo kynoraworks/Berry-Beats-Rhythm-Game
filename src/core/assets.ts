@@ -29,6 +29,15 @@ export type AmbientGroup = (typeof AMBIENT_GROUPS)[number];
 /** Characters with a walk cycle sheet besides Berry. */
 export const WALKERS = ['raspberry', 'pear', 'lemon', 'watermelon', 'instructor', 'banana', 'grape', 'plum', 'dragonfruit', 'coconut', 'orange', 'pineapple', 'blueberry', 'npc'] as const;
 
+/** Dancers that can have a moves sheet (<sheet>_moves.png: phrase finishers and sequence moves, see src/play/moves.ts). */
+export const MOVERS = ['blackberry', 'raspberry', 'blueberry', 'pear', 'lemon', 'instructor', 'grape', 'dragonfruit', 'coconut', 'pineapple', 'banana', 'plum', 'orange', 'watermelon'] as const;
+
+/** The dancers whose moves sheet is drawn and in public/assets/img. */
+export const MOVERS_DRAWN: readonly (typeof MOVERS)[number][] = [
+  'blackberry', 'raspberry', 'blueberry', 'pear', 'lemon',
+  'grape', 'dragonfruit', 'coconut', 'pineapple', 'banana', 'plum', 'orange', 'instructor', 'watermelon',
+];
+
 /** Every optional sheet the game knows how to use, with its size. */
 export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   ...[Tex.banana, Tex.grape, Tex.plum, Tex.dragonfruit, Tex.watermelon, Tex.coconut, Tex.orange, Tex.pineapple, Tex.blueberry].map((key) => ({
@@ -44,6 +53,7 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   { key: 'berry_walk', file: 'berry_walk.png', frameWidth: 64, frameHeight: 64 },
   // Everyone else's walk: 6 frames walking right in the same layout, keyed '<id>_walk' (the Coach is 'instructor_walk'). See tools/build_walks.py.
   ...WALKERS.map((id) => ({ key: `${id}_walk`, file: `${id}_walk.png`, frameWidth: 64, frameHeight: 64 })),
+  ...MOVERS.map((id) => ({ key: `${id}_moves`, file: `${id}_moves.png`, frameWidth: 64, frameHeight: 64 })),
   // Background extras for each setting: 4 people by 2 loop frames in 48x48 cells, feet on row 46. See tools/build_ambient.py.
   ...AMBIENT_GROUPS.map((group) => ({ key: `ambient_${group}`, file: `ambient_${group}.png`, frameWidth: 48, frameHeight: 48 })),
 ];
@@ -63,6 +73,7 @@ export const PRESENT_SHEETS: readonly string[] = [
   'npc',
   'berry_walk',
   ...WALKERS.map((id) => `${id}_walk`),
+  ...MOVERS_DRAWN.map((id) => `${id}_moves`),
   ...AMBIENT_GROUPS.map((group) => `ambient_${group}`),
 ];
 

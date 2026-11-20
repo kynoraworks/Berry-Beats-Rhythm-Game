@@ -6,6 +6,7 @@ import { LITE_SHEETS } from '../story/cast';
 import { characterSheet } from '../story/placeholders';
 import type { SheetLayout } from '../story/types';
 import { Depth } from './layout';
+import { FINISHER_DELAY, FINISHER_MIN_GAP, MOVES_BASE, detectSequence, moveFeel, moveTimings, nextAfter, planFinisher, sequenceFrame, DOUBLE_GAP, type FinisherPlan, type Hit, type MoveFeel, type MoveFx, type MoveSpec } from './moves';
 
 /** Hitting the same lane again within this time switches to the alternate move. */
 const REPEAT_WINDOW = 1.2;
@@ -51,12 +52,6 @@ interface DanceStyle {
   bounce: number;
   /** Showpieces stay on the floor and land with a squash instead of a hop. */
   grounded: boolean;
-  /**
-   * Phrase endings: after a run of at least `run` landed moves, a pause of `gap`
-   * beats is filled with one of the showpieces in `picks` (0 is the spin, 1 and
-   * up the single poses).
-   */
-  phraseEnd?: { run: number; gap: number; picks: number[] };
   /** Every this many moves in an unbroken run, a showpiece from `picks` replaces the move. */
   streamBreak?: { every: number; picks: number[] };
   /** Twitches between moves: beats from one to the next, shortest and longest. */
@@ -85,8 +80,8 @@ const STANDARD: DanceStyle = {
 
 /**
  * The Pear, a b-boy: laid-back and heavy. He lands a touch behind the hit,
- * sits in every pose, throws a power move into long runs and ends a phrase in a
- * freeze that he holds far longer than anyone else would.
+ * sits in every pose and throws a power move into long runs. His phrase endings
+ * (floor work, windmills, freezes) come from his move table in moves.ts.
  * Showpiece indexes: 0 backspin, 1 headspin, 2 windmill, 3 baby freeze, 4 one-handed freeze.
  */
 const PEAR_STYLE: DanceStyle = {
@@ -112,7 +107,6 @@ const PEAR_STYLE: DanceStyle = {
   specialLock: 0.55,
   bounce: 1,
   grounded: true,
-  phraseEnd: { run: 3, gap: 1.5, picks: [3, 4] },
   streamBreak: { every: 7, picks: [0, 1, 2] },
 };
 
@@ -250,7 +244,12 @@ const INSTRUCTOR: FrameSet = {
   ],
 };
 
-type Mode = 'idle' | 'pose' | 'stumble' | 'special' | 'final';
+type Mode = 'idle' | 'pose' | 'stumble' | 'special' | 'move' | 'final';
+
+/** Seconds per beat until the song tells the dancer its tempo (77 BPM). */
+const DEFAULT_SPB = 60 / 77;
+/** Recent hits remembered for spotting sequence moves. */
+const HISTORY = 12;
 
 export interface DancerOptions {
   /** Seed for the character's random habits, so a level looks the same every run. */
@@ -296,13 +295,24 @@ export class Dancer {
   private pending: { frames: number[]; wait: number } | null = null;
   private run = 0;
   private runBreaks = 0;
-  private phraseEnds = 0;
   private lastDanceBeat = Infinity;
   private nextTwitch = Infinity;
   private nextOutburst = Infinity;
   private flipLeft = 0;
   private joltLeft = 0;
   private jolt = 0;
+  private readonly baseTexture: string;
+  private readonly feel: MoveFeel | null;
+  private movesTexture: string | null = null;
+  private hits: Hit[] = [];
+  private schedule: number[] = [];
+  private secondsPerBeat = DEFAULT_SPB;
+  private runMissed = false;
+  private plan: FinisherPlan | null = null;
+  private moveFx: MoveFx = 'none';
+  private moveOffset = 0;
+  private shownIndex = -1;
+  private checkedAt = -Infinity;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string, frames: FrameSet, scale: number, originX: number, originY: number, style: DanceStyle = STANDARD, options: DancerOptions = {}) {
     this.scene = scene;
@@ -315,6 +325,39 @@ export class Dancer {
     this.baseY = y;
     this.baseScale = scale;
     this.sprite = scene.add.sprite(x, y, texture, frames.idle[0]).setOrigin(originX, originY).setScale(scale).setDepth(Depth.characters);
+    this.baseTexture = texture;
+    // The 2021 instructor art has its own frame numbers and no moves.
+    this.feel = frames === INSTRUCTOR ? null : moveFeel(texture, frames === LITE ? 'lite' : 'berry');
+    const moves = `${texture}_moves`;
+    this.movesTexture = scene.textures.exists(moves) ? moves : null;
+  }
+
+  /**
+   * The beats of this dancer's own notes (sorted) and the song's tempo, so
+   * phrase finishers can look ahead and fit the gap before the next note.
+   */
+  setSchedule(beats: readonly number[], secondsPerBeat: number): void {
+    this.schedule = [...beats].sort((a, b) => a - b);
+    this.secondsPerBeat = secondsPerBeat;
+  }
+
+  /** The move to play for `kind`: from the moves sheet when it is loaded, else from the base sheet. */
+  private moveSpec(kind: keyof MoveFeel['table']): MoveSpec | null {
+    if (!this.feel) return null;
+    return (this.movesTexture ? this.feel.table : this.feel.fallback)[kind];
+  }
+
+  /** Show a frame: base sheet frames as they are, moves sheet frames from MOVES_BASE up. */
+  private show(frame: number): void {
+    const sprite = this.sprite;
+    if (frame >= MOVES_BASE && this.movesTexture) {
+      if (sprite.texture.key !== this.movesTexture) sprite.setTexture(this.movesTexture, frame - MOVES_BASE);
+      else sprite.setFrame(frame - MOVES_BASE);
+      return;
+    }
+    if (frame >= MOVES_BASE) frame = this.frames.idle[0];
+    if (sprite.texture.key !== this.baseTexture) sprite.setTexture(this.baseTexture, frame);
+    else sprite.setFrame(frame);
   }
 
   /** Strike the pose for a lane. `held` lists the other lanes currently down, to pick two-lane poses. */
@@ -324,6 +367,12 @@ export class Dancer {
     const f = this.frames;
     const style = this.style;
     let frames = f.lanes[lane];
+    // A second lane landing on the same beat counts as held, so rivals get two-lane poses too.
+    const previous = this.hits[this.hits.length - 1];
+    if (previous && held.length === 0 && this.lastBeat - previous.beat <= DOUBLE_GAP && previous.lane !== lane) held = [previous.lane];
+    this.hits.push({ lane, beat: this.lastBeat });
+    if (this.hits.length > HISTORY) this.hits.shift();
+    this.plan = null;
     const other = held.find((l) => l !== lane);
     const combo = other === undefined ? undefined : f.combos?.[`${Math.min(lane, other)}-${Math.max(lane, other)}`];
     if (combo) {
@@ -335,6 +384,21 @@ export class Dancer {
       this.useAlt = repeat ? !this.useAlt : style.altChance > 0 && this.moveRandom() < style.altChance;
       if (this.useAlt) frames = f.altLanes[lane];
     }
+    let sequence: { frames: number[]; fx: MoveFx; frameTime?: number } | null = null;
+    const match = combo ? null : detectSequence(this.hits);
+    const spec = match ? this.moveSpec(match.kind) : null;
+    if (match && spec) {
+      // The full circle plays the whole turn within the beat; the others show the pattern's next frame.
+      sequence =
+        match.kind === 'circle'
+          ? { frames: spec.frames, fx: spec.fx, frameTime: (this.secondsPerBeat * (this.feel?.tempo ?? 1)) / (spec.frames.length + 1) }
+          : { frames: [sequenceFrame(spec, match.step)], fx: spec.fx };
+    } else if (match?.kind === 'power' && !combo && f.combos) {
+      const pair = this.hits[this.hits.length - 2].lane;
+      const key = `${Math.min(lane, pair)}-${Math.max(lane, pair)}`;
+      if (f.combos[key]) sequence = { frames: f.combos[key], fx: 'none' };
+    }
+    if (sequence) frames = sequence.frames;
     this.lastLane = lane;
     this.sinceDance = 0;
     this.lastDanceBeat = this.lastBeat;
@@ -348,7 +412,8 @@ export class Dancer {
       this.pending = { frames, wait: style.poseDelay };
       return;
     }
-    this.strike(frames);
+    this.strike(frames, sequence?.frameTime);
+    if (sequence) this.bodyFx(sequence.fx, Math.min(this.style.poseMax, this.secondsPerBeat));
   }
 
   /** Groove in place while a hold note is being held. */
@@ -370,6 +435,8 @@ export class Dancer {
   stumble(): void {
     if (this.mode === 'final') return;
     this.pending = null;
+    this.plan = null;
+    this.runMissed = true;
     this.sprite.setTint(0xff8090);
     this.scene.time.delayedCall(140, () => this.sprite.clearTint());
     if (this.frames.stumble) this.start('stumble', this.frames.stumble, STUMBLE_TIME / 2, STUMBLE_TIME);
@@ -391,14 +458,16 @@ export class Dancer {
     this.elapsed = 0;
     this.frameTime = 0.32;
     this.scene.tweens.killTweensOf(this.sprite);
-    this.sprite.clearTint().setFlipX(false).setPosition(this.baseX, this.baseY).setScale(this.baseScale).setFrame(this.sequence[0]);
+    this.moveOffset = 0;
+    this.sprite.clearTint().setFlipX(false).setPosition(this.baseX, this.baseY).setScale(this.baseScale);
+    this.show(this.sequence[0]);
   }
 
   update(dt: number, beat: number): void {
     this.sinceDance += dt;
     this.elapsed += dt;
     if (this.mode === 'final') {
-      this.sprite.setFrame(this.sequence[Math.floor(this.elapsed / this.frameTime) % this.sequence.length]);
+      this.show(this.sequence[Math.floor(this.elapsed / this.frameTime) % this.sequence.length]);
       return;
     }
     // The clock jumps back when the song takes over from the idle count. Habits
@@ -417,15 +486,20 @@ export class Dancer {
     const step = Math.floor(beat * style.stepsPerBeat);
     if (this.mode !== 'idle') {
       if (this.mode === 'special') this.animateSpecial();
+      if (this.mode === 'move') this.animateMove();
       // A lane pose is released on the first step after its minimum hold, so the
       // return to the idle dance lands on the music instead of at an arbitrary moment.
-      const onBeat = this.mode === 'pose' && this.elapsed >= style.poseHold && step !== this.lastStep;
+      const onBeat = this.mode === 'pose' && this.elapsed >= Math.max(style.poseHold, this.frameTime * (this.sequence.length - 1)) && step !== this.lastStep;
       if (this.elapsed < this.duration && !onBeat) {
-        this.sprite.setFrame(this.sequence[Math.min(this.sequence.length - 1, Math.floor(this.elapsed / this.frameTime))]);
+        const index = Math.min(this.sequence.length - 1, Math.floor(this.elapsed / this.frameTime));
+        this.show(this.sequence[index]);
+        if (this.mode === 'move' && index !== this.shownIndex && this.moveFx === 'bounce' && index > 0) this.squash(1.06, 0.92, 120);
+        this.shownIndex = index;
         this.lastStep = step;
         return;
       }
       this.sprite.setFlipX(false);
+      this.moveFx = 'none';
       this.mode = 'idle';
       this.lastStep = -Infinity;
     }
@@ -433,12 +507,15 @@ export class Dancer {
     this.lastStep = step;
     const f = this.frames;
     let loop = f.idle;
-    if (this.holding && f.hold) loop = f.hold;
+    // A long hold changes its groove every other bar, so it never looks frozen.
+    const holdAlt = this.movesTexture ? this.feel?.holdAlt : undefined;
+    if (this.holding && holdAlt && Math.floor(beat / 4) % 2 === 1) loop = holdAlt;
+    else if (this.holding && f.hold) loop = f.hold;
     else if (this.grooving && f.groove) loop = style.groove ?? f.groove;
     // Index from the beat itself, so the loop keeps its place through poses and pauses.
     const index = Phaser.Math.Wrap(step, 0, loop.length);
     const frame = this.hype && f.hype !== undefined && !this.holding && index % 4 === 0 ? f.hype : loop[index];
-    this.sprite.setFrame(frame);
+    this.show(frame);
 
     const whole = Math.floor(beat);
     if (style.bounce > 0 && this.grooving && !this.calm && whole !== this.lastWholeBeat) {
@@ -456,6 +533,10 @@ export class Dancer {
     this.twitchRandom = seededRandom(`${this.seed}:twitch`);
     this.outburstRandom = seededRandom(`${this.seed}:outburst`);
     this.run = 0;
+    this.runMissed = false;
+    this.plan = null;
+    this.checkedAt = -Infinity;
+    this.hits = [];
     this.lastDanceBeat = Infinity;
     this.nextTwitch = twitch ? beat + Phaser.Math.Linear(twitch[0], twitch[1], this.twitchRandom()) : Infinity;
     this.nextOutburst = outburst ? Math.max(beat, 0) + Phaser.Math.Linear(outburst.beats[0], outburst.beats[1], this.outburstRandom()) : Infinity;
@@ -463,7 +544,7 @@ export class Dancer {
 
   /** Twitches, outbursts and phrase endings: the things a character does without being asked. */
   private updateHabits(dt: number, beat: number): void {
-    const { twitch, outburst, phraseEnd } = this.style;
+    const { twitch, outburst } = this.style;
     const sprite = this.sprite;
     const free = this.mode === 'idle' || this.mode === 'pose';
 
@@ -497,15 +578,40 @@ export class Dancer {
       this.showpiece(outburst.picks[Math.floor(random() * outburst.picks.length)]);
     }
 
-    if (phraseEnd && free && !this.holding && !this.pending && this.run >= phraseEnd.run && beat - this.lastDanceBeat >= phraseEnd.gap && this.frames.spin) {
-      this.run = 0;
-      this.showpiece(phraseEnd.picks[this.phraseEnds++ % phraseEnd.picks.length]);
-    } else if (beat - this.lastDanceBeat >= (phraseEnd?.gap ?? 2)) {
-      this.run = 0;
-    }
+    this.updateFinisher(beat, free);
 
-    const shake = this.mode === 'special' && this.specialFx === 'shake' && !this.calm ? (Math.floor(this.elapsed / 0.045) % 2 === 0 ? -1 : 1) * this.baseScale : 0;
-    sprite.setX(this.baseX + this.jolt + shake);
+    const shaking = !this.calm && ((this.mode === 'special' && this.specialFx === 'shake') || (this.mode === 'move' && this.moveFx === 'shake'));
+    const shake = shaking ? (Math.floor(this.elapsed / 0.045) % 2 === 0 ? -1 : 1) * this.baseScale : 0;
+    sprite.setX(this.baseX + this.jolt + shake + this.moveOffset);
+  }
+
+  /**
+   * Phrase endings: once a run of notes is over and the dancer's next note is
+   * far enough away, fill the gap with a finisher that lands back in the groove.
+   */
+  private updateFinisher(beat: number, free: boolean): void {
+    if (!this.feel || this.lastDanceBeat === Infinity) return;
+    if (!this.plan && this.run > 0 && !this.pending && beat - this.lastDanceBeat >= 0.25 && this.checkedAt !== this.lastDanceBeat) {
+      this.checkedAt = this.lastDanceBeat;
+      const next = this.schedule.length > 0 ? nextAfter(this.schedule, this.lastDanceBeat + 0.05) : null;
+      // The next note is close: the run goes on.
+      if (next !== null && next - this.lastDanceBeat < FINISHER_DELAY + FINISHER_MIN_GAP) return;
+      this.plan = planFinisher(this.run, this.runMissed, this.lastDanceBeat, next);
+      if (!this.plan) this.endRun();
+    }
+    const plan = this.plan;
+    if (!plan || beat < plan.start) return;
+    this.plan = null;
+    if (free && !this.holding && !this.pending && beat < plan.start + 0.5) {
+      const spec = this.moveSpec(plan.kind);
+      if (spec) this.startMove(spec, plan.beats);
+    }
+    this.endRun();
+  }
+
+  private endRun(): void {
+    this.run = 0;
+    this.runMissed = false;
   }
 
   /** Play showpiece number `pick`: 0 is the spin, 1 and up are the single poses. */
@@ -537,13 +643,59 @@ export class Dancer {
     }
   }
 
+  /** Play a move from the table across `beats` beats, then fall back into the groove. */
+  private startMove(spec: MoveSpec, beats: number): void {
+    const { frameTime, duration } = moveTimings(spec.frames.length, beats, this.secondsPerBeat, this.feel?.tempo ?? 1);
+    this.start('move', spec.frames, frameTime, duration);
+    this.shownIndex = 0;
+    this.bodyFx(spec.fx, duration);
+  }
+
+  /** What the body does with a move: a hop, a planted squash, a slide, or (handled each frame) whirl and shake. */
+  private bodyFx(fx: MoveFx, duration: number): void {
+    const sprite = this.sprite;
+    this.moveFx = fx;
+    if (fx === 'hop') {
+      this.scene.tweens.killTweensOf(sprite);
+      sprite.setY(this.baseY).setScale(this.baseScale);
+      this.scene.tweens.add({ targets: sprite, y: this.baseY - 4 * PX, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
+    } else if (fx === 'ground') {
+      this.squash(1.1, 0.88, 240);
+    } else if (fx === 'slide' && !this.calm) {
+      // A step-slide: glide a few art pixels to one side and drift back by the end of the move.
+      const side = this.lastLane === 3 ? 1 : -1;
+      const glide = { v: 0 };
+      this.scene.tweens.add({
+        targets: glide,
+        v: side * 5 * this.baseScale,
+        duration: Math.max(120, duration * 400),
+        yoyo: true,
+        ease: 'Sine.easeInOut',
+        onUpdate: () => (this.moveOffset = glide.v),
+        onComplete: () => (this.moveOffset = 0),
+      });
+    }
+  }
+
+  private animateMove(): void {
+    if (this.moveFx === 'whirl') this.sprite.setFlipX(Math.floor(this.elapsed / 0.12) % 2 === 1);
+  }
+
+  private squash(wide: number, short: number, time: number): void {
+    const sprite = this.sprite;
+    const scale = this.baseScale;
+    this.scene.tweens.killTweensOf(sprite);
+    sprite.setY(this.baseY).setScale(scale * wide, scale * short);
+    this.scene.tweens.add({ targets: sprite, scaleX: scale, scaleY: scale, duration: time, ease: 'Back.easeOut' });
+  }
+
   /** Power moves turn by flipping the pose back and forth. */
   private animateSpecial(): void {
     if (this.specialFx === 'whirl') this.sprite.setFlipX(Math.floor(this.elapsed / 0.11) % 2 === 1);
   }
 
-  private strike(frames: number[]): void {
-    this.start('pose', frames, this.style.poseFrameTime, this.style.poseMax);
+  private strike(frames: number[], frameTime = this.style.poseFrameTime): void {
+    this.start('pose', frames, frameTime, Math.max(this.style.poseMax, frameTime * frames.length));
     this.pop();
   }
 
@@ -564,7 +716,8 @@ export class Dancer {
     this.duration = duration;
     this.elapsed = 0;
     this.flipLeft = 0;
-    this.sprite.setFlipX(false).setFrame(sequence[0]);
+    this.sprite.setFlipX(false);
+    this.show(sequence[0]);
   }
 }
 

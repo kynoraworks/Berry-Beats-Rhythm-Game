@@ -265,6 +265,7 @@ export class PlayScene extends Phaser.Scene {
     this.stage = new StageFx(this, stageKey, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     this.player = createPlayer(this, playerX, FLOOR_Y, crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
+    this.player.setSchedule(this.engine.notes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
     const session = crew ? getSession() : null;
     this.hud = new Hud(this, {
@@ -279,6 +280,8 @@ export class PlayScene extends Phaser.Scene {
     if (this.rivalEngine) {
       this.rivalField = new NoteField(this, RIVAL_LANES, this.rivalEngine.notes, true);
       this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y, { seed: chart.id, calm: settings.reduceMotion });
+      const rivalNotes = this.rivalEngine.notes;
+      this.rival?.setSchedule(rivalNotes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     } else {
       this.hud.setSolo();
       this.stage.setTurn('player');
