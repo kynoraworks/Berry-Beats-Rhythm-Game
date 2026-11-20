@@ -10,7 +10,7 @@ import { Depth } from './layout';
 /** Seconds the camera takes to tilt in, and to come back on a miss or at the end. */
 const TILT_IN = 0.5;
 const SNAP_OUT = 0.22;
-const EASE_OUT = 0.4;
+const EASE_OUT = 0.35;
 /** The HYPE! lettering: its frame in the judgement sheet and its size. */
 const BANNER_FRAME = 3;
 const BANNER_SCALE = 4;
@@ -73,9 +73,9 @@ export class HypeMode {
     return this.tracker.active;
   }
 
-  /** Share of hype's time still to run (0 when off), for the HUD's hype card. */
-  left(time: number): number {
-    return this.tracker.remaining(time);
+  /** Hype's time for the HUD card: share and beats still to run, and whether its clock is stopped for the rival's turn. */
+  status(): { left: number; beats: number; frozen: boolean } {
+    return { left: this.tracker.remaining(), beats: Math.ceil(this.tracker.secondsLeft() / (60 / this.setup.chart.bpm) - 1e-6), frozen: this.tracker.frozen };
   }
 
   /** Times hype started this song. */

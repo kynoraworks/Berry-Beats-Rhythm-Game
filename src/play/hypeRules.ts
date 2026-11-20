@@ -9,11 +9,13 @@ import type { EngineMods } from '../core/engine';
  * rounds never see it, so a battle stays fair whether it fires or not.
  */
 
-/** Longest a hype lasts, in beats. */
-export const HYPE_CAP_BEATS = 16;
+/** Longest a hype lasts, in beats of the player's own play (its clock stops while they have nothing to play). */
+export const HYPE_CAP_BEATS = 32;
+/** For this many beats after it starts, a miss does not end hype: it only loses that note. */
+export const HYPE_GRACE_BEATS = 8;
 /** Beats after a hype ends before another can start. */
 export const HYPE_COOLDOWN_BEATS = 8;
-/** Hype ends when the player's next note is further away than this, in beats. */
+/** With the player's next note further away than this, in beats, hype's clock stands still (and hype will not start). */
 export const HYPE_GAP_BEATS = 8;
 /** Score factor during hype, on top of the combo multiplier and any ability. */
 export const HYPE_FACTOR = 2;
@@ -27,11 +29,13 @@ const STREAK_SHARE = 0.2;
 export interface HypeTiming {
   /** Combo, counted since the last miss or the last hype, that starts hype. */
   streak: number;
-  /** Seconds a hype lasts at most. */
+  /** Seconds of the player's play a hype lasts at most. */
   cap: number;
+  /** Seconds at the start during which a miss does not end it. */
+  grace: number;
   /** Seconds after a hype before the next may start. */
   cooldown: number;
-  /** Seconds to the player's next note beyond which hype ends (or will not start). */
+  /** Seconds to the player's next note beyond which hype's clock stops (and it will not start). */
   gap: number;
 }
 
@@ -48,7 +52,7 @@ export function hypeStreak(judgements: number): number {
 /** Hype's timing for a chart, from its tempo. */
 export function hypeTiming(bpm: number, judgements: number): HypeTiming {
   const beat = 60 / (bpm > 0 ? bpm : 120);
-  return { streak: hypeStreak(judgements), cap: HYPE_CAP_BEATS * beat, cooldown: HYPE_COOLDOWN_BEATS * beat, gap: HYPE_GAP_BEATS * beat };
+  return { streak: hypeStreak(judgements), cap: HYPE_CAP_BEATS * beat, grace: HYPE_GRACE_BEATS * beat, cooldown: HYPE_COOLDOWN_BEATS * beat, gap: HYPE_GAP_BEATS * beat };
 }
 
 /** What changed: hype started, or why it ended. */
@@ -59,7 +63,10 @@ export class HypeTracker {
   /** Hypes started so far. */
   triggers = 0;
   private on = false;
-  private startedAt = -Infinity;
+  /** Seconds of hype used so far: it only runs while the player has notes coming. */
+  private used = 0;
+  private lastTick = -Infinity;
+  private paused = false;
   private readyAt = -Infinity;
   /** Combo at which the current streak began counting. */
   private base = 0;
@@ -78,8 +85,18 @@ export class HypeTracker {
   }
 
   /** Share of the longest hype still left, 1 at the start to 0 at the cap. */
-  remaining(time: number): number {
-    return this.on ? Math.min(1, Math.max(0, 1 - (time - this.startedAt) / this.timing.cap)) : 0;
+  remaining(): number {
+    return this.on ? Math.min(1, Math.max(0, 1 - this.used / this.timing.cap)) : 0;
+  }
+
+  /** Seconds of hype still left (they only count down while the player has notes coming). */
+  secondsLeft(): number {
+    return this.on ? Math.max(0, this.timing.cap - this.used) : 0;
+  }
+
+  /** True while hype's clock is stopped because the player has nothing to play (the rival's turn). */
+  get frozen(): boolean {
+    return this.on && this.paused;
   }
 
   /**
@@ -90,22 +107,32 @@ export class HypeTracker {
   judge(time: number, miss: boolean, combo: number, nextNote: number): HypeChange {
     if (miss) {
       this.base = 0;
-      return this.on ? this.stop(time, 'miss', 0) : null;
+      if (!this.on) return null;
+      // Early on, a slip only loses that note; after the grace beats the first miss ends it.
+      return this.used < this.timing.grace ? null : this.stop(time, 'miss', 0);
     }
     if (this.on || time < this.readyAt || combo - this.base < this.timing.streak) return null;
     // Starting just before a long rest would end it at once.
     if (nextNote - time > this.timing.gap) return null;
     this.on = true;
-    this.startedAt = time;
+    this.used = 0;
+    this.lastTick = time;
+    this.paused = false;
     this.triggers++;
     return 'start';
   }
 
-  /** Every frame: ends hype at the cap, or once the player has nothing left to play for a while. */
+  /**
+   * Every frame. Hype's clock runs only while the player has notes coming (or
+   * a hold down); through the rival's turn it stands still. It ends at the cap.
+   */
   tick(time: number, combo: number, nextNote: number, holding: boolean): HypeChange {
     if (!this.on) return null;
-    if (time >= this.startedAt + this.timing.cap) return this.stop(time, 'cap', combo);
-    if (!holding && nextNote - time > this.timing.gap) return this.stop(time, 'out', combo);
+    const step = Math.max(0, time - this.lastTick);
+    this.lastTick = time;
+    this.paused = !holding && nextNote - time > this.timing.gap;
+    if (!this.paused) this.used += step;
+    if (this.used >= this.timing.cap) return this.stop(time, 'cap', combo);
     return null;
   }
 
@@ -116,6 +143,7 @@ export class HypeTracker {
 
   private stop(time: number, why: Exclude<HypeChange, 'start' | null>, combo: number): HypeChange {
     this.on = false;
+    this.paused = false;
     this.readyAt = time + this.timing.cooldown;
     // The next hype needs a whole new streak.
     this.base = combo;
