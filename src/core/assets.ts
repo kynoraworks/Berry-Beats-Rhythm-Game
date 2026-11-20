@@ -1,4 +1,5 @@
 import { Tex } from './config';
+import { LIFE_SHEETS, type LifeTheme } from '../explore/lifePieces';
 
 /**
  * Art that is drawn bit by bit. The game runs without any of it (generated
@@ -22,9 +23,8 @@ export interface OptionalImage {
   file: string;
 }
 
-/** Settings with a sheet of background extras (public/assets/img/ambient_<group>.png). */
-export const AMBIENT_GROUPS = ['club', 'street', 'market', 'lab', 'food', 'commuters', 'tunnel', 'fans', 'posh', 'backstage', 'town'] as const;
-export type AmbientGroup = (typeof AMBIENT_GROUPS)[number];
+/** Sheets of the people baked into each setting's scenery (public/assets/img/life_<theme>.png). */
+export const LIFE_THEMES = Object.keys(LIFE_SHEETS) as LifeTheme[];
 
 /** Characters with a walk cycle sheet besides Berry. */
 export const WALKERS = ['raspberry', 'pear', 'lemon', 'watermelon', 'instructor', 'banana', 'grape', 'plum', 'dragonfruit', 'coconut', 'orange', 'pineapple', 'blueberry', 'npc'] as const;
@@ -54,8 +54,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   // Everyone else's walk: 6 frames walking right in the same layout, keyed '<id>_walk' (the Coach is 'instructor_walk'). See tools/build_walks.py.
   ...WALKERS.map((id) => ({ key: `${id}_walk`, file: `${id}_walk.png`, frameWidth: 64, frameHeight: 64 })),
   ...MOVERS.map((id) => ({ key: `${id}_moves`, file: `${id}_moves.png`, frameWidth: 64, frameHeight: 64 })),
-  // Background extras for each setting: 4 people by 2 loop frames in 48x48 cells, feet on row 46. See tools/build_ambient.py.
-  ...AMBIENT_GROUPS.map((group) => ({ key: `ambient_${group}`, file: `ambient_${group}.png`, frameWidth: 48, frameHeight: 48 })),
+  // The people baked into the scenery: one column per piece, at rest and nodding. See tools/build_life.py.
+  ...LIFE_THEMES.map((theme) => ({ key: `life_${theme}`, file: `life_${theme}.png`, frameWidth: LIFE_SHEETS[theme].cellW, frameHeight: LIFE_SHEETS[theme].cellH })),
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -74,7 +74,7 @@ export const PRESENT_SHEETS: readonly string[] = [
   'berry_walk',
   ...WALKERS.map((id) => `${id}_walk`),
   ...MOVERS_DRAWN.map((id) => `${id}_moves`),
-  ...AMBIENT_GROUPS.map((group) => `ambient_${group}`),
+  ...LIFE_THEMES.map((theme) => `life_${theme}`),
 ];
 
 /**

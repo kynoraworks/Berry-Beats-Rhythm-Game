@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { PX } from '../core/config';
 import type { TimeOfDay } from '../story/types';
-import { EXTRA_FEET, EXTRA_CELL, seeded, type AmbientEffect, type ExtraSpot } from './ambient';
+import { pieceOf, seeded, type AmbientEffect, type PlacedPiece } from './ambient';
+import { LIFE_SHEETS } from './lifePieces';
 
-/** Half a beat at the story's 77 BPM, for extras that dance outside a battle. */
+/** Half a beat at the story's 77 BPM, for a crowd keeping time outside a battle. */
 const HALF_BEAT_MS = 390;
 /** Most pooled pieces any one effect keeps alive. */
 const CAP = { steam: 10, bubbles: 10, confetti: 28, birds: 3 } as const;
@@ -42,81 +43,95 @@ function makeTextures(scene: Phaser.Scene): void {
 }
 
 // ---------------------------------------------------------------------------
-// Extras
+// The people baked into the scenery
 // ---------------------------------------------------------------------------
 
-interface Extra {
+interface Resident {
   sprite: Phaser.GameObjects.Sprite;
-  who: number;
-  /** Beats (battle) or milliseconds (explore) between frame changes. */
-  every: number;
+  column: number;
+  columns: number;
+  beat: boolean;
+  /** Milliseconds until the next change while exploring. */
   next: number;
   frame: 0 | 1;
 }
 
-function frameOf(who: number, frame: 0 | 1): number {
-  return frame * 4 + who;
+export interface LifeOptions {
+  depth: number;
+  calm: boolean;
+  seed: number;
+  /** Screen pixels per art pixel (the background's own scale). */
+  scale?: number;
+  addTo?: (sprite: Phaser.GameObjects.Sprite) => void;
 }
 
 /**
- * Background people. `addTo` receives each sprite (a layer or container),
- * positions are in art pixels from the place's origin, and the feet stand on
- * `feetRow`. Dancers swap frames on every half beat; everyone else idles
- * slowly at their own pace. Reduce motion keeps them still.
+ * The people who live in a setting (src/explore/ambient.ts), drawn at the
+ * background's own scale on the row each one rests on. They only nod: slowly
+ * and each at their own pace while exploring, on the beat in battles. Reduce
+ * motion keeps them still.
  */
-export class Extras {
-  private readonly extras: Extra[] = [];
+export class Residents {
+  private readonly residents: Resident[] = [];
   private readonly calm: boolean;
+  private readonly random: () => number;
 
-  constructor(
-    scene: Phaser.Scene,
-    texture: string,
-    spots: readonly ExtraSpot[],
-    feetRow: number,
-    options: { depth: number; dancing: boolean; calm: boolean; seed: number; scale?: number; addTo?: (sprite: Phaser.GameObjects.Sprite) => void },
-  ) {
+  constructor(scene: Phaser.Scene, placed: readonly PlacedPiece[], options: LifeOptions) {
     this.calm = options.calm;
-    if (!scene.textures.exists(texture)) return;
-    const random = seeded(options.seed);
+    this.random = seeded(options.seed);
     const scale = options.scale ?? PX;
-    for (const spot of spots) {
+    for (const piece of placed) {
+      const { spot } = piece;
+      const texture = `life_${spot.theme}`;
+      if (!scene.textures.exists(texture)) continue;
+      const sheet = LIFE_SHEETS[spot.theme];
+      const { w, column } = pieceOf(spot);
+      // Pieces sit bottom-centred in their cells; line the piece itself up on whole art pixels.
+      const inset = Math.floor((sheet.cellW - w) / 2);
+      const left = Math.round(piece.x0) - (spot.flip ? sheet.cellW - inset - w : inset);
       const sprite = scene.add
-        .sprite(spot.x * PX, (feetRow + 1) * PX, texture, frameOf(spot.who, 0))
-        .setOrigin(0.5, (EXTRA_FEET + 1) / EXTRA_CELL)
+        .sprite(left * scale, (piece.bottom + 1) * scale, texture, column)
+        .setOrigin(0, 1)
         .setScale(scale)
-        .setFlipX(spot.flip)
+        .setFlipX(spot.flip ?? false)
         .setDepth(options.depth);
       options.addTo?.(sprite);
-      const every = options.dancing ? HALF_BEAT_MS * (random() < 0.5 ? 1 : 2) : 700 + Math.floor(random() * 900);
-      this.extras.push({ sprite, who: spot.who, every, next: random() * every, frame: 0 });
+      this.residents.push({ sprite, column, columns: sheet.pieces.length, beat: spot.beat ?? false, next: this.rest(spot.beat ?? false), frame: 0 });
     }
   }
 
   get sprites(): Phaser.GameObjects.Sprite[] {
-    return this.extras.map((extra) => extra.sprite);
+    return this.residents.map((resident) => resident.sprite);
   }
 
-  /** Explore: advance by real time. */
+  /** Explore: a nod now and then, each at their own pace; the crowd keeps a slow groove. */
   update(dtMs: number): void {
     if (this.calm) return;
-    for (const extra of this.extras) {
-      extra.next -= dtMs;
-      if (extra.next > 0) continue;
-      extra.next += extra.every;
-      extra.frame = extra.frame === 0 ? 1 : 0;
-      extra.sprite.setFrame(frameOf(extra.who, extra.frame));
+    for (const resident of this.residents) {
+      resident.next -= dtMs;
+      if (resident.next > 0) continue;
+      this.show(resident, resident.frame === 0 ? 1 : 0);
+      resident.next = resident.frame === 1 ? (resident.beat ? HALF_BEAT_MS : 420) : this.rest(resident.beat);
     }
   }
 
-  /** Battle: change frame on the beat (dancers every beat, the rest every other beat). */
-  onBeat(beat: number, dancing: boolean): void {
+  /** Battle: the crowd nods on every beat, everyone else on every fourth, staggered. */
+  onBeat(beat: number): void {
     if (this.calm) return;
-    this.extras.forEach((extra, i) => {
-      const step = dancing ? 1 : 2;
-      if ((beat + i) % step !== 0) return;
-      extra.frame = extra.frame === 0 ? 1 : 0;
-      extra.sprite.setFrame(frameOf(extra.who, extra.frame));
+    this.residents.forEach((resident, i) => {
+      const nod = resident.beat ? (beat + i) % 2 === 0 : (beat + i) % 4 === 0;
+      this.show(resident, nod ? 1 : 0);
     });
+  }
+
+  private rest(beat: boolean): number {
+    return beat ? HALF_BEAT_MS : 1500 + Math.floor(this.random() * 2600);
+  }
+
+  private show(resident: Resident, frame: 0 | 1): void {
+    if (resident.frame === frame) return;
+    resident.frame = frame;
+    resident.sprite.setFrame(frame * resident.columns + resident.column);
   }
 }
 

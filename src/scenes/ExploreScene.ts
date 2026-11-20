@@ -8,8 +8,8 @@ import { UiButton, addBody, addIcon, addText, addUiButton, isLeaving } from '../
 import { breathStrength, gradeAt, gradeStrength, lampStrength, leafCount, type Setting } from '../core/atmosphere';
 import { BreathPuffs, LampPool, LeafFall, gradeBackdrop, gradePerson } from '../core/atmosphereFx';
 import { getSettings } from '../core/settings';
-import { blockedRanges, extraCount, placeExtras, placeLife, stopSeed } from '../explore/ambient';
-import { AmbientEffects, Extras } from '../explore/ambientFx';
+import { placeLife, placePiece, stopSeed } from '../explore/ambient';
+import { AmbientEffects, Residents } from '../explore/ambientFx';
 import { FEET_ORIGIN_Y, npcSheet, placeBackground, placeProps } from '../explore/backgrounds';
 import { Doors } from '../explore/doors';
 import { floorAt } from '../explore/floors';
@@ -68,7 +68,7 @@ export class ExploreScene extends Phaser.Scene {
   private leaves: LeafFall | null = null;
   private breath: BreathPuffs | null = null;
   private lamp: LampPool | null = null;
-  private extras: Extras | null = null;
+  private extras: Residents | null = null;
   private effects: AmbientEffects | null = null;
 
   constructor() {
@@ -198,21 +198,19 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   /**
-   * The people who live here: a few extras a little behind the walking line,
-   * clear of every hotspot. They are added before the light so they take the
-   * place's grade like its props.
+   * The people who live here, sitting and leaning on the scenery a little
+   * behind the walking line (src/explore/ambient.ts). They are added before the
+   * light so they take the place's grade like its props.
    */
   private addExtras(): void {
     const place = this.place;
     const life = placeLife(this.stop.id, place.kind);
-    if (!life.group) return;
-    const seed = stopSeed(this.stop, place.kind);
-    const spots = placeExtras(place.width, blockedRanges(place), extraCount(place.kind), seed);
-    this.extras = new Extras(this, `ambient_${life.group}`, spots, place.floor - 3, {
+    if (life.spots.length === 0) return;
+    const where = place.kind === 'street' ? 'street' : 'station';
+    this.extras = new Residents(this, life.spots.map((spot) => placePiece(spot, place.bg, where)), {
       depth: DEPTH.people - 2,
-      dancing: life.dancing,
       calm: getSettings().reduceMotion,
-      seed,
+      seed: stopSeed(this.stop, place.kind),
       addTo: (sprite) => this.world.add(sprite),
     });
   }

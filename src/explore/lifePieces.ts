@@ -14,14 +14,19 @@ export interface LifeSheet {
 }
 
 export const LIFE_SHEETS = {
+  graffiti: { cellW: 82, cellH: 58, pieces: [{ name: 'boombox_crew', w: 80, h: 53 }] },
   stack: { cellW: 42, cellH: 74, pieces: [{ name: 'speaker_stack', w: 28, h: 67 }, { name: 'small_boombox', w: 27, h: 45 }, { name: 'tagger', w: 34, h: 39 }, { name: 'fence_sitter', w: 26, h: 36 }] },
   commuters: { cellW: 34, cellH: 42, pieces: [{ name: 'newspaper', w: 21, h: 32 }, { name: 'dozing', w: 21, h: 29 }, { name: 'headphones', w: 23, h: 34 }, { name: 'coffee_lean', w: 17, h: 32 }, { name: 'suitcase_sitter', w: 19, h: 38 }, { name: 'two_friends', w: 30, h: 30 }, { name: 'map_reader', w: 22, h: 35 }, { name: 'cat_on_bag', w: 22, h: 16 }] },
   town: { cellW: 42, cellH: 42, pieces: [{ name: 'bird_feeder', w: 33, h: 31 }, { name: 'wall_cat', w: 30, h: 25 }, { name: 'sweeper', w: 29, h: 36 }, { name: 'knitter', w: 36, h: 33 }, { name: 'waiting_kid', w: 21, h: 34 }, { name: 'porter', w: 34, h: 37 }] },
+  market: { cellW: 42, cellH: 42, pieces: [{ name: 'tea_seller', w: 30, h: 33 }, { name: 'tea_drinkers', w: 36, h: 28 }, { name: 'browser', w: 32, h: 33 }, { name: 'lantern_kid', w: 24, h: 33 }, { name: 'fanning_elder', w: 22, h: 34 }, { name: 'steamer_cook', w: 35, h: 34 }] },
   lab: { cellW: 34, cellH: 42, pieces: [{ name: 'test_tube', w: 29, h: 31 }, { name: 'clipboard', w: 19, h: 39 }, { name: 'microscope', w: 29, h: 37 }, { name: 'yawner', w: 23, h: 38 }, { name: 'pourer', w: 27, h: 33 }, { name: 'robot', w: 23, h: 23 }] },
   club: { cellW: 34, cellH: 42, pieces: [{ name: 'dancer_a', w: 19, h: 31 }, { name: 'dancer_b', w: 18, h: 32 }, { name: 'dancer_c', w: 19, h: 32 }, { name: 'dancer_d', w: 26, h: 34 }, { name: 'dancer_e', w: 18, h: 32 }, { name: 'bartender', w: 22, h: 27 }, { name: 'bar_stools', w: 30, h: 33 }, { name: 'slow_dance', w: 21, h: 33 }] },
+  food: { cellW: 42, cellH: 42, pieces: [{ name: 'noodle_pair', w: 35, h: 36 }, { name: 'pot_cook', w: 31, h: 36 }, { name: 'slurper', w: 23, h: 40 }, { name: 'pan_cook', w: 36, h: 40 }, { name: 'skewer_kid', w: 26, h: 33 }, { name: 'chin_rest', w: 29, h: 38 }] },
+  tunnel: { cellW: 50, cellH: 50, pieces: [{ name: 'thermos', w: 23, h: 38 }, { name: 'sandbags', w: 46, h: 35 }, { name: 'shovel', w: 19, h: 41 }, { name: 'sleeper', w: 23, h: 35 }, { name: 'cone', w: 28, h: 23 }, { name: 'toolbox', w: 30, h: 31 }] },
   plaza: { cellW: 34, cellH: 42, pieces: [{ name: 'glowstick', w: 22, h: 28 }, { name: 'clapper', w: 23, h: 29 }, { name: 'drink', w: 23, h: 29 }, { name: 'foam_finger', w: 25, h: 32 }, { name: 'cap', w: 24, h: 30 }, { name: 'chin_hands', w: 24, h: 31 }, { name: 'shoulders', w: 17, h: 37 }, { name: 'sign', w: 19, h: 34 }] },
   posh: { cellW: 50, cellH: 42, pieces: [{ name: 'chaise', w: 35, h: 34 }, { name: 'cocktails', w: 48, h: 34 }, { name: 'waiter', w: 25, h: 36 }, { name: 'balustrade', w: 37, h: 37 }, { name: 'monocle', w: 23, h: 40 }, { name: 'armchair', w: 30, h: 38 }] },
   grand: { cellW: 50, cellH: 42, pieces: [{ name: 'cable_hand', w: 31, h: 27 }, { name: 'clipboard_hand', w: 18, h: 37 }, { name: 'camera', w: 30, h: 38 }, { name: 'fans_four', w: 42, h: 18 }, { name: 'fans_three', w: 39, h: 22 }, { name: 'security', w: 14, h: 34 }] },
+  town_streets: { cellW: 42, cellH: 42, pieces: [{ name: 'cafe', w: 20, h: 25 }, { name: 'crate_kid', w: 25, h: 31 }, { name: 'bench_lady', w: 28, h: 29 }, { name: 'lamp_reader', w: 27, h: 26 }, { name: 'picker', w: 26, h: 36 }, { name: 'juice_pair', w: 35, h: 32 }, { name: 'shop_sweeper', w: 22, h: 26 }, { name: 'dog', w: 19, h: 21 }] },
 } as const satisfies Record<string, LifeSheet>;
 
 export type LifeTheme = keyof typeof LIFE_SHEETS;

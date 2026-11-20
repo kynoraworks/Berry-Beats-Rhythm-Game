@@ -1,92 +1,183 @@
-import type { AmbientGroup } from '../core/assets';
 import type { PlaceDef, PlaceKind } from '../story/places';
 import type { StopDef } from '../story/stops';
+import { floorAt } from './floors';
+import { LIFE_SHEETS, type LifeTheme } from './lifePieces';
 
 /**
- * Background life: which extras stand around each station, street and battle
- * stage, and which no-art effects play there. Pure data and placement maths;
- * src/explore/ambientFx.ts draws it.
+ * The people who live in each setting, baked into its scenery: commuters on
+ * benches, cooks behind their counters, a punk crew lounging on a giant
+ * boombox. They sit, lean and perch on the scenery's props a little behind the
+ * walking line, in the setting's own colours (see tools/build_life.py), and
+ * only nod or breathe. Pure data and placement maths; src/explore/ambientFx.ts
+ * draws them.
  *
- * Extras come from public/assets/img/ambient_<group>.png: 4 people (columns)
- * by 2 loop frames (rows) in 48x48 cells with the feet on row 46.
+ * Pieces come from public/assets/img/life_<theme>.png: one column per piece,
+ * the piece bottom-centred in its cell, a resting frame on top and a nod below.
  */
-
-export const EXTRA_CELL = 48;
-export const EXTRA_FEET = 46;
-/** Rough half width of an extra's body in art pixels, for keeping them clear of hotspots. */
-const EXTRA_HALF = 9;
 
 /** No-art effects a setting can have. */
 export type AmbientEffect = 'beams' | 'neon' | 'steam' | 'bubbles' | 'confetti' | 'birds' | 'lanterns';
 
+export interface LifeSpot {
+  theme: LifeTheme;
+  piece: string;
+  /** Centre x in art pixels, from the place's (or the battle stage's) left edge. */
+  x: number;
+  /**
+   * The row the piece's base rests on, for pieces on a raised prop (a bleacher
+   * row, a fence top). Omitted: on the ground, `back` rows behind the walking line.
+   */
+  y?: number;
+  /** Rows behind the walking line for a piece on the ground. Defaults per place (see BACK). */
+  back?: number;
+  flip?: boolean;
+  /** Nods on every beat in battles (dancers, a crowd); everyone else every few beats. */
+  beat?: boolean;
+  /**
+   * The piece is the hotspot's own subject (the giant boombox is the Boombox,
+   * the cooks are the stall), so it may stand on that hotspot.
+   */
+  covers?: string;
+}
+
 export interface SettingLife {
-  /** Extras sheet, or null for none. */
-  group: AmbientGroup | null;
-  /** Extras that dance on the beat (club dancers, fans) rather than idling slowly. */
-  dancing: boolean;
-  effects: AmbientEffect[];
+  spots: readonly LifeSpot[];
+  effects: readonly AmbientEffect[];
 }
 
 type Where = 'station' | 'street' | 'battle';
 
-const NONE: SettingLife = { group: null, dancing: false, effects: [] };
+const NONE: SettingLife = { spots: [], effects: [] };
 
-/** Who and what fills each stop's station, street and battle stage. */
+/** Default rows behind the walking line: people stand at the wall base, not on the path. */
+export const BACK: Record<Where, number> = { station: 5, street: 9, battle: 3 };
+
+const s = (theme: LifeTheme, piece: string, x: number, extra: Partial<LifeSpot> = {}): LifeSpot => ({ theme, piece, x, ...extra });
+
+/** Who lives at each stop's station, street and battle stage, and the effects there. */
 const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
-  stop01: { station: { group: 'town', dancing: false, effects: ['birds'] } },
+  stop01: {
+    // Berry Town's platform: the neighbours seeing the train off.
+    station: { spots: [s('town', 'sweeper', 58), s('town', 'knitter', 124), s('town', 'wall_cat', 197)], effects: ['birds'] },
+  },
   stop02: {
-    station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'street', dancing: false, effects: ['birds'] },
-    battle: { group: 'street', dancing: true, effects: ['birds'] },
+    station: { spots: [s('commuters', 'newspaper', 102), s('commuters', 'cat_on_bag', 207)], effects: [] },
+    street: {
+      spots: [s('town_streets', 'cafe', 172), s('town_streets', 'crate_kid', 216), s('town_streets', 'bench_lady', 340), s('town_streets', 'shop_sweeper', 478)],
+      effects: ['birds'],
+    },
+    battle: { spots: [s('town_streets', 'crate_kid', 26), s('town_streets', 'dog', 58), s('town_streets', 'shop_sweeper', 198), s('town_streets', 'cafe', 236)], effects: ['birds'] },
   },
   stop03: {
-    station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'street', dancing: true, effects: [] },
-    battle: { group: 'street', dancing: true, effects: [] },
+    // Graffiti Corner: the crew's corner.
+    station: { spots: [s('stack', 'speaker_stack', 158), s('stack', 'small_boombox', 194, { beat: true })], effects: [] },
+    street: { spots: [s('graffiti', 'boombox_crew', 48, { beat: true, covers: 'Boombox' }), s('stack', 'tagger', 150, { covers: 'Mural' })], effects: [] },
+    battle: {
+      spots: [
+        s('graffiti', 'boombox_crew', 38, { beat: true }),
+        s('stack', 'fence_sitter', 194, { beat: true }),
+        s('stack', 'speaker_stack', 236, { beat: true }),
+      ],
+      effects: [],
+    },
   },
   stop04: {
-    station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'market', dancing: false, effects: ['birds'] },
-    battle: { group: 'market', dancing: true, effects: [] },
+    station: { spots: [s('commuters', 'map_reader', 66), s('commuters', 'two_friends', 98)], effects: [] },
+    street: {
+      spots: [s('town_streets', 'picker', 172), s('commuters', 'headphones', 340), s('town_streets', 'juice_pair', 422, { covers: 'Juice stand' }), s('town_streets', 'dog', 486)],
+      effects: ['birds'],
+    },
+    battle: { spots: [s('town_streets', 'juice_pair', 38), s('town_streets', 'picker', 200), s('town_streets', 'dog', 236)], effects: [] },
   },
   stop05: {
-    station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'lab', dancing: false, effects: ['bubbles'] },
-    battle: { group: 'lab', dancing: true, effects: ['bubbles'] },
+    station: { spots: [s('lab', 'clipboard', 100), s('lab', 'microscope', 166), s('lab', 'robot', 204)], effects: ['bubbles'] },
+    street: { spots: [s('lab', 'test_tube', 30), s('lab', 'clipboard', 60)], effects: ['bubbles'] },
+    battle: { spots: [s('lab', 'test_tube', 22), s('lab', 'clipboard', 56), s('lab', 'microscope', 202), s('lab', 'robot', 238)], effects: ['bubbles'] },
   },
   stop06: {
-    station: { group: 'commuters', dancing: false, effects: ['lanterns'] },
-    street: { group: 'market', dancing: false, effects: ['lanterns', 'steam'] },
-    battle: { group: 'market', dancing: true, effects: ['lanterns'] },
+    station: { spots: [s('market', 'tea_drinkers', 70), s('market', 'fanning_elder', 101)], effects: ['lanterns'] },
+    street: {
+      spots: [
+        s('market', 'tea_seller', 116, { covers: 'Tea stall' }),
+        s('market', 'tea_drinkers', 196),
+        s('market', 'fanning_elder', 340),
+        s('market', 'steamer_cook', 424, { covers: 'Dumpling stall' }),
+        s('market', 'lantern_kid', 484),
+      ],
+      effects: ['lanterns', 'steam'],
+    },
+    battle: { spots: [s('market', 'steamer_cook', 40), s('market', 'lantern_kid', 198), s('market', 'fanning_elder', 236)], effects: ['lanterns'] },
   },
   stop07: {
-    station: { group: 'fans', dancing: false, effects: ['neon'] },
-    street: { group: 'club', dancing: true, effects: ['beams', 'neon'] },
-    battle: { group: 'club', dancing: true, effects: ['beams', 'neon'] },
+    station: { spots: [s('club', 'slow_dance', 100, { beat: true }), s('club', 'dancer_b', 197, { beat: true })], effects: ['neon'] },
+    street: { spots: [s('club', 'dancer_a', 20, { beat: true }), s('club', 'dancer_c', 44, { beat: true }), s('club', 'dancer_e', 174, { beat: true }), s('club', 'bartender', 240)], effects: ['beams', 'neon'] },
+    battle: {
+      spots: [
+        s('club', 'dancer_a', 14, { beat: true }),
+        s('club', 'dancer_b', 36, { beat: true }),
+        s('club', 'dancer_c', 60, { beat: true }),
+        s('club', 'dancer_d', 196, { beat: true }),
+        s('club', 'dancer_e', 222, { beat: true }),
+        s('club', 'slow_dance', 244, { beat: true }),
+      ],
+      effects: ['beams', 'neon'],
+    },
   },
   stop08: {
-    station: { group: 'food', dancing: false, effects: ['steam', 'lanterns'] },
-    street: { group: 'food', dancing: false, effects: ['steam', 'lanterns'] },
-    battle: { group: 'food', dancing: true, effects: ['steam', 'lanterns'] },
+    station: { spots: [s('food', 'noodle_pair', 97), s('food', 'skewer_kid', 205)], effects: ['steam', 'lanterns'] },
+    street: {
+      spots: [
+        s('food', 'pot_cook', 118, { covers: 'Noodle stall' }),
+        s('food', 'noodle_pair', 258, { covers: 'Tables' }),
+        s('food', 'chin_rest', 290, { covers: 'Tables' }),
+        s('food', 'slurper', 344),
+        s('food', 'pan_cook', 422, { covers: 'Dumpling stall' }),
+        s('food', 'skewer_kid', 484),
+      ],
+      effects: ['steam', 'lanterns'],
+    },
+    battle: { spots: [s('food', 'noodle_pair', 24), s('food', 'chin_rest', 58), s('food', 'slurper', 200), s('food', 'skewer_kid', 236)], effects: ['steam', 'lanterns'] },
   },
   stop09: {
-    station: { group: 'tunnel', dancing: false, effects: [] },
-    street: { group: 'tunnel', dancing: false, effects: [] },
-    battle: { group: 'tunnel', dancing: true, effects: [] },
+    station: { spots: [s('tunnel', 'thermos', 101), s('tunnel', 'sleeper', 170), s('tunnel', 'cone', 204)], effects: [] },
+    street: { spots: [s('tunnel', 'cone', 64), s('tunnel', 'thermos', 186), s('tunnel', 'sandbags', 344), s('tunnel', 'sleeper', 484)], effects: [] },
+    battle: { spots: [s('tunnel', 'sandbags', 40), s('tunnel', 'shovel', 200), s('tunnel', 'cone', 238)], effects: [] },
   },
   stop10: {
-    station: { group: 'fans', dancing: true, effects: ['confetti'] },
-    street: { group: 'fans', dancing: true, effects: ['confetti'] },
-    battle: { group: 'fans', dancing: true, effects: ['confetti'] },
+    station: { spots: [s('plaza', 'glowstick', 70, { beat: true }), s('plaza', 'shoulders', 104, { beat: true }), s('plaza', 'sign', 205, { beat: true })], effects: ['confetti'] },
+    street: {
+      spots: [
+        // The bleachers' rows, front to back.
+        s('plaza', 'glowstick', 82, { y: 134, beat: true }),
+        s('plaza', 'clapper', 110, { y: 122, beat: true, covers: 'Bleachers' }),
+        s('plaza', 'foam_finger', 136, { y: 134, beat: true, covers: 'Bleachers' }),
+        s('plaza', 'shoulders', 212, { beat: true }),
+        s('plaza', 'sign', 360, { beat: true }),
+        s('plaza', 'cap', 480, { beat: true }),
+      ],
+      effects: ['confetti'],
+    },
+    battle: {
+      spots: [s('plaza', 'shoulders', 20, { beat: true }), s('plaza', 'sign', 52, { beat: true }), s('plaza', 'cap', 200, { beat: true }), s('plaza', 'drink', 232, { beat: true })],
+      effects: ['confetti'],
+    },
   },
   stop11: {
-    station: { group: 'posh', dancing: false, effects: [] },
-    street: { group: 'posh', dancing: false, effects: [] },
-    battle: { group: 'posh', dancing: true, effects: [] },
+    station: { spots: [s('posh', 'waiter', 101), s('posh', 'monocle', 160), s('posh', 'armchair', 198)], effects: [] },
+    street: { spots: [s('posh', 'balustrade', 64), s('posh', 'chaise', 192), s('posh', 'cocktails', 340), s('posh', 'waiter', 476)], effects: [] },
+    battle: { spots: [s('posh', 'waiter', 30), s('posh', 'monocle', 60), s('posh', 'armchair', 200), s('posh', 'chaise', 236)], effects: [] },
   },
   stop12: {
-    station: { group: 'backstage', dancing: false, effects: [] },
-    battle: { group: 'fans', dancing: true, effects: ['beams', 'confetti'] },
+    station: { spots: [s('grand', 'clipboard_hand', 100), s('grand', 'security', 207)], effects: [] },
+    battle: {
+      spots: [
+        s('grand', 'camera', 18),
+        s('grand', 'fans_four', 50, { y: 160, beat: true }),
+        s('grand', 'fans_three', 208, { y: 160, beat: true }),
+        s('grand', 'cable_hand', 238),
+      ],
+      effects: ['beams', 'confetti'],
+    },
   },
 };
 
@@ -102,13 +193,43 @@ export function battleLife(stopId: string): SettingLife {
   return LIFE[stopId]?.battle ?? NONE;
 }
 
-export interface ExtraSpot {
-  /** Centre x in art pixels. */
-  x: number;
-  /** Which person on the sheet (column 0 to 3). */
-  who: number;
-  flip: boolean;
+/** A piece's size in art pixels, and its column on its sheet. */
+export function pieceOf(spot: Pick<LifeSpot, 'theme' | 'piece'>): { w: number; h: number; column: number } {
+  const sheet = LIFE_SHEETS[spot.theme];
+  const column = sheet.pieces.findIndex((p) => p.name === spot.piece);
+  if (column < 0) throw new Error(`No piece ${spot.piece} on life sheet ${spot.theme}`);
+  const { w, h } = sheet.pieces[column];
+  return { w, h, column };
 }
+
+export interface PlacedPiece {
+  spot: LifeSpot;
+  /** Left, right, top and bottom in art pixels (bottom is the row the piece rests on). */
+  x0: number;
+  x1: number;
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Where a spot's piece ends up in a background: on the given row, or on the
+ * ground `back` rows behind the walking line at its x (floors.ts).
+ */
+export function placePiece(spot: LifeSpot, background: string, where: Where): PlacedPiece {
+  const { w, h } = pieceOf(spot);
+  const bottom = spot.y ?? floorAt(background, spot.x) - (spot.back ?? BACK[where]);
+  return { spot, x0: spot.x - w / 2, x1: spot.x + w / 2, top: bottom - h + 1, bottom };
+}
+
+/** Art x ranges a piece must keep clear of in a place: the people Berry talks to, the fruit, the doors. */
+export function keepClear(place: PlaceDef): { label: string; kind: string; range: [number, number] }[] {
+  const ranges: { label: string; kind: string; range: [number, number] }[] = place.hotspots.map((h) => ({ label: h.label, kind: h.kind, range: [h.x, h.x + h.w] as [number, number] }));
+  if (place.kind === 'station' || place.kind === 'depart') ranges.push({ label: 'Train door', kind: 'door', range: [0, 40] });
+  return ranges;
+}
+
+/** Battles: the gap between the two lane fields (art x), where the dancers and the HUD are. */
+export const BATTLE_GAP: readonly [number, number] = [79, 177];
 
 /** A tiny deterministic random source, so a place looks the same on every visit. */
 export function seeded(seed: number): () => number {
@@ -121,84 +242,6 @@ export function seeded(seed: number): () => number {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-/** Art x ranges where an extra must not stand: hotspots (and the people at them), with a margin. */
-export function blockedRanges(place: PlaceDef): [number, number][] {
-  // Things on the wall may be brushed at their edges (people stand in front of a poster);
-  // the people Berry talks to and the fruit get a clear margin.
-  const ranges: [number, number][] = place.hotspots.map((h) => {
-    if (h.kind === 'look') return [h.x - EXTRA_HALF + 4, h.x + h.w + EXTRA_HALF - 4];
-    // The fruit gets the most room: they are who Berry walks up to, and the battle starts there.
-    const margin = h.kind === 'fruit' ? 28 : 4;
-    return [h.x - EXTRA_HALF - margin, h.x + h.w + EXTRA_HALF + margin];
-  });
-  if (place.kind === 'station' || place.kind === 'depart') {
-    ranges.push([0, 40]); // the train door
-    ranges.push([216, place.width]); // the exit
-  }
-  return ranges;
-}
-
-/**
- * Where a place's extras stand: up to `count` spots spread across the free
- * stretches of floor, never inside a blocked range, at least `gap` apart.
- */
-export function placeExtras(width: number, blocked: [number, number][], count: number, seed: number, gap = 34): ExtraSpot[] {
-  const random = seeded(seed);
-  const free = (x: number) => x > EXTRA_HALF && x < width - EXTRA_HALF && blocked.every(([a, b]) => x < a || x > b);
-  const candidates: number[] = [];
-  for (let x = EXTRA_HALF + 2; x < width - EXTRA_HALF; x += 2) if (free(x)) candidates.push(x);
-  const spots: ExtraSpot[] = [];
-  // Spread them: try evenly spaced targets first, then take the nearest free spot to each.
-  for (let i = 0; i < count && candidates.length > 0; i++) {
-    const target = ((i + 0.5) / count) * width + (random() - 0.5) * 24;
-    let best: number | null = null;
-    for (const x of candidates) {
-      if (spots.some((s) => Math.abs(s.x - x) < gap)) continue;
-      if (best === null || Math.abs(x - target) < Math.abs(best - target)) best = x;
-    }
-    if (best === null) break;
-    spots.push({ x: best, who: 0, flip: false });
-  }
-  // Fill any places still empty with the free spot farthest from everyone, if one is far enough.
-  while (spots.length < count) {
-    let best: number | null = null;
-    let bestDistance = gap - 1;
-    for (const x of candidates) {
-      const distance = Math.min(...spots.map((s) => Math.abs(s.x - x)), Number.POSITIVE_INFINITY);
-      if (distance > bestDistance) {
-        best = x;
-        bestDistance = distance;
-      }
-    }
-    if (best === null) break;
-    spots.push({ x: best, who: 0, flip: false });
-  }
-  spots.sort((a, b) => a.x - b.x);
-  const people = [0, 1, 2, 3].sort(() => random() - 0.5);
-  return spots.map((spot, i) => ({ x: spot.x, who: people[i % 4], flip: spot.x > width / 2 ? random() < 0.75 : random() < 0.25 }));
-}
-
-/** How many extras a place gets: a couple on a platform, more along a street. */
-export function extraCount(kind: PlaceKind): number {
-  return kind === 'street' ? 5 : kind === 'room' ? 0 : 3;
-}
-
-/**
- * Battle extras stand at the back of the stage, between the two lane fields
- * (art x 79 to 177), so they never cover a note. They are drawn smaller than
- * the dancers (BATTLE_SCALE) so they read as a crowd further back.
- */
-export const BATTLE_SPOTS: readonly { x: number; who: number; flip: boolean }[] = [
-  { x: 87, who: 0, flip: false },
-  { x: 118, who: 1, flip: false },
-  { x: 140, who: 2, flip: true },
-  { x: 169, who: 3, flip: true },
-];
-/** The battle extras' feet row: further back than the dancers (row 138). */
-export const BATTLE_FEET = 118;
-/** Canvas pixels per extras art pixel in battle (the dancers use 5). */
-export const BATTLE_SCALE = 3;
 
 /** A stop's number from its id, for seeding. */
 export function stopSeed(stop: Pick<StopDef, 'number'>, kind: PlaceKind): number {

@@ -6,8 +6,8 @@ import { Depth, FLOOR_Y, LANE_FIELD_WIDTH } from './layout';
 import { backdropTint, gradeStrength, leafCount, mixColor, multiplyColor } from '../core/atmosphere';
 import { LeafFall } from '../core/atmosphereFx';
 import { STOPS, stopForChart, TUTORIAL, type StopDef } from '../story/stops';
-import { BATTLE_FEET, BATTLE_SCALE, BATTLE_SPOTS, battleLife, type SettingLife } from '../explore/ambient';
-import { AmbientEffects, Extras } from '../explore/ambientFx';
+import { battleLife, placePiece } from '../explore/ambient';
+import { AmbientEffects, Residents } from '../explore/ambientFx';
 
 const SPOT_COLOR = 0xfff0c0;
 const PULSE_DARK = 0xd2cdea;
@@ -35,9 +35,8 @@ export class StageFx {
   private readonly leaves: LeafFall | null;
   /** The stage's background life: extras at the back and the setting's effects, moved with the back wall. */
   private readonly backWall: Phaser.GameObjects.Container;
-  private extras: Extras | null = null;
+  private extras: Residents | null = null;
   private effects: AmbientEffects | null = null;
-  private life: SettingLife | null = null;
   /** The time of day's tint at the stage's corners, or white for no story stop. */
   private grade: [number, number, number, number] = [0xffffff, 0xffffff, 0xffffff, 0xffffff];
   private lastBeat = -Infinity;
@@ -62,7 +61,7 @@ export class StageFx {
     this.leaves = this.addAtmosphere(stage);
     this.background.setTint(...this.grade);
     this.backWall = scene.add.container(0, 0).setDepth(Depth.background + 0.3);
-    this.addLife(stage);
+    this.addLife(stage, key);
     this.spots = {
       player: this.makeSpot(playerX, feetY(key, playerX)),
       rival: this.makeSpot(rivalX ?? playerX, feetY(key, rivalX ?? playerX)),
@@ -114,7 +113,7 @@ export class StageFx {
     const onBeat = whole !== this.lastBeat;
     if (onBeat) {
       this.lastBeat = whole;
-      this.extras?.onBeat(whole, this.life?.dancing ?? false);
+      this.extras?.onBeat(whole);
       this.pulse = 1;
       this.crowd?.setFrame(((whole % 2) + 2) % 2);
     }
@@ -162,24 +161,22 @@ export class StageFx {
   }
 
   /**
-   * A lighter version of the setting's life: three extras at the back of the
-   * stage between the two lane fields (never over a note), bobbing on the beat,
-   * and the setting's effects behind the dancers.
+   * The setting's people on the back wall, at the background's scale and on its
+   * floor, clear of the gap between the lane fields where the dancers and the
+   * HUD are; they nod on the beat and the hype camera lifts them with the wall.
+   * Then the setting's effects behind the dancers.
    */
-  private addLife(stage: string): void {
+  private addLife(stage: string, key: string): void {
     const stop = this.storyStop(stage);
     if (!stop) return;
     const life = battleLife(stop.id);
-    this.life = life;
-    if (life.group) {
-      // The extras take the stage's light, a shade darker so they stay behind the dancers.
+    if (life.spots.length > 0) {
+      // The people take the stage's light, a shade darker so they stay behind the dancers.
       const shade = multiplyColor(this.grade[2], 0xc8c0dc);
-      this.extras = new Extras(this.scene, `ambient_${life.group}`, BATTLE_SPOTS, BATTLE_FEET, {
+      this.extras = new Residents(this.scene, life.spots.map((spot) => placePiece(spot, key, 'battle')), {
         depth: 0,
-        dancing: life.dancing,
         calm: this.calm,
         seed: stop.number,
-        scale: BATTLE_SCALE,
         addTo: (sprite) => {
           sprite.setTint(shade);
           this.backWall.add(sprite);

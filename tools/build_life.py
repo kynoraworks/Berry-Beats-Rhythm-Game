@@ -36,10 +36,10 @@ SRC = ROOT / "archive" / "generated-sprites" / "life"
 OUT = ROOT / "public" / "assets" / "img"
 TS = ROOT / "src" / "explore" / "lifePieces.ts"
 
-# theme: (background the palette comes from, piece names in reading order, art-pixel size override or None,
+# theme: (background the palette comes from, piece names in reading order, extra shrink for sheets drawn larger or None,
 #         how much the colours are pulled into the scene's shadows)
 THEMES = {
-    "graffiti": ("stage_street", ["boombox_crew"], None, 0.22),
+    "graffiti": ("stage_street", ["boombox_crew"], 1.45, 0.22),
     "stack": ("stage_street", ["speaker_stack", "small_boombox", "tagger", "fence_sitter"], None, 0.22),
     "commuters": ("station_peel_street", ["newspaper", "dozing", "headphones", "coffee_lean", "suitcase_sitter", "two_friends", "map_reader", "cat_on_bag"], None, 0.2),
     "town": ("station_berry_town", ["bird_feeder", "wall_cat", "sweeper", "knitter", "waiting_kid", "porter"], None, 0.18),
@@ -150,7 +150,7 @@ def build(theme: str) -> dict:
         cell = raw[max(0, y0 - 4):y1 + 4, max(0, x0 - 4):x1 + 4]
         # The model draws its people at the cast's size; background people are a size smaller,
         # so each source pixel block is sampled a little coarser than it was drawn.
-        p = (size or art_pixel(cell)) * SHRINK
+        p = art_pixel(cell) * SHRINK * (size or 1.0)
         sprite = ps.sample(cell, p, p / 2, p / 2)
         sprite = ps.drop_specks(sprite, 6)
         sprite = trim(low_key(sprite, shade, pull, palette))
