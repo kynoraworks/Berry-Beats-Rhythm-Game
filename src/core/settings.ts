@@ -1,4 +1,5 @@
 import { LANE_COUNT } from './config';
+import { DEFAULT_TOUCH_SCHEME, TOUCH_SCHEMES, type TouchScheme } from './touchSchemes';
 
 export interface Settings {
   /** 0..1 */
@@ -21,6 +22,10 @@ export interface Settings {
   reduceMotion: boolean;
   /** Tilt the battle into 2.5D during a hype streak (reduce motion keeps it flat). */
   hypeCamera: boolean;
+  /** How battles are played by touch. */
+  touchScheme: TouchScheme;
+  /** Keep the touch guide on screen for the whole song (otherwise it fades after a few seconds). */
+  touchGuides: boolean;
   /** KeyboardEvent.code values bound to each lane (left, up, down, right). */
   keys: string[][];
 }
@@ -34,6 +39,8 @@ export const DEFAULT_SETTINGS: Settings = {
   noFail: false,
   reduceMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   hypeCamera: true,
+  touchScheme: DEFAULT_TOUCH_SCHEME,
+  touchGuides: false,
   keys: [
     ['ArrowLeft', 'KeyD'],
     ['ArrowUp', 'KeyF'],
@@ -67,6 +74,8 @@ function sanitize(raw: Partial<Settings>): Settings {
     noFail: typeof raw.noFail === 'boolean' ? raw.noFail : d.noFail,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
     hypeCamera: typeof raw.hypeCamera === 'boolean' ? raw.hypeCamera : d.hypeCamera,
+    touchScheme: TOUCH_SCHEMES.includes(raw.touchScheme as TouchScheme) ? (raw.touchScheme as TouchScheme) : d.touchScheme,
+    touchGuides: typeof raw.touchGuides === 'boolean' ? raw.touchGuides : d.touchGuides,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),
   };
 }

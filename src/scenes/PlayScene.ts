@@ -27,6 +27,7 @@ import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
+import { SCHEME_INFO } from '../core/touchSchemes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { createPlayer, createRival, type Dancer } from '../play/characters';
 import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
@@ -734,8 +735,9 @@ export class PlayScene extends Phaser.Scene {
 
   /** Explains the touch controls until the song starts. */
   private showTouchHint(): void {
-    const backing = addBox(this, GAME_W / 2 - 380, 540, 760, 120, 'panel').setDepth(Depth.hud);
-    const hint = addBody(this, GAME_W / 2, 600, 'Tap the four coloured columns:\nleft, up, down and right', 26, { color: CSS.yellow }).setDepth(Depth.hud);
+    const backing = addBox(this, GAME_W / 2 - 380, 530, 760, 140, 'panel').setDepth(Depth.hud);
+    const text = `${SCHEME_INFO[getSettings().touchScheme].hint}\nDouble-tap the top edge to pause`;
+    const hint = addBody(this, GAME_W / 2, 600, text, 24, { color: CSS.yellow }).setDepth(Depth.hud);
     this.tweens.add({
       targets: [backing, hint],
       alpha: 0,
@@ -783,10 +785,12 @@ export class PlayScene extends Phaser.Scene {
         up: (lane, timeMs) => this.laneUp(lane, timeMs),
       });
 
-      // Touch and mouse: the whole window is split into four columns, one per lane.
+      // Touch and mouse: the scheme chosen in Options (columns, bottom pads, thumb pads or swipes).
+      const settings = getSettings();
       this.touchLanes = new TouchLanes(
         { down: (lane, timeMs) => this.laneDown(lane, timeMs), up: (lane, timeMs) => this.laneUp(lane, timeMs) },
         (event) => this.state !== 'playing' || this.isOverPauseButton(event) || this.isOverFlair(event),
+        { scheme: settings.touchScheme, alwaysShowGuide: settings.touchGuides, onPause: () => this.state === 'playing' && this.pauseGame() },
       );
     }
     this.stopRotateWatch = onRotateNoticeChange((shown) => shown && this.pauseGame());
