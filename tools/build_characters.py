@@ -91,6 +91,35 @@ The Lemon is a mad scientist doctor who dances with a flask of pink liquid.
   spares in lemon_j: 0 leap with a fist out, 1 star jump, 5 leap with legs apart
   replaced and no longer used: lemon_g 5 (a leap that hid his hair behind his
   arms), lemon_h 2 (its spark was lost in conversion), lemon_h 3
+
+Lite sheets
+-----------
+The other story fruits (Banana, Grape, Blueberry, Dragon Fruit, Watermelon,
+Plum, Coconut, Orange, Pineapple) only dance against Berry, so they get a
+smaller 18-frame layout (64x64 cells, 9 per row, 576x128, feet on row 62):
+
+   0-2   idle (stand, dip, accent)
+   3-4   left        5-6   right       7-8   up          9-10  down
+  11-12  stumble
+  13     victory     14    defeat
+  15-17  signature move, three frames in order
+
+Each was generated from one design sheet (all nine side by side) as two 3x3
+sheets: <name>_a holds frames 0-8 and <name>_b frames 9-17, in order. They
+were converted with tools/pixelize_sprites.py at an art pixel of about 10.4
+source pixels (pineapple 10.6, watermelon 10.2) with a palette taken from both
+sheets (palette_<name>.png), and detached motion lines were removed except for
+the Dragon Fruit's sparks. Idle frames are centred on the feet; the rest are
+centred on their bounding box. Signature moves:
+  banana       slips on a peel, flies flat in the air, lands in the splits
+  grape        the bunch squeezes into a ball, bursts into a fan, lands pointing
+  blueberry    the Trio Turn alone: step-slide, spin, drop
+  dragonfruit  scarf whip, cape flourish with sparks, theatrical bow
+  watermelon   crouch, belly bounce in the air, landing wobble
+  plum         tai-chi crane stance, low lantern sweep, palms together
+  coconut      tucks into a ball, rolls as a coconut, pops up arms crossed
+  orange       swings the mic by its cable, spins with it, mic drop
+  pineapple    vogue frame, angular dip, hands on hips
 """
 from pathlib import Path
 
@@ -204,9 +233,49 @@ def build(name: str, mapping: dict[int, tuple[str, int]], original: Image.Image 
     print(f"wrote {name}.png ({out.width}x{out.height})")
 
 
+LITE_FRAMES = 18
+LITE_ANCHORED = {0, 1, 2}
+# Frames where the character is in the air in the lite layout (8 hop, 13 victory jump, plus mid-air signature frames).
+LITE_LIFT = {
+    "banana": {8: 5, 13: 6, 16: 8},
+    "grape": {8: 5, 13: 6, 16: 4},
+    "blueberry": {8: 5, 13: 6},
+    "dragonfruit": {8: 5, 13: 6},
+    "watermelon": {8: 5, 13: 6, 16: 6},
+    "plum": {8: 4, 13: 5},
+    "coconut": {8: 5, 13: 6},
+    "orange": {8: 5, 13: 6},
+    "pineapple": {8: 5, 13: 6},
+}
+
+
+def build_lite(name: str) -> None:
+    sources = {tag: Image.open(GEN / f"{name}_{tag}.png").convert("RGBA") for tag in ("a", "b")}
+    out = Image.new("RGBA", (COLUMNS * CELL, 2 * CELL), (0, 0, 0, 0))
+    for index in range(LITE_FRAMES):
+        cell = cell_of(sources["a" if index < 9 else "b"], index % 9)
+        alpha = np.array(cell)[..., 3]
+        ys, xs = np.nonzero(alpha)
+        sprite = cell.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+        if index in LITE_ANCHORED:
+            feet = np.nonzero(alpha[ys.max() - 2:ys.max() + 1].any(axis=0))[0]
+            x = CENTER_X - int(round((feet.min() + feet.max() + 1) / 2)) + int(xs.min())
+        else:
+            x = CENTER_X - sprite.width // 2
+        x = min(max(x, 0), CELL - sprite.width)
+        y = BASELINE + 1 - LITE_LIFT[name].get(index, 0) - sprite.height
+        frame = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
+        frame.alpha_composite(sprite, (x, max(y, 0)))
+        out.alpha_composite(frame, ((index % COLUMNS) * CELL, (index // COLUMNS) * CELL))
+    out.save(OUT / f"{name}.png", optimize=True)
+    print(f"wrote {name}.png ({out.width}x{out.height}, lite)")
+
+
 if __name__ == "__main__":
     build("blackberry", BLACKBERRY, Image.open(ORIGINAL_BLACKBERRY).convert("RGBA"))
     build("raspberry", RASPBERRY, None)
     build("instructor", INSTRUCTOR, None)
     build("pear", PEAR, None)
     build("lemon", LEMON, None)
+    for lite in LITE_LIFT:
+        build_lite(lite)

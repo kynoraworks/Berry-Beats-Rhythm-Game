@@ -25,6 +25,10 @@ The hand-editable sources are in archive/generated-sprites:
   the head moves. A few stray pixels in the Pear's beanie brim were fixed, and
   the Lemon's closed smile and tilted grin were redrawn by hand.
 
+  watermelon_sit.png: the same three cells (closed-eye smile, open laugh, head
+  tilt), sitting wide with his hands on his belly; the second and third cells
+  reuse the first cell's body below row 27 (the neck).
+
 This script adds a one-pixel "breathing" variant of the neutral and tilt frames
 and writes five-frame sheets to public/assets/img:
   0 neutral, 1 neutral (bob), 2 blink (Pear: nod, Lemon: tight smile), 3 tilt, 4 tilt (bob)
@@ -40,7 +44,7 @@ OUT = ROOT / "public" / "assets" / "img"
 CELL = 75
 
 # Row (within the 75px cell) of the character's lap: everything above it sinks by one pixel on the bob.
-LAP_ROW = {"raspberry_sit": 36, "coach_sit": 42, "pear_sit": 50, "lemon_sit": 49}
+LAP_ROW = {"raspberry_sit": 36, "coach_sit": 42, "pear_sit": 50, "lemon_sit": 49, "watermelon_sit": 48}
 
 
 def cells(sheet: Image.Image) -> list[np.ndarray]:

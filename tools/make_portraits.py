@@ -3,17 +3,32 @@
 
 Run from the repo root:  python3 tools/make_portraits.py
 
-The portraits are head-and-shoulders busts of the five speaking characters,
+The portraits are head-and-shoulders busts of the speaking characters,
 generated with an image model from each character's sprite, converted to real
 pixel art with tools/pixelize_sprites.py and snapped to that character's
 palette. The hand-editable source is archive/generated-sprites/portraits.png:
-ten 64x64 cells in a row, each bust centred and standing on the bottom edge.
+thirty 64x64 cells in a row, each bust centred and standing on the bottom edge.
 
   0 Blackberry, neutral   1 Blackberry, bold
   2 Raspberry, neutral    3 Raspberry, bold
   4 Coach, neutral        5 Coach, bold
   6 Pear, neutral         7 Pear, bold
   8 Lemon, neutral        9 Lemon, bold
+ 10 Banana, neutral       11 Banana, bold
+ 12 Grape, neutral        13 Grape, bold
+ 14 Plum, neutral         15 Plum, bold
+ 16 Dragon Fruit, neutral 17 Dragon Fruit, bold
+ 18 Watermelon, neutral   19 Watermelon, bold
+ 20 Coconut, neutral      21 Coconut, bold
+ 22 Orange, neutral       23 Orange, bold
+ 24 Pineapple, neutral    25 Pineapple, bold
+ 26 Blueberry, neutral    27 Blueberry, bold
+ 28 station NPC (a kiwi commuter), neutral only
+ 29 Blackberry, hood down and eyes showing (bold), for the last scene only
+
+Frames 10-29 were generated three characters (or the extras) to a 3x2 sheet
+from a design lineup of the new fruits and frames 0-9 as a style reference,
+converted at an art pixel of 10.6 source pixels with one palette per character.
 
 "Bold" is the confident face (a smirk, a raised chin, a grin). Blackberry's
 eyes stay hidden under his hair, as in his sprites; the Pear's are hidden the
@@ -33,7 +48,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "archive" / "generated-sprites" / "portraits.png"
 OUT = ROOT / "public" / "assets" / "img" / "portraits.png"
 CELL = 64
-COUNT = 10
+COUNT = 30
 
 
 def main() -> None:
