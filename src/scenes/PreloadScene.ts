@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
+import { MenuTex, loadMenuArt } from '../menu/art';
 import { parseChart } from '../core/chart';
 import { optionalImages, optionalSheets } from '../core/assets';
 import { LEVELS, loadLevelChart } from '../core/levels';
@@ -60,6 +61,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image(Tex.arrowUp, `${IMG}arrow_ui_up.png`);
     this.load.image(Tex.arrowDown, `${IMG}arrow_ui_down.png`);
     this.load.image(Tex.logo, `${IMG}logo.png`);
+    loadMenuArt(this.load);
     this.load.image(Tex.titleBg, `${IMG}title_bg.jpg`);
     // Art that is drawn bit by bit: only what is listed as present is requested.
     for (const optional of optionalSheets()) sheet(optional.key, optional.file, optional.frameWidth, optional.frameHeight);
@@ -68,7 +70,7 @@ export class PreloadScene extends Phaser.Scene {
 
   create(): void {
     // Everything is pixel art except these hand-drawn pieces, which look better smoothed.
-    for (const key of [Tex.titleBg, Tex.logo, Tex.arrowLeft, Tex.arrowRight, Tex.arrowUp, Tex.arrowDown, Tex.missSplash]) {
+    for (const key of [Tex.titleBg, Tex.logo, MenuTex.sticker, Tex.arrowLeft, Tex.arrowRight, Tex.arrowUp, Tex.arrowDown, Tex.missSplash]) {
       this.textures.get(key).setFilter(Phaser.Textures.FilterMode.LINEAR);
     }
 

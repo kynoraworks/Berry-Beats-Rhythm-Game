@@ -36,11 +36,24 @@ const game = new Phaser.Game({
 });
 
 music.init(game);
+keepFitted(game);
 
 // Handy for debugging and automated tests.
 (window as unknown as { __game: Phaser.Game }).__game = game;
 
 registerServiceWorker();
+
+/**
+ * Refit the canvas whenever the visible area changes. Mobile browsers show and
+ * hide their toolbars without always sending a window resize, which left the
+ * canvas sized for a viewport taller than the one on screen.
+ */
+function keepFitted(target: Phaser.Game): void {
+  const refresh = () => target.scale.refresh();
+  window.visualViewport?.addEventListener('resize', refresh);
+  window.addEventListener('orientationchange', () => window.setTimeout(refresh, 250));
+  window.addEventListener('pageshow', refresh);
+}
 
 /**
  * Offline play. Production builds only, so development never serves stale files.

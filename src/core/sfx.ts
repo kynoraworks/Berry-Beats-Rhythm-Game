@@ -3,8 +3,10 @@ import { getSettings } from './settings';
 import { getAudioContext } from './songs';
 
 /**
- * Synthesised sound effects, so the game ships no sample files. Each effect is
- * a short list of layers: pitched tones with a pluck envelope, or filtered noise.
+ * Synthesised sound effects. Each effect is a short list of layers: pitched
+ * tones with a pluck envelope, or filtered noise. A few menu sounds also have
+ * a recorded sample (see SAMPLES below); the synthesised version plays until
+ * the sample has loaded, or if it cannot be loaded.
  */
 export type SfxName =
   | 'move'
@@ -32,7 +34,13 @@ export type SfxName =
   | 'warn'
   | 'zap'
   | 'hype'
-  | 'hypeOut';
+  | 'hypeOut'
+  | 'tapePlay'
+  | 'tapeEject'
+  | 'tapeForward'
+  | 'tapeRewind'
+  | 'paperFlip'
+  | 'marker';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -128,7 +136,83 @@ const RECIPES: Record<SfxName, Layer[]> = {
   ],
   // The camera settling back: a short falling whoosh.
   hypeOut: [{ type: 'noise', from: 4000, to: 500, dur: 0.24, gain: 0.06, attack: 0.02 }],
+  // The main menu's tape deck. A clunk of the play key...
+  tapePlay: [
+    { type: 'noise', from: 700, dur: 0.05, gain: 0.14 },
+    { type: 'triangle', from: 150, to: 80, dur: 0.09, gain: 0.14 },
+    { type: 'noise', from: 3200, dur: 0.012, gain: 0.08, delay: 0.035 },
+  ],
+  // ...the eject key and the door springing open...
+  tapeEject: [
+    { type: 'noise', from: 1400, to: 500, dur: 0.07, gain: 0.12 },
+    { type: 'triangle', from: 260, to: 620, dur: 0.1, gain: 0.08, delay: 0.04 },
+    { type: 'noise', from: 2600, dur: 0.02, gain: 0.07, delay: 0.12 },
+  ],
+  // ...a short wind forward and back...
+  tapeForward: [
+    { type: 'sawtooth', from: 260, to: 760, dur: 0.2, gain: 0.025, attack: 0.04 },
+    { type: 'noise', from: 2400, to: 5200, dur: 0.2, gain: 0.04, attack: 0.04 },
+    { type: 'square', from: 70, to: 110, dur: 0.18, gain: 0.02 },
+  ],
+  tapeRewind: [
+    { type: 'sawtooth', from: 760, to: 260, dur: 0.2, gain: 0.025, attack: 0.04 },
+    { type: 'noise', from: 5200, to: 2400, dur: 0.2, gain: 0.04, attack: 0.04 },
+    { type: 'square', from: 110, to: 70, dur: 0.18, gain: 0.02 },
+  ],
+  // ...a card flicked over, and a marker ticking the chosen track.
+  paperFlip: [{ type: 'noise', from: 2200, to: 6500, dur: 0.14, gain: 0.07, attack: 0.03 }],
+  marker: [
+    { type: 'noise', from: 3600, to: 2600, dur: 0.06, gain: 0.05, attack: 0.01 },
+    { type: 'noise', from: 5200, to: 4200, dur: 0.05, gain: 0.04, delay: 0.07, attack: 0.01 },
+  ],
 };
+
+/**
+ * Recorded menu sounds (generated with Higgsfield's Mirelo sound model, cut to
+ * their main hit and normalised; sources in archive/generated-sprites/menu/sfx).
+ */
+const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
+  tapePlay: { file: 'assets/audio/sfx/tape_play.mp3', gain: 0.55 },
+  tapeEject: { file: 'assets/audio/sfx/tape_eject.mp3', gain: 0.5 },
+  paperFlip: { file: 'assets/audio/sfx/paper_flip.mp3', gain: 0.5 },
+};
+
+/** Decoded samples; null once a sample has failed, so it stops being retried. */
+const decoded = new Map<SfxName, AudioBuffer | null>();
+const pending = new Set<SfxName>();
+
+/** Start fetching the recorded samples. Safe to call more than once. */
+export function preloadSamples(game: Phaser.Game): void {
+  const ctx = getAudioContext(game);
+  for (const [name, sample] of Object.entries(SAMPLES) as [SfxName, { file: string; gain: number }][]) {
+    if (decoded.has(name) || pending.has(name)) continue;
+    pending.add(name);
+    fetch(sample.file)
+      .then((response) => {
+        if (!response.ok) throw new Error(`${sample.file}: ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((bytes) => ctx.decodeAudioData(bytes))
+      .then(
+        (buffer) => decoded.set(name, buffer),
+        () => decoded.set(name, null),
+      )
+      .finally(() => pending.delete(name));
+  }
+}
+
+function playSample(ctx: AudioContext, name: SfxName, volume: number): boolean {
+  const buffer = decoded.get(name);
+  const sample = SAMPLES[name];
+  if (!buffer || !sample) return false;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const gain = ctx.createGain();
+  gain.gain.value = sample.gain * volume;
+  source.connect(gain).connect(ctx.destination);
+  source.start();
+  return true;
+}
 
 let noiseBuffer: AudioBuffer | null = null;
 
@@ -146,6 +230,7 @@ export function playSfx(game: Phaser.Game, name: SfxName): void {
   if (volume <= 0) return;
   const ctx = getAudioContext(game);
   if (ctx.state !== 'running') return;
+  if (playSample(ctx, name, volume)) return;
   for (const layer of RECIPES[name]) {
     const start = ctx.currentTime + (layer.delay ?? 0);
     const end = start + layer.dur;
