@@ -256,3 +256,65 @@ export class DoubleTap {
     return hit;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Two-finger tap
+// ---------------------------------------------------------------------------
+
+/** The two fingers must land this close together in time, and each lift this soon. */
+const TWO_FINGER_LAND_MS = 200;
+const TWO_FINGER_HOLD_MS = 350;
+
+interface Touch {
+  x: number;
+  y: number;
+  t: number;
+  moved: boolean;
+}
+
+/**
+ * Notices a quick tap with two fingers at once, away from the lane areas, as
+ * a way to pause. Presses that play a lane never reach it, so doubles on the
+ * pads stay doubles.
+ */
+export class TwoFingerTap {
+  private readonly touches = new Map<number, Touch>();
+  private readonly finished: { down: number; up: number }[] = [];
+
+  constructor(private slop: number) {}
+
+  setSlop(slop: number): void {
+    this.slop = slop;
+  }
+
+  down(id: number, x: number, y: number, t: number): void {
+    this.touches.set(id, { x, y, t, moved: false });
+  }
+
+  move(id: number, x: number, y: number): void {
+    const touch = this.touches.get(id);
+    if (touch && Math.hypot(x - touch.x, y - touch.y) > this.slop) touch.moved = true;
+  }
+
+  /** Forget a pointer (for example one that turned into a swipe). */
+  cancel(id: number): void {
+    this.touches.delete(id);
+  }
+
+  /** True when this lift completes a two-finger tap. */
+  up(id: number, t: number): boolean {
+    const touch = this.touches.get(id);
+    if (!touch) return false;
+    this.touches.delete(id);
+    if (touch.moved || t - touch.t > TWO_FINGER_HOLD_MS) return false;
+    // Drop taps too old to pair with this one.
+    while (this.finished.length > 0 && t - this.finished[0].up > TWO_FINGER_HOLD_MS) this.finished.shift();
+    const partner = this.finished.findIndex((other) => Math.abs(other.down - touch.t) <= TWO_FINGER_LAND_MS);
+    if (partner >= 0) {
+      this.finished.length = 0;
+      return true;
+    }
+    this.finished.push({ down: touch.t, up: t });
+    return false;
+  }
+}
