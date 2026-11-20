@@ -126,7 +126,7 @@ export class ExploreScene extends Phaser.Scene {
     crew.forEach((fruit, i) => {
       const sheet = characterSheet(this, fruit);
       const start = place.kind === 'depart' ? Math.min(max, place.startX + (i + 1) * FOLLOW_GAP) : place.startX - (i + 1) * FOLLOW_GAP;
-      const walker = new Walker(this, sheet.texture, sheet.layout, start, place.floor).setBounds(4, max + 6);
+      const walker = new Walker(this, sheet.texture, sheet.layout, start, place.floor, `${fruit}_walk`).setBounds(4, max + 6);
       this.world.add(walker.sprite.setDepth(DEPTH.people + 1 - i * 0.01));
       this.crew.push(walker);
     });

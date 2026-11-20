@@ -4,8 +4,8 @@ import type { SheetLayout } from '../story/types';
 
 /**
  * Someone who walks along the floor of a station or street. With a drawn walk
- * cycle (Berry's berry_walk: six frames walking right, flipped for left) it
- * plays that; anyone without one borrows the idle dance instead: the berry
+ * cycle (<id>_walk: six frames walking right, flipped for left) it plays
+ * that; anyone without one borrows the idle dance instead: the berry
  * layout's sway (frames 45 to 50) or a lite sheet's idle frames, sped up,
  * with a one-pixel bob.
  */
