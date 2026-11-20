@@ -40,7 +40,10 @@ export type SfxName =
   | 'tapeForward'
   | 'tapeRewind'
   | 'paperFlip'
-  | 'marker';
+  | 'marker'
+  | 'doorChime'
+  | 'doorHiss'
+  | 'doorThunk';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -63,6 +66,21 @@ function arpeggio(steps: number[], step: number, dur: number, gain: number, type
 }
 
 const RECIPES: Record<SfxName, Layer[]> = {
+  // The train: a two-tone chime before the doors move, the air hiss as they slide, the bump as they meet.
+  doorChime: [
+    { type: 'sine', from: note(4), dur: 0.5, gain: 0.11, attack: 0.01 },
+    { type: 'sine', from: note(16), dur: 0.35, gain: 0.03, attack: 0.01 },
+    { type: 'sine', from: note(0), dur: 0.7, gain: 0.11, delay: 0.32, attack: 0.01 },
+    { type: 'sine', from: note(12), dur: 0.45, gain: 0.03, delay: 0.32, attack: 0.01 },
+  ],
+  doorHiss: [
+    { type: 'noise', from: 5200, to: 2400, dur: 0.5, gain: 0.07, attack: 0.03 },
+    { type: 'noise', from: 900, to: 500, dur: 0.3, gain: 0.04, attack: 0.02 },
+  ],
+  doorThunk: [
+    { type: 'sine', from: 140, to: 70, dur: 0.16, gain: 0.16 },
+    { type: 'noise', from: 600, dur: 0.07, gain: 0.08 },
+  ],
   move: [{ type: 'square', from: 520, to: 640, dur: 0.05, gain: 0.1 }],
   select: [
     { type: 'square', from: note(0), dur: 0.07, gain: 0.11 },

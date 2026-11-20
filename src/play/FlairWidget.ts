@@ -1,60 +1,61 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, Tex } from '../core/config';
-import { addBox, addText } from '../core/ui';
+import { COLORS, Tex } from '../core/config';
+import { addBox } from '../core/ui';
 import { CAST } from '../story/cast';
 import type { FruitId } from '../story/types';
+import { HUD } from './fighterCard';
+import { chipIconTexture } from './hudIcons';
 import { Depth } from './layout';
 
-const X = 12;
-/** Under the fighter card's HP bar, the first card of the effects rack. */
-const Y = 126;
-const W = 252;
-const H = 64;
-const PORTRAIT = 48;
-const TRACK_X = X + 72;
-const TRACK_Y = Y + 44;
-const TRACK_W = W - 86;
+const X = HUD.left;
+const Y = HUD.rowY;
+const W = HUD.flairW;
+const H = HUD.flairH;
+const FACE = 42;
+const TRACK_X = X + FACE + 18;
+const TRACK_Y = Y + H / 2;
+const TRACK_W = W - (TRACK_X - X) - 12;
 const TRACK_H = 14;
 
+export interface FlairWidgetOptions {
+  /** Coconut's hard shell: Flair charges slower, shown as a shell on the meter. */
+  hardShell?: boolean;
+}
+
 /**
- * The Flair meter in the top corner: the backup's face, their ability, and a
- * bar that fills with your hits. Full, it pulses and asks for Space (or a tap
- * on it). While the ability runs, the bar drains with the beats left.
+ * The Flair meter, first in the HUD's effect row: the backup's face and a bar
+ * that fills with your hits. Full, it glows and pulses (Space or a tap fires
+ * it). While the ability runs the meter rests; the ability's own chip shows
+ * the time left.
  */
 export class FlairWidget {
   private readonly scene: Phaser.Scene;
-  private readonly box: Phaser.GameObjects.NineSlice;
   private readonly glow: Phaser.GameObjects.NineSlice;
   private readonly face: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
-  private readonly label: Phaser.GameObjects.Text;
-  private readonly prompt: Phaser.GameObjects.Text;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly layer: Phaser.GameObjects.Container;
-  private readonly abilityName: string;
   private readonly color: number;
   private shownLevel = 0;
   private pulse = 0;
 
-  constructor(scene: Phaser.Scene, owner: FruitId, abilityName: string, touch: boolean, onFire: () => void) {
+  constructor(scene: Phaser.Scene, owner: FruitId, onFire: () => void, options: FlairWidgetOptions = {}) {
     this.scene = scene;
-    this.abilityName = abilityName;
     const character = CAST[owner];
     this.color = character.color;
-    this.box = addBox(scene, X, Y, W, H, 'panel');
+    const box = addBox(scene, X, Y, W, H, 'panel').setAlpha(0.92);
     this.glow = addBox(scene, X, Y, W, H, 'panel_focus').setAlpha(0);
     const sheet = scene.textures.exists(Tex.portraits) ? scene.textures.get(Tex.portraits) : null;
-    const faceX = X + 14 + PORTRAIT / 2;
-    const faceY = Y + H / 2;
-    this.face = sheet?.has(String(character.portrait + 1))
-      ? scene.add.image(faceX, faceY, Tex.portraits, character.portrait + 1).setScale(PORTRAIT / 64)
-      : scene.add.rectangle(faceX, faceY, PORTRAIT, PORTRAIT, character.color);
-    this.label = addText(scene, TRACK_X, Y + 20, abilityName, 24, { origin: [0, 0.5], color: CSS.cream });
-    this.prompt = addText(scene, X + W - 12, Y + 20, touch ? 'Tap!' : 'Space!', 24, { origin: [1, 0.5], color: CSS.yellow }).setVisible(false);
+    const faceX = X + 10 + FACE / 2;
+    this.face = sheet?.has(String(character.portrait))
+      ? scene.add.image(faceX, TRACK_Y, Tex.portraits, character.portrait).setDisplaySize(FACE, FACE)
+      : scene.add.rectangle(faceX, TRACK_Y, FACE, FACE, character.color);
     const track = scene.add.rectangle(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, COLORS.ink).setOrigin(0, 0.5).setStrokeStyle(3, COLORS.night);
-    this.fill = scene.add.rectangle(TRACK_X, TRACK_Y, 0, TRACK_H - 4, character.color).setOrigin(0, 0.5);
-    this.layer = scene.add.container(0, 0, [this.box, this.glow, this.face, this.label, this.prompt, track, this.fill]).setDepth(Depth.hud);
-    this.box.setInteractive({ useHandCursor: true });
-    this.box.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+    this.fill = scene.add.rectangle(TRACK_X + 2, TRACK_Y, 0, TRACK_H - 4, character.color).setOrigin(0, 0.5);
+    const parts: Phaser.GameObjects.GameObject[] = [box, this.glow, this.face, track, this.fill];
+    if (options.hardShell) parts.push(scene.add.image(TRACK_X + TRACK_W - 2, TRACK_Y - 12, chipIconTexture(scene, 'shell', 0x8a5a34)).setScale(2));
+    this.layer = scene.add.container(0, 0, parts).setDepth(Depth.hud);
+    box.setInteractive({ useHandCursor: true });
+    box.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
       onFire();
     });
@@ -75,37 +76,32 @@ export class FlairWidget {
   }
 
   /** `level` 0..1 while charging; `active` is the share of the ability left (null when not running). */
-  update(level: number, full: boolean, active: number | null, beatsLeft: number, dt: number): void {
+  update(level: number, full: boolean, active: number | null, _beatsLeft: number, dt: number): void {
     if (active !== null) {
-      this.shownLevel = active;
-      this.label.setText(`${this.abilityName} ${Math.max(1, Math.ceil(beatsLeft))}`).setColor(CSS.yellow);
-      this.prompt.setVisible(false);
-      this.glow.setAlpha(0.6);
-      this.fill.setFillStyle(COLORS.yellow);
+      this.shownLevel = 0;
+      this.glow.setAlpha(0);
+      this.face.setAlpha(0.5);
     } else {
+      this.face.setAlpha(1);
       this.shownLevel += (level - this.shownLevel) * Math.min(1, dt * 10);
-      this.label.setText(this.abilityName).setColor(CSS.cream);
       this.fill.setFillStyle(full ? COLORS.yellow : this.color);
-      this.prompt.setVisible(full);
       if (full) {
         this.pulse += dt;
-        const wave = 0.5 + 0.5 * Math.sin(this.pulse * 9);
-        this.glow.setAlpha(0.4 + 0.6 * wave);
-        this.prompt.setScale(1 + 0.12 * wave);
+        this.glow.setAlpha(0.4 + 0.6 * (0.5 + 0.5 * Math.sin(this.pulse * 9)));
       } else {
         this.pulse = 0;
         this.glow.setAlpha(0);
       }
     }
     this.fill.width = (TRACK_W - 4) * Phaser.Math.Clamp(this.shownLevel, 0, 1);
-    this.fill.x = TRACK_X + 2;
   }
 
   /** A bounce when the ability fires. */
   pop(): void {
     this.scene.tweens.killTweensOf(this.face);
-    const scale = this.face.scale;
-    this.face.setScale(scale * 1.35);
-    this.scene.tweens.add({ targets: this.face, scale, duration: 260, ease: 'Back.easeOut' });
+    const sx = this.face.scaleX;
+    const sy = this.face.scaleY;
+    this.face.setScale(sx * 1.35, sy * 1.35);
+    this.scene.tweens.add({ targets: this.face, scaleX: sx, scaleY: sy, duration: 260, ease: 'Back.easeOut' });
   }
 }

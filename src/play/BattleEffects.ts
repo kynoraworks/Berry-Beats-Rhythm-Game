@@ -129,7 +129,7 @@ export class BattleEffects {
   private makeWidget(): FlairWidget | null {
     const { ability, abilityOwner } = this.rules;
     if (!ability || !abilityOwner) return null;
-    return new FlairWidget(this.scene, abilityOwner, ABILITIES[ability].name, this.setup.touch, () => this.fire(this.time));
+    return new FlairWidget(this.scene, abilityOwner, () => this.fire(this.time), { hardShell: this.rules.gimmick === 'hardShell' });
   }
 
   /** The meter can be fired right now. */
@@ -215,7 +215,7 @@ export class BattleEffects {
     const left = Math.max(0, this.activeUntil - time);
     return {
       id,
-      name: ABILITIES[id].name,
+      owner: this.rules.abilityOwner,
       beats: Math.max(1, Math.ceil(left / this.beat - 1e-6)),
       left: Math.min(1, left / this.abilityLength),
       eurekaLeft: this.eurekaLeft,

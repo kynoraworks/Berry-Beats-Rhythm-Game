@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { MenuTex, loadMenuArt } from '../menu/art';
+import { loadDoorArt } from '../explore/doors';
 import { parseChart } from '../core/chart';
 import { optionalImages, optionalSheets } from '../core/assets';
 import { LEVELS, loadLevelChart } from '../core/levels';
@@ -62,6 +63,7 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image(Tex.arrowDown, `${IMG}arrow_ui_down.png`);
     this.load.image(Tex.logo, `${IMG}logo.png`);
     loadMenuArt(this.load);
+    loadDoorArt(this.load);
     this.load.image(Tex.titleBg, `${IMG}title_bg.jpg`);
     // Art that is drawn bit by bit: only what is listed as present is requested.
     for (const optional of optionalSheets()) sheet(optional.key, optional.file, optional.frameWidth, optional.frameHeight);

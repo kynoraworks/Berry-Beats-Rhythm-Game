@@ -62,21 +62,22 @@ def build(group: str) -> None:
     _, sheet = ps.pixelize(str(path), 4, 2, palette(raw), size)
     big = np.array(sheet)
     out = Image.new("RGBA", (4 * CELL, 2 * CELL), (0, 0, 0, 0))
-    for r in range(2):
-        for c in range(4):
+    for c in range(4):
+        # Both frames of a column move by the same offset, taken from the first frame
+        # (feet on FEET, centred), so a jump or a lean keeps its place relative to the stand.
+        first = big[0:64, c * 64:(c + 1) * 64, 3] > 0
+        ys, xs = np.nonzero(first)
+        if not len(ys):
+            continue
+        dy = FEET - int(ys.max())
+        dx = CELL // 2 - int(round((xs.min() + xs.max() + 1) / 2))
+        for r in range(2):
             cell = big[r * 64:(r + 1) * 64, c * 64:(c + 1) * 64].copy()
-            alpha = cell[..., 3] > 0
-            if not alpha.any():
-                continue
-            ys, xs = np.nonzero(alpha)
-            sprite = cell[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
-            rgb = sprite[..., :3].astype(np.float64)
-            sprite[..., :3] = np.round(rgb * (1 - DIM) + INK * DIM).astype(np.uint8)
-            img = Image.fromarray(sprite)
-            # Keep each frame where the model put it relative to the column's first frame.
-            x = (CELL - img.width) // 2
-            y = FEET + 1 - img.height
-            out.alpha_composite(img, (c * CELL + max(0, x), r * CELL + max(0, y)))
+            rgb = cell[..., :3].astype(np.float64)
+            cell[..., :3] = np.round(rgb * (1 - DIM) + INK * DIM).astype(np.uint8)
+            frame = Image.new("RGBA", (CELL, CELL), (0, 0, 0, 0))
+            frame.alpha_composite(Image.fromarray(cell), (dx, dy)) if dx >= 0 and dy >= 0 else frame.paste(Image.fromarray(cell).crop((max(0, -dx), max(0, -dy), 64, 64)), (max(0, dx), max(0, dy)))
+            out.alpha_composite(frame, (c * CELL, r * CELL))
     out.save(OUT / f"ambient_{group}.png", optimize=True)
     print(f"wrote ambient_{group}.png (art pixel {size:.1f})")
 
