@@ -35,7 +35,8 @@ const KEY_DY = 64;
 const SLOT_W = 112;
 const SLOT_H = 48;
 /** Keys the menus and the pause screen rely on. */
-const RESERVED = new Set(['Escape', 'Enter', 'NumpadEnter', 'Tab', 'Backspace', 'KeyP']);
+/** Keys the game needs for itself: menus, pause, and Space for the Flair meter. */
+const RESERVED = new Set(['Escape', 'Enter', 'NumpadEnter', 'Tab', 'Backspace', 'KeyP', 'Space']);
 
 const percent = (v: number) => `${Math.round(v * 100)}%`;
 const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
@@ -130,7 +131,7 @@ export class OptionsScene extends Phaser.Scene {
       scrollSpeed: step(s.scrollSpeed, d, 0.1, 0.5, 2.5),
     }));
     this.addToggle(RIGHT, rightY(1), 'No fail', 'Keep playing when the bar runs out.', 'noFail');
-    this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, bright bursts and background pulsing.', 'reduceMotion');
+    this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, bright bursts and pulsing. Flashes become dark smoke.', 'reduceMotion');
 
     const controlsY = rightY(2) + 56;
     if (isTouch()) {

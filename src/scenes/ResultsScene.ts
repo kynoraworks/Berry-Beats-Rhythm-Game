@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { accuracy, rankFor, type Judgement } from '../core/engine';
-import type { ResultsData } from '../core/flow';
+import type { FlairResults } from './PlayScene';
 import { levelForChart } from '../core/levels';
 import { music } from '../core/music';
 import { submitScore } from '../core/saves';
@@ -45,7 +45,7 @@ const BUTTON_Y = 686;
 const TIMING_Y = 610;
 
 export class ResultsScene extends Phaser.Scene {
-  private results!: ResultsData;
+  private results!: FlairResults;
   private choices: UiButton[] = [];
   private focus!: FocusGroup;
 
@@ -53,7 +53,7 @@ export class ResultsScene extends Phaser.Scene {
     super(SceneKeys.Results);
   }
 
-  init(data: ResultsData): void {
+  init(data: FlairResults): void {
     this.results = data;
     this.choices = [];
   }
@@ -61,7 +61,7 @@ export class ResultsScene extends Phaser.Scene {
   create(): void {
     fadeIn(this, 400);
     music.play('level_select', 800);
-    const { play, stats, failed, battle, meanErrorMs } = this.results;
+    const { play, stats, failed, battle, meanErrorMs, flairUsed, abilityName } = this.results;
     const percent = accuracy(stats);
     const rank = failed ? 'F' : rankFor(percent);
     const fullCombo = !failed && stats.counts.miss === 0 && stats.judged > 0;
@@ -120,6 +120,9 @@ export class ResultsScene extends Phaser.Scene {
     line(454, 'Max combo', String(stats.maxCombo), CSS.lilac);
     line(496, scored ? 'You' : 'Accuracy', `${percent.toFixed(1)}%`, scored ? CSS.blue : CSS.lilac);
     if (scored) line(538, scored.rivalName, `${scored.rivalAccuracy.toFixed(1)}%`, rivalCss);
+    if (flairUsed !== undefined && abilityName) {
+      addBody(this, LEFT, 576, `Flair: ${abilityName} fired ${flairUsed === 1 ? 'once' : `${flairUsed} times`}`, 22, { origin: [0, 0.5], color: CSS.yellow });
+    }
 
     // Right column: the rank lands like a stamp, then the score counts up.
     addText(this, RANK_X, 244, 'Rank', 32, { color: CSS.lilac });

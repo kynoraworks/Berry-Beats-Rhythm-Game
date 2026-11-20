@@ -26,7 +26,11 @@ export type SfxName =
   | 'count'
   | 'go'
   | 'place'
-  | 'remove';
+  | 'remove'
+  | 'flair'
+  | 'ability'
+  | 'warn'
+  | 'zap';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -98,6 +102,20 @@ const RECIPES: Record<SfxName, Layer[]> = {
   ],
   place: [{ type: 'triangle', from: 700, to: 900, dur: 0.04, gain: 0.16 }],
   remove: [{ type: 'triangle', from: 500, to: 300, dur: 0.05, gain: 0.16 }],
+  flair: [...arpeggio([7, 12, 19], 0.06, 0.18, 0.1, 'sine'), { type: 'noise', from: 8000, dur: 0.12, gain: 0.03, delay: 0.12 }],
+  ability: [
+    { type: 'sawtooth', from: 220, to: 880, dur: 0.28, gain: 0.08 },
+    ...arpeggio([12, 16, 19, 24], 0.05, 0.22, 0.11, 'square'),
+    { type: 'noise', from: 1500, to: 6000, dur: 0.35, gain: 0.05, attack: 0.05 },
+  ],
+  warn: [
+    { type: 'square', from: 990, dur: 0.06, gain: 0.08 },
+    { type: 'square', from: 990, dur: 0.06, gain: 0.08, delay: 0.12 },
+  ],
+  zap: [
+    { type: 'sawtooth', from: 1600, to: 180, dur: 0.22, gain: 0.09 },
+    { type: 'noise', from: 3000, to: 600, dur: 0.25, gain: 0.06 },
+  ],
 };
 
 let noiseBuffer: AudioBuffer | null = null;

@@ -8,6 +8,16 @@ const HOLD_WIDTH = 34;
 const HOLD_BORDER = 5;
 const MARGIN = 70;
 
+/** Ways a gimmick or ability bends how notes fall. Purely visual: lanes and timing never change. */
+export interface FieldEffects {
+  /** Lane each sliding note starts its fall in, by note id. */
+  slideFrom?: ReadonlyMap<number, Lane>;
+  /** Smooth 0..1 progress of a slide by how far the note has fallen (0 top, 1 receptor). */
+  slideProgress?: (fallen: number) => number;
+  /** Sideways shake in pixels for a note at song time `time`, or 0. */
+  jitter?: (noteId: number, time: number) => number;
+}
+
 /**
  * Draws one side of the play field: four receptors and the notes falling onto them.
  * It only reads note state; judging happens in the engine (player) or the rival autoplayer.
@@ -26,6 +36,7 @@ export class NoteField {
   private first = 0;
   private readonly dim: boolean;
   private readonly shade: Phaser.GameObjects.Rectangle;
+  private effects: FieldEffects = {};
 
   /** `dim` draws the field slightly faded, used for the rival's side. */
   constructor(scene: Phaser.Scene, lanes: number[], notes: PlayNote[], dim = false) {
@@ -75,6 +86,10 @@ export class NoteField {
         emitting: false,
       })
       .setDepth(Depth.effects);
+  }
+
+  setEffects(effects: FieldEffects): void {
+    this.effects = effects;
   }
 
   /** Fade the field back (it stays readable) or bring it forward again. */
@@ -134,9 +149,17 @@ export class NoteField {
         this.release(note.id);
         continue;
       }
-      const x = this.lanes[note.lane];
       const holding = note.state === 'holding';
       const headY = holding ? RECEPTOR_Y : RECEPTOR_Y - (note.t - time) * speed;
+      let x = this.lanes[note.lane];
+      if (note.state === 'pending') {
+        const from = this.effects.slideFrom?.get(note.id);
+        if (from !== undefined && this.effects.slideProgress) {
+          const fallen = Phaser.Math.Clamp(headY / RECEPTOR_Y, 0, 1);
+          x = Phaser.Math.Linear(this.lanes[from], x, this.effects.slideProgress(fallen));
+        }
+        if (this.effects.jitter) x += this.effects.jitter(note.id, time);
+      }
       const alpha = (note.state === 'missed' ? 0.35 : 1) * (this.dim ? 0.85 : 1);
 
       if (note.isHold) {

@@ -23,7 +23,8 @@ export class VersusCard {
   private readonly versus: Phaser.GameObjects.Text;
   private done = false;
 
-  constructor(scene: Phaser.Scene, rivalName: string, rivalTexture: string, look: RivalProfile) {
+  /** `backup` names the player's backup and how to fire their ability, shown under Berry. */
+  constructor(scene: Phaser.Scene, rivalName: string, rivalTexture: string, look: RivalProfile, backup = '') {
     const dim = scene.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.86).setOrigin(0);
     const side = (texture: string, frame: number, name: string, color: string, flip: boolean, trait = '') => {
       const sprite = scene.add.sprite(0, 0, texture, frame).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(SCALE).setFlipX(flip);
@@ -32,7 +33,7 @@ export class VersusCard {
       if (trait) parts.push(addBody(scene, 0, 92, trait, 26, { color: CSS.cream, stroke: true }));
       return scene.add.container(0, 560, parts);
     };
-    this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Berry', CSS.blue, false);
+    this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Berry', CSS.blue, false, backup);
     const pose = layoutOf(rivalTexture) === 'lite' ? poseFrames(rivalTexture).boast : look.versusFrame;
     this.right = side(rivalTexture, pose, rivalName, look.css, true, look.trait);
     this.versus = addText(scene, GAME_W / 2, 330, 'VS', 128, { color: CSS.yellow });

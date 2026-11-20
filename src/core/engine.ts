@@ -42,6 +42,8 @@ export interface JudgeEvent {
   delta: number;
   /** `tap`: a tap note. `holdStart`: the head of a hold. `holdEnd`: the hold was finished or dropped. */
   part: 'tap' | 'holdStart' | 'holdEnd';
+  /** A miss that a shield took: it cost no health and kept the combo. */
+  absorbed?: boolean;
 }
 
 export interface Stats {
@@ -58,11 +60,13 @@ export interface Stats {
   failed: boolean;
 }
 
-export function judgeDelta(delta: number): Judgement | null {
+export type Windows = { readonly [K in keyof typeof WINDOWS]: number };
+
+export function judgeDelta(delta: number, windows: Windows = WINDOWS): Judgement | null {
   const d = Math.abs(delta);
-  if (d <= WINDOWS.perfect) return 'perfect';
-  if (d <= WINDOWS.good) return 'good';
-  if (d <= WINDOWS.hit) return 'hit';
+  if (d <= windows.perfect) return 'perfect';
+  if (d <= windows.good) return 'good';
+  if (d <= windows.hit) return 'hit';
   return null;
 }
 
@@ -87,6 +91,25 @@ export interface EngineOptions {
   noFail?: boolean;
 }
 
+/**
+ * Rule changes from battle gimmicks and crew abilities. The defaults leave the
+ * engine exactly as the original rules.
+ */
+export interface EngineMods {
+  /** Timing windows used to judge presses and to decide when a note has been missed. */
+  windows: Windows;
+  /** Multiplies the health a miss costs. */
+  missDamage: number;
+  /** Misses still to be shrugged off: no health lost and the combo kept. A hold's two halves count once. */
+  shield: number;
+  /** Extra score factor for a judgement (on top of the combo multiplier), or null for none. */
+  scoreFactor: ((note: PlayNote, judgement: Judgement, part: JudgeEvent['part']) => number) | null;
+}
+
+export function defaultMods(): EngineMods {
+  return { windows: WINDOWS, missDamage: 1, shield: 0, scoreFactor: null };
+}
+
 export class Engine {
   readonly notes: PlayNote[];
   readonly stats: Stats;
@@ -96,6 +119,9 @@ export class Engine {
   private readonly holding: (PlayNote | null)[] = [null, null, null, null];
   private multiplierProgress = 0;
   private readonly noFail: boolean;
+  /** Gimmicks and abilities in play. Change the fields at any time. */
+  readonly mods: EngineMods = defaultMods();
+  private shieldedNote = -1;
 
   constructor(notes: TimedNote[], options: EngineOptions = {}) {
     this.noFail = options.noFail ?? false;
@@ -167,7 +193,7 @@ export class Engine {
     const note = this.byLane[lane][this.cursor[lane]];
     if (!note || note.state !== 'pending') return events;
     const delta = t - note.t;
-    const judgement = judgeDelta(delta);
+    const judgement = judgeDelta(delta, this.mods.windows);
     if (!judgement) return events; // too early: ignore the press
     this.cursor[lane]++;
     if (note.isHold) {
@@ -210,7 +236,7 @@ export class Engine {
     const list = this.byLane[lane];
     while (this.cursor[lane] < list.length) {
       const note = list[this.cursor[lane]];
-      if (t - note.t <= WINDOWS.hit) break;
+      if (t - note.t <= this.mods.windows.hit) break;
       this.cursor[lane]++;
       note.state = 'missed';
       events.push(this.apply(note, 'miss', 0, note.isHold ? 'holdStart' : 'tap'));
@@ -222,6 +248,13 @@ export class Engine {
     const s = this.stats;
     s.judged++;
     s.counts[judgement]++;
+    if (judgement === 'miss' && (this.mods.shield > 0 || note.id === this.shieldedNote)) {
+      if (note.id !== this.shieldedNote) {
+        this.mods.shield--;
+        this.shieldedNote = note.id;
+      }
+      return { note, judgement, delta, part, absorbed: true };
+    }
     if (judgement === 'miss') {
       s.combo = 0;
       s.multiplier = 1;
@@ -229,14 +262,15 @@ export class Engine {
     } else {
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
-      s.score += SCORE[judgement] * s.multiplier;
+      const factor = this.mods.scoreFactor?.(note, judgement, part) ?? 1;
+      s.score += SCORE[judgement] * s.multiplier * factor;
       const step = MULTIPLIER_STEPS[s.multiplier - 1];
       if (step !== undefined && ++this.multiplierProgress >= step) {
         s.multiplier++;
         this.multiplierProgress = 0;
       }
     }
-    this.adjustHealth(HEALTH_CHANGE[judgement]);
+    this.adjustHealth(HEALTH_CHANGE[judgement] * (judgement === 'miss' ? this.mods.missDamage : 1));
     return { note, judgement, delta, part };
   }
 }

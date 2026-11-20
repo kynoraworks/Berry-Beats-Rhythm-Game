@@ -34,9 +34,14 @@ import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
+import { BattleEffects } from '../play/BattleEffects';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
+import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
+import { cycleBackup, getBackup, listAvailable } from '../story/crew';
+import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
+import { stopForChart } from '../story/stops';
 import { segmentAt } from '../story/flow';
 import { stageTexture } from '../story/placeholders';
 import { markCleared } from '../story/progress';
@@ -44,6 +49,15 @@ import { nextRef, playSegment } from '../story/run';
 import type { Line } from '../story/types';
 
 type State = 'loading' | 'playing' | 'paused' | 'resuming' | 'ended';
+
+/**
+ * Play data with battle rules set by the caller (the crew battle sets each
+ * round's gimmick and ability). Without them a story stop's own apply.
+ */
+export type RuledPlayData = PlayData & { rules?: BattleRules };
+
+/** What the results screen gets on top of the usual: how often the Flair was fired. */
+export type FlairResults = ResultsData & { flairUsed?: number; abilityName?: string };
 
 /** Silent lead-in before the song starts, with a 3-2-1 countdown. */
 const LEAD_IN = 2.4;
@@ -76,7 +90,11 @@ const LISTENER_TINT = 0x7a7896;
 const IDLE_BPM = 77;
 
 export class PlayScene extends Phaser.Scene {
-  private playData!: PlayData;
+  private playData!: RuledPlayData;
+  private rules: BattleRules = NO_RULES;
+  private effects: BattleEffects | null = null;
+  private backupLabel: Phaser.GameObjects.Text | null = null;
+  private backupButton: UiButton | null = null;
   private chart!: Chart;
   private state: State = 'loading';
   private conductor: Conductor | null = null;
@@ -127,8 +145,12 @@ export class PlayScene extends Phaser.Scene {
     super(SceneKeys.Play);
   }
 
-  init(data: PlayData): void {
+  init(data: RuledPlayData): void {
     this.playData = data;
+    this.rules = NO_RULES;
+    this.effects = null;
+    this.backupLabel = null;
+    this.backupButton = null;
     this.chart = data.chart;
     this.state = 'loading';
     this.conductor = null;
@@ -186,11 +208,13 @@ export class PlayScene extends Phaser.Scene {
     const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson';
 
     this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail });
+    this.rules = isBattle ? this.resolveRules() : NO_RULES;
+    let rivalPlan: ReturnType<typeof planRival> = [];
     if (hasRival) {
       this.rivalEngine = new Engine(toTimedNotes(chart, rivalChart), { noFail: true });
       const notes = this.rivalEngine.notes;
-      const plan = planRival(notes.length, chart.difficulty, chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
-      this.rivalDriver = new PlannedPlayer(this.rivalEngine, plan);
+      rivalPlan = planRival(notes.length, chart.difficulty, chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
+      this.rivalDriver = new PlannedPlayer(this.rivalEngine, rivalPlan);
       this.turns = buildTurns(chart, chart.notes, rivalChart);
     }
     if (isBattle) {
@@ -220,6 +244,33 @@ export class PlayScene extends Phaser.Scene {
     } else {
       this.hud.setSolo();
       this.stage.setTurn('player');
+    }
+
+    if (this.rules.gimmick || this.rules.ability) {
+      const hud = this.hud;
+      this.effects = new BattleEffects(this, {
+        chart,
+        rules: this.rules,
+        engine: this.engine,
+        field: this.playerField,
+        battle: this.battle,
+        rivalNotes: this.rivalEngine?.notes ?? [],
+        rivalPlan,
+        rivalName: this.rivalName,
+        rivalColor: this.rivalLook.color,
+        rivalCss: this.rivalLook.css,
+        calm: settings.reduceMotion,
+        touch: isTouch(),
+        hooks: {
+          callout: (text, color) => hud.callout(text, color),
+          sfx: (name) => playSfx(this.game, name),
+          flash: (color, alpha) => this.stage.flash(color, alpha),
+          cheer: () => {
+            this.stage.cheer();
+            this.player.special();
+          },
+        },
+      });
     }
 
     const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
@@ -264,6 +315,19 @@ export class PlayScene extends Phaser.Scene {
       },
       (error: unknown) => this.showLoadError(error instanceof Error ? error.message : 'Could not load the song'),
     );
+  }
+
+  /**
+   * The battle's rules: given by the caller (the crew battle), or a story
+   * stop's own gimmick with the chosen backup's ability. Custom maps and test
+   * plays get none.
+   */
+  private resolveRules(): BattleRules {
+    if (this.playData.rules) return this.playData.rules;
+    if (this.playData.practice) return NO_RULES;
+    const stop = this.story?.stop ?? stopForChart(this.chart.id);
+    if (!stop) return NO_RULES;
+    return battleRules(stop.gimmick, getBackup());
   }
 
   // ---------------------------------------------------------------------
@@ -313,7 +377,11 @@ export class PlayScene extends Phaser.Scene {
     this.countText.setText(startAt > 0 ? 'Ready' : '');
     if (this.introTime > 0) {
       const texture = rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
-      this.versus = new VersusCard(this, this.rivalName, texture, this.rivalLook);
+      const gimmick = this.rules.gimmick;
+      const look = gimmick ? { ...this.rivalLook, trait: GIMMICK_TRAITS[gimmick] } : this.rivalLook;
+      const ability = this.rules.ability ? ABILITIES[this.rules.ability] : null;
+      const backup = ability && this.rules.abilityOwner ? `${CAST[this.rules.abilityOwner].name}: ${ability.name}\n${isTouch() ? 'Tap the meter' : 'Space'} when Flair is full` : '';
+      this.versus = new VersusCard(this, this.rivalName, texture, look, backup);
       playSfx(this.game, 'banner');
     }
     this.showSongCredit();
@@ -495,7 +563,12 @@ export class PlayScene extends Phaser.Scene {
         won: result.won && !failed,
       };
     }
-    const results: ResultsData = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
+    this.effects?.finish();
+    const results: FlairResults = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
+    if (this.effects && this.rules.ability) {
+      results.flairUsed = this.effects.flairUsed;
+      results.abilityName = ABILITIES[this.rules.ability].name;
+    }
     if (this.errorCount >= MIN_ERROR_SAMPLES) results.meanErrorMs = (this.errorSum / this.errorCount) * 1000;
 
     const playerOnTop = !failed && (summary?.won ?? true);
@@ -621,12 +694,14 @@ export class PlayScene extends Phaser.Scene {
       // Touch and mouse: the whole window is split into four columns, one per lane.
       this.touchLanes = new TouchLanes(
         { down: (lane, timeMs) => this.laneDown(lane, timeMs), up: (lane, timeMs) => this.laneUp(lane, timeMs) },
-        (event) => this.state !== 'playing' || this.isOverPauseButton(event),
+        (event) => this.state !== 'playing' || this.isOverPauseButton(event) || this.isOverFlair(event),
       );
     }
     this.stopRotateWatch = onRotateNoticeChange((shown) => shown && this.pauseGame());
 
     menuKeys(this, {
+      left: () => this.state === 'paused' && this.backupButton !== null && this.pauseFocus.index === 1 && this.swapBackup(-1),
+      right: () => this.state === 'paused' && this.backupButton !== null && this.pauseFocus.index === 1 && this.swapBackup(1),
       up: () => this.state === 'paused' && this.pauseFocus.move(-1),
       down: () => this.state === 'paused' && this.pauseFocus.move(1),
       confirm: () => this.state === 'paused' && this.pauseFocus.activate(),
@@ -641,14 +716,30 @@ export class PlayScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-P', () => {
       if (this.state === 'playing') this.pauseGame();
     });
+    // Space fires the backup's ability, unless the player has given Space to a lane.
+    const spaceIsLane = getSettings().keys.some((codes) => codes.includes('Space'));
+    this.input.keyboard?.on('keydown-SPACE', () => {
+      if (this.state === 'playing' && !spaceIsLane && !this.playData.autoplay) this.effects?.fire(this.heardTime());
+    });
+  }
+
+  /** A browser pointer event's position on the canvas, in game pixels. */
+  private canvasPoint(event: PointerEvent): { x: number; y: number } {
+    const canvas = this.game.canvas.getBoundingClientRect();
+    return { x: ((event.clientX - canvas.left) / canvas.width) * GAME_W, y: ((event.clientY - canvas.top) / canvas.height) * this.scale.height };
   }
 
   /** True if a browser pointer event landed on the pause button, which handles its own taps. */
   private isOverPauseButton(event: PointerEvent): boolean {
-    const canvas = this.game.canvas.getBoundingClientRect();
-    const x = ((event.clientX - canvas.left) / canvas.width) * GAME_W;
-    const y = ((event.clientY - canvas.top) / canvas.height) * this.scale.height;
+    const { x, y } = this.canvasPoint(event);
     return this.pauseButton.getBounds().contains(x, y);
+  }
+
+  /** True if a pointer event landed on the Flair meter, which fires the ability itself. */
+  private isOverFlair(event: PointerEvent): boolean {
+    if (!this.effects) return false;
+    const { x, y } = this.canvasPoint(event);
+    return this.effects.isOverWidget(x, y);
   }
 
   private laneDown(lane: Lane, timeMs: number): void {
@@ -670,9 +761,17 @@ export class PlayScene extends Phaser.Scene {
       const { judgement, note, part } = event;
       this.battle?.record('player', note.t, judgement);
       this.flawless?.record(note.t, judgement);
+      this.effects?.record(event);
       if (judgement === 'miss') {
         // A missed hold reports its head and tail together: show it once.
         if (part === 'holdEnd' && note.state === 'missed') continue;
+        if (event.absorbed) {
+          // Rind took it: no stumble, the combo lives on.
+          this.hud.callout('Rind!', CSS.perfect);
+          this.playerField.hitFx(note.lane, 0.3);
+          playSfx(this.game, 'remove');
+          continue;
+        }
         this.hud.showJudgement('miss', 0);
         this.player.stumble();
         playSfx(this.game, 'miss');
@@ -807,6 +906,7 @@ export class PlayScene extends Phaser.Scene {
 
     if (this.state === 'playing') {
       this.updateCountdown(conductor.time);
+      this.effects?.update(time, dt);
       if (this.playData.autoplay) this.autoplay(time);
       this.handleEvents(this.engine.update(time));
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
@@ -855,8 +955,9 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  /** Plays every note perfectly. Used for demos and automated tests. */
+  /** Plays every note perfectly (and fires the Flair when full). Used for demos and automated tests. */
   private autoplay(time: number): void {
+    if (this.effects?.ready && this.effects.goodMoment(time)) this.effects.fire(time);
     for (const lane of [0, 1, 2, 3] as Lane[]) {
       const held = this.autoHeld[lane];
       if (held && held.state !== 'holding') {
@@ -882,18 +983,54 @@ export class PlayScene extends Phaser.Scene {
     const dim = addDim(this, 0.7);
     // Block clicks from reaching the lanes while paused.
     dim.setInteractive();
-    const panel = addBox(this, GAME_W / 2 - 240, 180, 480, 440, 'panel');
-    const title = addText(this, GAME_W / 2, 248, 'Paused', 64, { color: CSS.lilac });
+    // A story battle's backup can be swapped here, when there is more than one to choose from.
+    const canSwap = !this.playData.rules && this.rules.ability !== null && listAvailable().length > 1;
+    const extra = canSwap ? 170 : 0;
+    const top = 180 - extra / 2;
+    const panelW = canSwap ? 600 : 480;
+    const panel = addBox(this, GAME_W / 2 - panelW / 2, top, panelW, 440 + extra, 'panel');
+    const title = addText(this, GAME_W / 2, top + 68, 'Paused', 64, { color: CSS.lilac });
     const entries: [string, () => void, 'select' | 'back'][] = [
       ['Resume', () => this.resumeGame(), 'select'],
       ['Restart', () => this.restart(), 'select'],
       ['Exit', () => this.quit(), 'back'],
     ];
-    const buttons = entries.map(([label, action, sfx], i) => addUiButton(this, GAME_W / 2, 350 + i * 84, label, action, { width: 320, sfx }));
+    if (canSwap) entries.splice(1, 0, [this.backupText(), () => this.swapBackup(1), 'select']);
+    const buttons = entries.map(([label, action, sfx], i) => addUiButton(this, GAME_W / 2, top + 170 + i * 84, label, action, { width: 400, sfx }));
+    const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, ...buttons.map((button) => button.container)];
+    if (canSwap) {
+      this.backupButton = buttons[1];
+      const hint = isTouch() ? 'Tap to change backup' : 'Left / Right: change backup';
+      this.backupLabel = addBody(this, GAME_W / 2, top + 170 + 84 * 3 + 64, '', 22, { color: CSS.grey, wrapWidth: panelW - 64 }).setOrigin(0.5, 0);
+      this.backupLabel.setText(`${this.backupBlurb()}\n${hint}`);
+      parts.push(this.backupLabel);
+    }
     this.pauseFocus = new FocusGroup(this, buttons);
     this.pauseLayer = this.add
-      .container(0, 0, [dim, panel, title, ...buttons.map((button) => button.container)])
+      .container(0, 0, parts)
       .setDepth(Depth.overlay + 10)
       .setVisible(false);
+  }
+
+  private backupText(): string {
+    const backup = this.rules.abilityOwner;
+    return `Backup: ${backup ? CAST[backup].name : 'None'}`;
+  }
+
+  private backupBlurb(): string {
+    const ability = this.rules.ability ? ABILITIES[this.rules.ability] : null;
+    return ability ? `${ability.name}: ${ability.blurb}` : '';
+  }
+
+  /** Change the backup from the pause menu. The choice is remembered for later stops. */
+  private swapBackup(step: 1 | -1): void {
+    const next = cycleBackup(step);
+    if (!next) return;
+    const rules = battleRules(this.rules.gimmick, next);
+    this.rules = rules;
+    this.effects?.changeBackup(rules);
+    this.backupButton?.setLabel(this.backupText());
+    const hint = isTouch() ? 'Tap to change backup' : 'Left / Right: change backup';
+    this.backupLabel?.setText(`${this.backupBlurb()}\n${hint}`);
   }
 }
