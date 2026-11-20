@@ -198,6 +198,9 @@ export class Hud {
   private verdictAge = Infinity;
   private pulse = 0;
   private solo = false;
+  /** The HP bar's left edge and width (it makes room for Pineapple's x2 mark). */
+  private readonly hpX: number;
+  private readonly hpW: number;
 
   constructor(scene: Phaser.Scene, options: HudOptions) {
     this.scene = scene;
@@ -253,14 +256,16 @@ export class Hud {
     for (const star of this.rivalStars) this.rivalParts.push(star.icon, ...(star.badge ? [star.badge] : []));
 
     // Health: under the player's face. Same rules as always; only the look is new.
+    const doubleMiss = options.gimmick === 'doubleMiss';
+    this.hpX = doubleMiss ? HP_X + 34 : HP_X;
+    this.hpW = HP_W - (this.hpX - HP_X);
     this.hpLabel = addText(scene, P_FACE_X, HP_Y + HP_H / 2, 'HP', 24, { origin: [0, 0.5], color: CSS.cream }).setDepth(Depth.hud);
-    this.hpFrame = hud(scene.add.rectangle(HP_X, HP_Y, HP_W, HP_H, COLORS.ink).setOrigin(0).setStrokeStyle(3, options.gimmick === 'doubleMiss' ? COLORS.miss : COLORS.night));
-    this.hpFill = hud(scene.add.rectangle(HP_X + 2, HP_Y + 2, 0, HP_H - 4, HP_GOOD).setOrigin(0));
-    if (options.gimmick === 'doubleMiss') {
-      // Pineapple: every miss costs double, so the bar wears a warning.
-      addBody(scene, HP_X - 6, HP_Y + HP_H / 2, 'x2', 20, { origin: [1, 0.5], color: CSS.miss, bold: true }).setDepth(Depth.hud);
-      this.hpLabel.setX(P_FACE_X - 2).setText('HP');
-      for (let i = 1; i < 6; i++) hud(scene.add.rectangle(HP_X + (HP_W * i) / 6, HP_Y - 3, 3, HP_H + 6, COLORS.miss, 0.9).setOrigin(0.5, 0));
+    this.hpFrame = hud(scene.add.rectangle(this.hpX, HP_Y, this.hpW, HP_H, COLORS.ink).setOrigin(0).setStrokeStyle(3, doubleMiss ? COLORS.miss : COLORS.night));
+    this.hpFill = hud(scene.add.rectangle(this.hpX + 2, HP_Y + 2, 0, HP_H - 4, HP_GOOD).setOrigin(0));
+    if (doubleMiss) {
+      // Pineapple: every miss costs double, so the bar wears a warning: a red edge, ticks and "x2".
+      addBody(scene, this.hpX - 6, HP_Y + HP_H / 2, 'x2', 22, { origin: [1, 0.5], color: CSS.miss, bold: true }).setDepth(Depth.hud);
+      for (let i = 1; i < 6; i++) hud(scene.add.rectangle(this.hpX + (this.hpW * i) / 6, HP_Y - 3, 3, HP_H + 6, COLORS.miss, 0.9).setOrigin(0.5, 0));
     }
 
     this.scoreText = addText(scene, GAME_W / 2, SCORE_Y, '0', 36).setDepth(Depth.hud);
@@ -644,7 +649,7 @@ export class Hud {
 
   private drawHealth(health: number): void {
     const value = Phaser.Math.Clamp(health, 0, 1);
-    this.hpFill.width = (HP_W - 4) * value;
+    this.hpFill.width = (this.hpW - 4) * value;
     const low = value <= LOW_HEALTH;
     const color = low ? HP_LOW : value <= 0.5 ? HP_MID : HP_GOOD;
     this.hpFill.setFillStyle(color);
