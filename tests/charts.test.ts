@@ -8,33 +8,47 @@ import { describe, expect, it } from 'vitest';
 
 const DIR = 'public/charts';
 
-/** Each song's length in seconds (ffprobe) and the time of its first beat (tools/analyze_audio.py). */
-const SONGS: Record<string, { duration: number; offset: number }> = {
-  level1: { duration: 94.85, offset: 0.024 },
-  level_select: { duration: 49.9, offset: 0 },
-  menu: { duration: 76.43, offset: 0.024 },
-  pause: { duration: 87.31, offset: 0 },
-  title: { duration: 74.87, offset: 0.024 },
-  tutorial: { duration: 77.98, offset: 0.024 },
+/** Each song's length in seconds (decoded), tempo and the time of its first beat (tools/analyze_audio.py). */
+const SONGS: Record<string, { duration: number; bpm: number; offset: number }> = {
+  // Nicole Yazmin's soundtrack: the tutorial and the Beat Maps soundtrack charts.
+  level1: { duration: 94.85, bpm: 77, offset: 0.024 },
+  level_select: { duration: 49.87, bpm: 77, offset: 0 },
+  menu: { duration: 76.43, bpm: 77, offset: 0.024 },
+  pause: { duration: 87.27, bpm: 77, offset: 0 },
+  title: { duration: 74.87, bpm: 77, offset: 0.024 },
+  tutorial: { duration: 77.98, bpm: 77, offset: 0.024 },
+  // The stop songs.
+  berry_town: { duration: 120.03, bpm: 100, offset: 0.025 },
+  peel_street: { duration: 100.05, bpm: 108, offset: 0.025 },
+  graffiti_corner: { duration: 100.05, bpm: 108, offset: 0.025 },
+  vine_crossing: { duration: 100.0, bpm: 104, offset: 0.025 },
+  citrus_labs: { duration: 100.05, bpm: 132, offset: 0.025 },
+  lantern_market: { duration: 145.11, bpm: 96, offset: 0.034 },
+  the_club: { duration: 100.0, bpm: 126, offset: 0.025 },
+  rooftop: { duration: 100.0, bpm: 104, offset: 0.037 },
+  the_tunnel: { duration: 100.0, bpm: 140, offset: 0.025 },
+  orange_plaza: { duration: 100.0, bpm: 128, offset: 0.025 },
+  pineapple_hall: { duration: 100.05, bpm: 134, offset: 0.032 },
+  grand_stage: { duration: 100.05, bpm: 117, offset: 0.039 },
 };
 
-const BPM = 77;
-const BAR_SECONDS = (4 * 60) / BPM;
+/** Nicole Yazmin's six songs, each with exactly one Beat Maps chart. */
+const SOUNDTRACK = ['tutorial', 'level1', 'title', 'menu', 'level_select', 'pause'];
 
 /** The twelve story stops: docs/STORY_BIBLE.md, and the plans in tools/analyze_audio.py. */
 const STOPS: { id: string; rival: string; song: string; difficulty: number }[] = [
-  { id: 'stop01', rival: 'raspberry', song: 'level1', difficulty: 2 },
-  { id: 'stop02', rival: 'banana', song: 'tutorial', difficulty: 1 },
-  { id: 'stop03', rival: 'pear', song: 'level_select', difficulty: 2 },
-  { id: 'stop04', rival: 'grape', song: 'menu', difficulty: 3 },
-  { id: 'stop05', rival: 'lemon', song: 'pause', difficulty: 3 },
-  { id: 'stop06', rival: 'plum', song: 'title', difficulty: 3 },
-  { id: 'stop07', rival: 'dragonfruit', song: 'level1', difficulty: 4 },
-  { id: 'stop08', rival: 'watermelon', song: 'tutorial', difficulty: 3 },
-  { id: 'stop09', rival: 'coconut', song: 'title', difficulty: 4 },
-  { id: 'stop10', rival: 'orange', song: 'level_select', difficulty: 4 },
-  { id: 'stop11', rival: 'pineapple', song: 'pause', difficulty: 5 },
-  { id: 'stop12', rival: 'blueberry', song: 'menu', difficulty: 5 },
+  { id: 'stop01', rival: 'raspberry', song: 'berry_town', difficulty: 2 },
+  { id: 'stop02', rival: 'banana', song: 'peel_street', difficulty: 1 },
+  { id: 'stop03', rival: 'pear', song: 'graffiti_corner', difficulty: 2 },
+  { id: 'stop04', rival: 'grape', song: 'vine_crossing', difficulty: 3 },
+  { id: 'stop05', rival: 'lemon', song: 'citrus_labs', difficulty: 3 },
+  { id: 'stop06', rival: 'plum', song: 'lantern_market', difficulty: 3 },
+  { id: 'stop07', rival: 'dragonfruit', song: 'the_club', difficulty: 4 },
+  { id: 'stop08', rival: 'watermelon', song: 'rooftop', difficulty: 3 },
+  { id: 'stop09', rival: 'coconut', song: 'the_tunnel', difficulty: 4 },
+  { id: 'stop10', rival: 'orange', song: 'orange_plaza', difficulty: 4 },
+  { id: 'stop11', rival: 'pineapple', song: 'pineapple_hall', difficulty: 5 },
+  { id: 'stop12', rival: 'blueberry', song: 'grand_stage', difficulty: 5 },
 ];
 
 interface Note {
@@ -100,7 +114,7 @@ function effort(chart: ChartFile): number {
     active.add(Math.floor(n.b / 4));
     if (n.d) active.add(Math.floor((n.b + n.d - 1e-6) / 4));
   }
-  const time = active.size * BAR_SECONDS;
+  const time = (active.size * 4 * 60) / chart.bpm;
   const beats = [...new Set(notes.map((n) => n.b))].sort((a, b) => a - b);
   let sixteenths = 0;
   for (let i = 1; i < beats.length; i++) if (beats[i] - beats[i - 1] <= 0.25 + 1e-9) sixteenths++;
@@ -125,7 +139,7 @@ describe('every shipped chart', () => {
         expect(chart.id).toBe(id);
         expect(typeof chart.title).toBe('string');
         expect(SONGS[chart.song]).toBeDefined();
-        expect(chart.bpm).toBe(BPM);
+        expect(chart.bpm).toBe(SONGS[chart.song].bpm);
         expect(chart.offset).toBeCloseTo(SONGS[chart.song].offset, 3);
         for (const [, notes] of sides) {
           expect(notes.length).toBeLessThanOrEqual(20000);
@@ -166,6 +180,22 @@ describe('every shipped chart', () => {
       });
     });
   }
+});
+
+describe("Nicole Yazmin's soundtrack", () => {
+  it('has one chart per song, each song once, none of them a story stop', () => {
+    const ost = [...charts.values()].filter((c) => c.id.startsWith('ost_'));
+    expect(ost.map((c) => c.song).sort()).toEqual([...SOUNDTRACK].sort());
+    for (const chart of ost) expect(chart.id).toBe(`ost_${chart.song}`);
+    for (const stop of STOPS) expect(SOUNDTRACK).not.toContain(stop.song);
+    // The tutorial is the one story chart on her music.
+    expect(charts.get('tutorial')!.song).toBe('tutorial');
+  });
+
+  it('gives each song a different beat map', () => {
+    const shapes = [...charts.values()].filter((c) => c.id.startsWith('ost_')).map((c) => JSON.stringify(c.notes));
+    expect(new Set(shapes).size).toBe(6);
+  });
 });
 
 describe('the twelve story stops', () => {

@@ -67,7 +67,7 @@ const SEEDS: StopSeed[] = [
     role: 'ally',
     journey: 'Ordinary World, Call, Mentor',
     arc: 'The Coach teaches the beat, Raspberry confronts Berry for hiding since summer, they battle, then the Coach hands over a ticket. Raspberry joins.',
-    song: 'level1',
+    song: 'berry_town',
     stage: Tex.room,
     street: false,
   },
@@ -78,7 +78,7 @@ const SEEDS: StopSeed[] = [
     role: 'local',
     journey: 'Crossing the Threshold',
     arc: 'First stop outside home. Berry barely speaks. A slapstick warm-up under a poster of Blueberry.',
-    song: 'tutorial',
+    song: 'peel_street',
   },
   {
     station: 'Graffiti Corner',
@@ -87,7 +87,7 @@ const SEEDS: StopSeed[] = [
     role: 'ally',
     journey: 'Allies',
     arc: "Pear joins. A wall mural shows a step-slide that looks like Berry's.",
-    song: 'level_select',
+    song: 'graffiti_corner',
     stage: Tex.stageStreet,
   },
   {
@@ -97,7 +97,7 @@ const SEEDS: StopSeed[] = [
     role: 'boss',
     journey: 'Enemies',
     arc: "First of Blueberry's crew. Grape says the step is their captain's.",
-    song: 'menu',
+    song: 'vine_crossing',
   },
   {
     station: 'Citrus Labs',
@@ -106,7 +106,7 @@ const SEEDS: StopSeed[] = [
     role: 'ally',
     journey: 'Allies',
     arc: "Lemon joins, with footage of Blueberry's crew using Berry's footwork.",
-    song: 'pause',
+    song: 'citrus_labs',
     stage: Tex.stageLab,
   },
   {
@@ -116,7 +116,7 @@ const SEEDS: StopSeed[] = [
     role: 'local',
     journey: 'Tests, false high',
     arc: "The crew's best night. Plum asks who is missing from Berry's dance. A scout in a dragon scarf takes notes.",
-    song: 'title',
+    song: 'lantern_market',
   },
   {
     station: 'The Club',
@@ -125,7 +125,7 @@ const SEEDS: StopSeed[] = [
     role: 'boss',
     journey: 'Ordeal, low point',
     arc: 'Berry wins alone and the crew walks out because he never says what he feels. The crowd goes silent.',
-    song: 'level1',
+    song: 'the_club',
     stage: Tex.stageClub,
   },
   {
@@ -135,7 +135,7 @@ const SEEDS: StopSeed[] = [
     role: 'ally',
     journey: 'Reward',
     arc: 'Berry speaks his first full line and admits what happened in July. The crew returns. Watermelon makes five.',
-    song: 'tutorial',
+    song: 'rooftop',
     // A rooftop food court: its own street (street_rooftop), danced at its far end, Watermelon's grill (stage_rooftop).
   },
   {
@@ -145,7 +145,7 @@ const SEEDS: StopSeed[] = [
     role: 'boss',
     journey: 'The Road Back',
     arc: "Blueberry's crew blocks the line. Coconut says the captain never laughs anymore.",
-    song: 'title',
+    song: 'the_tunnel',
   },
   {
     station: 'Orange Plaza',
@@ -154,7 +154,7 @@ const SEEDS: StopSeed[] = [
     role: 'local',
     journey: 'Resurrection I',
     arc: "The Grand Dance opens. The crowd chants for Berry's face. He says not yet.",
-    song: 'level_select',
+    song: 'orange_plaza',
   },
   {
     station: 'Pineapple Hall',
@@ -163,7 +163,7 @@ const SEEDS: StopSeed[] = [
     role: 'boss',
     journey: 'Resurrection II',
     arc: 'Pineapple reveals the captain keeps asking about a hoodie who never answered.',
-    song: 'pause',
+    song: 'pineapple_hall',
   },
   {
     station: 'Grand Stage',
@@ -172,7 +172,7 @@ const SEEDS: StopSeed[] = [
     role: 'final',
     journey: 'Return with the Elixir',
     arc: 'Five against five. Berry vs Blueberry. Berry finally says yes, the hood comes down, the trio reunites.',
-    song: 'menu',
+    song: 'grand_stage',
     street: false,
   },
 ];

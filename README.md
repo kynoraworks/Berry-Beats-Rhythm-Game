@@ -81,7 +81,7 @@ Rules follow the original game: a Hit is worth 100 points, a Good 125 and a Perf
 
 ## Make beat maps
 
-Choose **Beat Maps** in the main menu to create, edit, play, import and export maps. You can chart any of the built-in tracks or import your own audio file, which stays in your browser.
+Choose **Beat Maps** in the main menu to create, edit, play, import and export maps. You can chart any of the built-in tracks or import your own audio file, which stays in your browser. **Soundtrack** there lists Nicole Yazmin's original six songs, each once, with a beat map for each.
 
 Maps are stored in the browser's local storage. Use Export to save a map as a `.berrybeat.json` file and Import to load one. "Remix a story level" opens a copy of a story chart for editing.
 
@@ -172,7 +172,7 @@ python3 tools/build_characters.py   # every dancer's sprite sheet (full and lite
 python3 tools/make_crowd.py         # crowd silhouettes, built from the dancers
 ```
 
-Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat, places notes on detected onsets and validates the result. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
+Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat (the stop songs are searched near the tempo they were made at), places notes on detected onsets following a section plan per chart, and validates the result. It writes the tutorial, the twelve stops and the six soundtrack charts. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
 
 ```bash
 pip install numpy scipy
@@ -197,7 +197,7 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 - The rival is scored too, so the tug-of-war bar from the original mockups is a real contest with turns and rounds.
 - Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. In November 2026 Berry and Raspberry were redesigned (Berry with his hood half up, Raspberry in sporty streetwear) and all their frames regenerated; the first versions, including Blackberry's 21 original 2021 frames, are kept in `archive/generated-sprites/v1`. The Coach, the Pear and Dr. Lemon (51 frames), the nine other fruits (18 frames each), the portraits, the stations, streets and stages, and the judgement lettering were made the same way.
 - The story grew from a handful of test levels into a 12-stop journey with dialogue, exploration, per-fruit gimmicks, crew abilities and a 5v5 finale, written up in `docs/STORY_BIBLE.md`.
-- The story levels have new charts for Nicole Yazmin's tracks, generated from the audio by `tools/analyze_audio.py`. The old test levels were timed to a placeholder song that is not part of the game.
+- Each of the twelve stops has its own song (96 to 140 BPM, generated in November 2026) and a chart generated from it by `tools/analyze_audio.py`. Nicole Yazmin's original tracks play in the tutorial and in Beat Maps under Soundtrack, each with one chart (the charts the stops used before they had their own songs). The old test levels were timed to a placeholder song that is not part of the game.
 - The menu's "Online" entry, which was never built, is replaced by Beat Maps.
 
 ## Credits
@@ -212,9 +212,11 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 - Sainttufa: [Website](https://www.sainttufa.com/)
 
 ### Music
-- Nicole Yazmin: [Official website](https://www.nicoleyazmin.com/)
+- Nicole Yazmin: [Official website](https://www.nicoleyazmin.com/). The original soundtrack: Title Screen, Main Menu, Character Select, Pause Screen, Tutorial and Level 1. Her tracks play in the tutorial and under Beat Maps > Soundtrack.
 
 Listen to the tracks: [Berry Beats Tracks](https://drive.google.com/drive/folders/1M5X1kcofPPYjnJhVeCuum3J1FNX8nzcd?usp=sharing)
+
+- The twelve stop songs (`public/assets/audio/berry_town.mp3` to `grand_stage.mp3`, credited in game as "Berry Beats (generated)") were generated with an AI music model (ElevenLabs Music through Higgsfield) from text prompts, in November 2026. They also play on the title, menu, map and pause screens. **Their usage rights have not been verified**: check the generator's terms for your use before shipping them commercially. They are not built from `archive/`, so `tools/prepare_assets.py` leaves them alone.
 
 ## More pictures
 

@@ -91,7 +91,8 @@ function load(id: string): Chart {
   return parseChart(JSON.parse(readFileSync(`public/charts/${id}.json`, 'utf8')));
 }
 
-const DURATION: Record<string, number> = { menu: 76.43, title: 74.87, pause: 87.31, level1: 94.85 };
+/** Song lengths in seconds (ffprobe). */
+const DURATION: Record<string, number> = { vine_crossing: 100.0, the_tunnel: 100.0, pineapple_hall: 100.05, the_club: 100.0, grand_stage: 100.05 };
 
 describe('crew battle segments', () => {
   const segments = CREW_ROUNDS.map((round, i) => {
@@ -110,14 +111,19 @@ describe('crew battle segments', () => {
     }
   });
 
-  it('runs 12 to 16 bars and ends inside its song, about 4 minutes in all', () => {
+  it('runs about 37 seconds (the last about 50) and ends inside its song, 3 to 4 minutes in all', () => {
     let total = 0;
-    for (const { round, full, span } of segments) {
-      const bars = round.endBar - round.startBar;
-      expect(bars).toBeGreaterThanOrEqual(12);
-      expect(bars).toBeLessThanOrEqual(16);
+    for (const [i, { full, span }] of segments.entries()) {
+      const seconds = span.end - span.start;
+      if (i < 4) {
+        expect(seconds).toBeGreaterThanOrEqual(33);
+        expect(seconds).toBeLessThanOrEqual(42);
+      } else {
+        expect(seconds).toBeGreaterThanOrEqual(45);
+        expect(seconds).toBeLessThanOrEqual(55);
+      }
       expect(span.end).toBeLessThanOrEqual(DURATION[full.song] + 0.05);
-      total += span.end - span.start;
+      total += seconds;
     }
     expect(total).toBeGreaterThan(180);
     expect(total).toBeLessThan(260);

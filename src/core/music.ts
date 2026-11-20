@@ -6,9 +6,33 @@ import { getAudioContext, loadSongBuffer } from './songs';
  * Background music for menus, with cross-fades. Tracks play through the Web
  * Audio context, which the browser unlocks once on the first tap or key press.
  * After that music can start from timers and scene changes, which phones do
- * not allow for plain <audio> elements. Any built-in song key can be played.
+ * not allow for plain <audio> elements. Screens ask for a role (title, menu,
+ * level_select, pause), which plays the song below; any song key can also be
+ * played directly.
  */
-export type MusicKey = 'title' | 'menu' | 'level_select' | 'pause' | 'tutorial' | 'level1';
+export type MusicRole = 'title' | 'menu' | 'level_select' | 'pause';
+export type MusicKey = MusicRole | (string & {});
+
+/**
+ * The song each screen plays. Nicole Yazmin's six tracks are kept for the
+ * tutorial and the Beat Maps soundtrack; every other screen uses a stop song.
+ */
+export const ROLE_SONGS: Record<MusicRole, string> = {
+  title: 'grand_stage',
+  menu: 'berry_town',
+  level_select: 'peel_street',
+  pause: 'lantern_market',
+};
+
+/** The song a key plays: a role's song, or the key itself. */
+export function songFor(key: MusicKey): string {
+  return (ROLE_SONGS as Record<string, string>)[key] ?? key;
+}
+
+/** Pause music for a stage, never the song that stage dances to. */
+export function pauseSongFor(stageSong: string): string {
+  return stageSong === ROLE_SONGS.pause ? ROLE_SONGS.menu : ROLE_SONGS.pause;
+}
 
 interface Track {
   key: string;
@@ -20,7 +44,7 @@ let game: Phaser.Game | null = null;
 let master: GainNode | null = null;
 let current: Track | null = null;
 /** The track that should be playing; guards against a slow load finishing after a newer request. */
-let wanted: MusicKey | null = null;
+let wanted: string | null = null;
 /** Bumped by every play and stop, so a load that was overtaken never starts its track. */
 let request = 0;
 
@@ -53,12 +77,13 @@ export const music = {
   },
 
   /** The track that is playing or about to play, if any. */
-  get current(): MusicKey | null {
+  get current(): string | null {
     return wanted;
   },
 
   /** Cross-fade to a track. Does nothing if it is already playing. */
-  play(key: MusicKey, fadeMs = 600): void {
+  play(requested: MusicKey, fadeMs = 600): void {
+    const key = songFor(requested);
     if (!game || wanted === key) return;
     wanted = key;
     const mine = ++request;

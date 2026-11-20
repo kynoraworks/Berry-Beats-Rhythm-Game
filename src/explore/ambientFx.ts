@@ -4,8 +4,8 @@ import type { TimeOfDay } from '../story/types';
 import { liftColor, pieceOf, seeded, type AmbientEffect, type PlacedPiece } from './ambient';
 import { LIFE_SHEETS } from './lifePieces';
 
-/** Half a beat at the story's 77 BPM, for a crowd keeping time outside a battle. */
-const HALF_BEAT_MS = 390;
+/** Half a beat at 77 BPM: the fallback when the place does not say which song is playing. */
+const DEFAULT_HALF_BEAT_MS = 390;
 /** Most pooled pieces any one effect keeps alive. */
 const CAP = { steam: 10, bubbles: 10, confetti: 28, birds: 3 } as const;
 
@@ -69,6 +69,8 @@ export interface LifeOptions {
    * props, which at dusk and night left people too dark to read.
    */
   lift?: number;
+  /** Half a beat of the song playing here, in milliseconds, so people keeping time nod with it. */
+  halfBeatMs?: number;
 }
 
 /** The share of the props' grade lifted off background people while exploring. */
@@ -85,9 +87,11 @@ export class Residents {
   private readonly residents: Resident[] = [];
   private readonly calm: boolean;
   private readonly random: () => number;
+  private readonly halfBeatMs: number;
 
   constructor(scene: Phaser.Scene, placed: readonly PlacedPiece[], options: LifeOptions) {
     this.calm = options.calm;
+    this.halfBeatMs = options.halfBeatMs ?? DEFAULT_HALF_BEAT_MS;
     this.random = seeded(options.seed);
     const scale = options.scale ?? PX;
     for (const piece of placed) {
@@ -136,7 +140,7 @@ export class Residents {
       resident.next -= dtMs;
       if (resident.next > 0) continue;
       this.show(resident, resident.frame === 0 ? 1 : 0);
-      resident.next = resident.frame === 1 ? (resident.beat ? HALF_BEAT_MS : 420) : this.rest(resident.beat);
+      resident.next = resident.frame === 1 ? (resident.beat ? this.halfBeatMs : 420) : this.rest(resident.beat);
     }
   }
 
@@ -150,7 +154,7 @@ export class Residents {
   }
 
   private rest(beat: boolean): number {
-    return beat ? HALF_BEAT_MS : 1500 + Math.floor(this.random() * 2600);
+    return beat ? this.halfBeatMs : 1500 + Math.floor(this.random() * 2600);
   }
 
   private show(resident: Resident, frame: 0 | 1): void {

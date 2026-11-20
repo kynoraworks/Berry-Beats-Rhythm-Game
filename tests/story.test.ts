@@ -148,7 +148,10 @@ describe('stops', () => {
   });
 
   it('use the agreed song for each stop', () => {
-    expect(STOPS.map((s) => s.song)).toEqual(['level1', 'tutorial', 'level_select', 'menu', 'pause', 'title', 'level1', 'tutorial', 'title', 'level_select', 'pause', 'menu']);
+    expect(STOPS.map((s) => s.song)).toEqual([
+      'berry_town', 'peel_street', 'graffiti_corner', 'vine_crossing', 'citrus_labs', 'lantern_market',
+      'the_club', 'rooftop', 'the_tunnel', 'orange_plaza', 'pineapple_hall', 'grand_stage',
+    ]);
   });
 
   it('go from afternoon to dusk to night', () => {

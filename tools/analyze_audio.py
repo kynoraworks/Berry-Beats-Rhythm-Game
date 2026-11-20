@@ -535,8 +535,9 @@ PLANS = [
 # ignored by the charter.
 S = Section
 
-# Shared by the hold-heavy sections of Watermelon's chart.
-MELON = dict(max_hold=4, hold_sustain=0.25, hold_min=2, hold_tonal=0.02, floor=0.2)
+# Shared by the hold-heavy sections of Watermelon's chart. The rooftop song's horns blur
+# into the mix, so any clearly pitched note may start a hold; the longest-ringing go first.
+MELON = dict(max_hold=4, hold_sustain=0.08, hold_min=2, hold_tonal=0.03, floor=0.2)
 
 
 def lemon_block(b: int, dense: int) -> list[Section]:
@@ -591,14 +592,14 @@ PLANS += [
     Plan(
         "stop03", "graffiti_corner", "Stop 3", "pear", 2, max_nps=4, solo_holds=False, lane_gap=3,
         sections=[
-            S(0, 4, "trade", grid=4, notes=2, rival_notes=2, unit=1),
-            S(4, 8, "trade", grid=2, notes=3, rival_notes=3, unit=1),
-            S(8, 14, "trade", grid=2, notes=4, rival_notes=4, unit=2),
-            S(14, 16, "both", grid=4, notes=2, rival_notes=2, holds=2, hold_sustain=0.6),
-            S(16, 24, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=1, hold_sustain=0.6),
-            S(24, 32, "both", grid=2, notes=4, rival_notes=4, doubles=0.5),
-            S(32, 38, "trade", grid=2, notes=5, rival_notes=5, unit=1, bursts=1),
-            S(38, 46, "both", grid=2, notes=6, rival_notes=5, bursts=1, doubles=0.5),
+            S(0, 4, "trade", grid=4, notes=2, rival_notes=3, unit=1),
+            S(4, 8, "trade", grid=2, notes=3, rival_notes=4, unit=1),
+            S(8, 14, "trade", grid=2, notes=4, rival_notes=5, unit=2),
+            S(14, 16, "both", grid=4, notes=2, rival_notes=2, holds=2, hold_sustain=0.08, hold_min=2),
+            S(16, 24, "trade", grid=2, notes=4, rival_notes=5, unit=1, holds=1, hold_sustain=0.08, hold_min=2),
+            S(24, 32, "both", grid=2, notes=4, rival_notes=5, doubles=0.5),
+            S(32, 38, "trade", grid=2, notes=5, rival_notes=6, unit=1, bursts=1),
+            S(38, 46, "both", grid=2, notes=6, rival_notes=6, bursts=1, doubles=0.5),
         ],
         rank_lanes=True,
     ),
@@ -661,10 +662,10 @@ PLANS += [
     Plan(
         "stop08", "rooftop", "Stop 8", "watermelon", 3, max_nps=4, solo_holds=False, hold_spacing=8,
         sections=[
-            S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=2, rival_holds=2, **{**MELON, "hold_min": 1.5}),
-            S(4, 20, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=8, rival_holds=8, **MELON),
-            S(20, 32, "both", grid=2, notes=4, rival_notes=3, holds=6, rival_holds=6, **MELON),
-            S(32, 43, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=6, rival_holds=5, **MELON),
+            S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=2, rival_holds=1, **{**MELON, "hold_min": 1.5}),
+            S(4, 20, "trade", grid=2, notes=5, rival_notes=5, unit=1, holds=8, rival_holds=3, **MELON),
+            S(20, 32, "both", grid=2, notes=5, rival_notes=4, holds=6, rival_holds=2, **MELON),
+            S(32, 43, "trade", grid=2, notes=5, rival_notes=5, unit=1, holds=6, rival_holds=2, **MELON),
         ],
         rank_lanes=True,
     ),
@@ -688,25 +689,26 @@ PLANS += [
         "stop10", "orange_plaza", "Stop 10", "orange", 4, max_nps=6, solo_holds=False,
         sections=[
             S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1),
-            S(4, 24, "trade", grid=2, notes=3, rival_notes=3, unit=1, runs=1, floor=0.12),
+            S(4, 24, "trade", grid=2, notes=2, rival_notes=2, unit=1, runs=1, floor=0.12),
             S(24, 28, "trade", grid=4, notes=3, rival_notes=3, unit=2, floor=0.12),
-            S(28, 36, "trade", grid=2, notes=3, rival_notes=3, unit=1, runs=1, floor=0.12),
+            S(28, 36, "trade", grid=2, notes=2, rival_notes=2, unit=1, runs=1, floor=0.12),
             S(36, 40, "trade", grid=4, notes=3, rival_notes=3, unit=2, floor=0.12),
-            S(40, 53, "trade", grid=2, notes=4, rival_notes=4, unit=1, runs=1, floor=0.12),
+            S(40, 53, "trade", grid=2, notes=3, rival_notes=3, unit=1, runs=1, floor=0.12),
         ],
         rank_lanes=True,
     ),
-    # Stop 11, Pineapple: precise, clean and punishing. No gimmick shapes, just accuracy.
+    # Stop 11, Pineapple: precise, clean and punishing. No gimmick shapes, just accuracy:
+    # an eighth-note line that rarely lets up, with the song's few sixteenths charted.
     Plan(
         "stop11", "pineapple_hall", "Stop 11", "pineapple", 5, max_nps=6, solo_holds=False,
         sections=[
             S(0, 2, "rival", grid=2, rival_notes=4),
-            S(2, 8, "both", grid=2, notes=4, rival_notes=3, floor=0.2),
-            S(8, 16, "both", grid=1, notes=6, rival_notes=4, bursts=2, runs=1, floor=0.15),
-            S(16, 24, "trade", grid=1, notes=7, rival_notes=6, unit=1, runs=1, bursts=1, floor=0.12),
-            S(24, 32, "both", grid=1, notes=6, rival_notes=4, bursts=2, runs=1, doubles=0.25, floor=0.15),
-            S(32, 40, "both", grid=1, notes=6, rival_notes=4, runs=1, bursts=1, doubles=0.25, floor=0.15),
-            S(40, 50, "both", grid=1, notes=7, rival_notes=4, bursts=2, runs=1, doubles=0.5, floor=0.15),
+            S(2, 8, "both", grid=2, notes=5, rival_notes=3, floor=0.2),
+            S(8, 16, "both", grid=1, notes=7, rival_notes=4, bursts=2, runs=1, doubles=0.5, floor=0.15),
+            S(16, 24, "trade", grid=1, notes=8, rival_notes=6, unit=1, runs=1, bursts=1, doubles=0.5, floor=0.12),
+            S(24, 32, "both", grid=1, notes=7, rival_notes=4, bursts=2, runs=1, doubles=0.5, floor=0.15),
+            S(32, 40, "both", grid=1, notes=7, rival_notes=4, runs=1, bursts=1, doubles=0.5, floor=0.15),
+            S(40, 50, "both", grid=1, notes=8, rival_notes=4, bursts=2, runs=1, doubles=1, floor=0.15),
             S(50, 55, "both", grid=2, notes=4, rival_notes=3, holds=1, floor=0.12),
         ],
         rank_lanes=True,

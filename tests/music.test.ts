@@ -43,7 +43,7 @@ describe('menu music', () => {
   });
 
   it('never leaves a superseded track playing', async () => {
-    const { music } = await import('../src/core/music');
+    const { music, ROLE_SONGS } = await import('../src/core/music');
     music.init({} as never);
     music.play('tutorial', 0);
     const first = loads.get('tutorial')!;
@@ -53,7 +53,7 @@ describe('menu music', () => {
     // Both loads of the same song finish after the player has flicked away and back.
     first.resolve({});
     second.resolve({});
-    loads.get('menu')!.resolve({});
+    loads.get(ROLE_SONGS.menu)!.resolve({});
     await Promise.resolve();
     await Promise.resolve();
     const playing = audio.started.filter((source) => !source.stopped);
@@ -62,14 +62,27 @@ describe('menu music', () => {
   });
 
   it('starts nothing if stopped before the song has loaded', async () => {
-    const { music } = await import('../src/core/music');
+    const { music, ROLE_SONGS } = await import('../src/core/music');
     music.init({} as never);
     music.play('menu', 0);
     music.stop(0);
-    loads.get('menu')!.resolve({});
+    loads.get(ROLE_SONGS.menu)!.resolve({});
     await Promise.resolve();
     await Promise.resolve();
     expect(audio.started).toHaveLength(0);
     expect(music.current).toBeNull();
+  });
+
+  it('plays stop songs on the menus, never Nicole\'s, and never the stage\'s own song at pause', async () => {
+    const { ROLE_SONGS, songFor, pauseSongFor, music } = await import('../src/core/music');
+    const nicole = ['tutorial', 'level1', 'title', 'menu', 'level_select', 'pause'];
+    for (const song of Object.values(ROLE_SONGS)) expect(nicole).not.toContain(song);
+    expect(songFor('tutorial')).toBe('tutorial');
+    expect(songFor('the_club')).toBe('the_club');
+    expect(pauseSongFor(ROLE_SONGS.pause)).not.toBe(ROLE_SONGS.pause);
+    expect(pauseSongFor('the_club')).toBe(ROLE_SONGS.pause);
+    music.init({} as never);
+    music.play('menu', 0);
+    expect(music.current).toBe(ROLE_SONGS.menu);
   });
 });

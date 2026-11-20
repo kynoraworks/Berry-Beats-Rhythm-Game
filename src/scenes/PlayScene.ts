@@ -23,7 +23,7 @@ import { Engine, START_HEALTH, type JudgeEvent, type PlayNote } from '../core/en
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
 import { LaneInput } from '../core/input';
 import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
-import { music } from '../core/music';
+import { music, pauseSongFor } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx, preloadSamples, type SfxName } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
@@ -89,9 +89,6 @@ const TURN_LABELS: Record<'battle' | 'lesson', Record<Exclude<Turn, 'rest'>, str
   lesson: { player: 'Your turn!', rival: 'Watch', both: 'Together!' },
 };
 const TURN_COLORS: Record<Exclude<Turn, 'rest'>, string> = { player: CSS.blue, rival: CSS.pink, both: CSS.yellow };
-/** The pause screen's own track, and the one it borrows on the stage that dances to that track. */
-const PAUSE_SONG = 'pause';
-const PAUSE_SONG_SPARE = 'menu';
 
 /** The crew battle's music fades out over this long as a round ends. */
 const ROUND_FADE = 1.6;
@@ -563,7 +560,7 @@ export class PlayScene extends Phaser.Scene {
 
   /** One stage dances to the pause screen's own track; pausing there plays another. */
   private playPauseMusic(): void {
-    music.play(this.chart.song === PAUSE_SONG ? PAUSE_SONG_SPARE : PAUSE_SONG, 400);
+    music.play(pauseSongFor(this.chart.song), 400);
   }
 
   /**

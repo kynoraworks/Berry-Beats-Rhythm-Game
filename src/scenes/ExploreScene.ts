@@ -3,6 +3,7 @@ import { onBackGesture } from '../core/backGesture';
 import { COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
+import { getSong } from '../core/songs';
 import { playSfx } from '../core/sfx';
 import { UiButton, addBody, addIcon, addText, addUiButton, isLeaving } from '../core/ui';
 import { breathStrength, gradeAt, gradeStrength, lampStrength, leafCount, type Setting } from '../core/atmosphere';
@@ -212,6 +213,7 @@ export class ExploreScene extends Phaser.Scene {
       calm: getSettings().reduceMotion,
       seed: stopSeed(this.stop, place.kind),
       addTo: (sprite) => this.world.add(sprite),
+      halfBeatMs: 30000 / (getSong(place.kind === 'room' ? 'tutorial' : this.stop.song)?.bpm ?? 77),
     });
   }
 

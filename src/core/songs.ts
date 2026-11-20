@@ -14,14 +14,44 @@ export interface SongDef {
   offset: number;
 }
 
+/** Artist credit for the generated stop songs (see the music credits in README.md). */
+export const GENERATED = 'Berry Beats (generated)';
+/** Nicole Yazmin's original soundtrack: these six songs. */
+export const OST_ARTIST = 'Nicole Yazmin';
+
 export const SONGS: SongDef[] = [
-  { key: 'tutorial', title: 'Tutorial', artist: 'Nicole Yazmin', url: 'assets/audio/tutorial.mp3', bpm: 77, offset: 0.024 },
-  { key: 'level1', title: 'Level 1', artist: 'Nicole Yazmin', url: 'assets/audio/level1.mp3', bpm: 77, offset: 0.024 },
-  { key: 'title', title: 'Title Screen', artist: 'Nicole Yazmin', url: 'assets/audio/title.mp3', bpm: 77, offset: 0.024 },
-  { key: 'menu', title: 'Main Menu', artist: 'Nicole Yazmin', url: 'assets/audio/menu.mp3', bpm: 77, offset: 0.024 },
-  { key: 'level_select', title: 'Character Select', artist: 'Nicole Yazmin', url: 'assets/audio/level_select.mp3', bpm: 77, offset: 0 },
-  { key: 'pause', title: 'Pause Screen', artist: 'Nicole Yazmin', url: 'assets/audio/pause.mp3', bpm: 77, offset: 0 },
+  { key: 'tutorial', title: 'Tutorial', artist: OST_ARTIST, url: 'assets/audio/tutorial.mp3', bpm: 77, offset: 0.024 },
+  { key: 'level1', title: 'Level 1', artist: OST_ARTIST, url: 'assets/audio/level1.mp3', bpm: 77, offset: 0.024 },
+  { key: 'title', title: 'Title Screen', artist: OST_ARTIST, url: 'assets/audio/title.mp3', bpm: 77, offset: 0.024 },
+  { key: 'menu', title: 'Main Menu', artist: OST_ARTIST, url: 'assets/audio/menu.mp3', bpm: 77, offset: 0.024 },
+  { key: 'level_select', title: 'Character Select', artist: OST_ARTIST, url: 'assets/audio/level_select.mp3', bpm: 77, offset: 0 },
+  { key: 'pause', title: 'Pause Screen', artist: OST_ARTIST, url: 'assets/audio/pause.mp3', bpm: 77, offset: 0 },
+  // The twelve story stops, one generated song each (src/story/stops.ts).
+  { key: 'berry_town', title: 'Berry Town Lo-Fi', artist: GENERATED, url: 'assets/audio/berry_town.mp3', bpm: 100, offset: 0.025 },
+  { key: 'peel_street', title: 'Peel Street Slap', artist: GENERATED, url: 'assets/audio/peel_street.mp3', bpm: 108, offset: 0.025 },
+  { key: 'graffiti_corner', title: 'Graffiti Corner Breaks', artist: GENERATED, url: 'assets/audio/graffiti_corner.mp3', bpm: 108, offset: 0.025 },
+  { key: 'vine_crossing', title: 'Vine Crossing Chant', artist: GENERATED, url: 'assets/audio/vine_crossing.mp3', bpm: 104, offset: 0.025 },
+  { key: 'citrus_labs', title: 'Citrus Labs Glitch', artist: GENERATED, url: 'assets/audio/citrus_labs.mp3', bpm: 132, offset: 0.025 },
+  { key: 'lantern_market', title: 'Lantern Market Nights', artist: GENERATED, url: 'assets/audio/lantern_market.mp3', bpm: 96, offset: 0.034 },
+  { key: 'the_club', title: 'The Club', artist: GENERATED, url: 'assets/audio/the_club.mp3', bpm: 126, offset: 0.025 },
+  { key: 'rooftop', title: 'Rooftop Sunset', artist: GENERATED, url: 'assets/audio/rooftop.mp3', bpm: 104, offset: 0.037 },
+  { key: 'the_tunnel', title: 'The Tunnel', artist: GENERATED, url: 'assets/audio/the_tunnel.mp3', bpm: 140, offset: 0.025 },
+  { key: 'orange_plaza', title: 'Orange Plaza Festival', artist: GENERATED, url: 'assets/audio/orange_plaza.mp3', bpm: 128, offset: 0.025 },
+  { key: 'pineapple_hall', title: 'Pineapple Hall', artist: GENERATED, url: 'assets/audio/pineapple_hall.mp3', bpm: 134, offset: 0.032 },
+  { key: 'grand_stage', title: 'Grand Stage Finale', artist: GENERATED, url: 'assets/audio/grand_stage.mp3', bpm: 117, offset: 0.039 },
 ];
+
+/**
+ * Nicole Yazmin's original soundtrack, listed once each in Beat Maps under
+ * Soundtrack. Each song has one beat map (public/charts/ost_<song>.json, made by
+ * tools/analyze_audio.py). The story only plays her tutorial track; the stops
+ * have songs of their own.
+ */
+export const SOUNDTRACK: readonly { song: string; chartId: string; chartUrl: string }[] = SONGS.filter((song) => song.artist === OST_ARTIST).map((song) => ({
+  song: song.key,
+  chartId: `ost_${song.key}`,
+  chartUrl: `charts/ost_${song.key}.json`,
+}));
 
 export const CUSTOM_PREFIX = 'custom:';
 

@@ -2,11 +2,11 @@ import Phaser from 'phaser';
 import { CSS, GAME_H, GAME_W, SceneKeys } from '../core/config';
 import { newChart, parseChart, serializeChart, type Chart } from '../core/chart';
 import type { ComposerData, PlayData } from '../core/flow';
-import { LEVELS, loadLevelChart } from '../core/levels';
+import { LEVELS, loadLevelChart, loadStoryChart } from '../core/levels';
 import { music } from '../core/music';
 import { deleteCustomChart, getBest, listCustomCharts, saveCustomChart } from '../core/saves';
 import { playSfx } from '../core/sfx';
-import { CUSTOM_PREFIX, SONGS, deleteCustomAudio, getSong, listCustomAudio, loadSongBuffer, saveCustomAudio } from '../core/songs';
+import { CUSTOM_PREFIX, OST_ARTIST, SONGS, SOUNDTRACK, deleteCustomAudio, getSong, listCustomAudio, loadSongBuffer, saveCustomAudio } from '../core/songs';
 import { FOOTER_H, HEADER_H, UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { MAX_AUDIO_BYTES, baseName, disposePicker, downloadText, pickFile, safeFileName } from '../composer/files';
 import { Modal, showToast, type ModalConfig, type ModalKey } from '../composer/widgets';
@@ -27,11 +27,11 @@ interface RowView {
 }
 
 /** Header buttons, left to right. Back is the header's own button. */
-const TOP_ACTIONS = ['Back', 'New', 'Import', 'Remix'] as const;
+const TOP_ACTIONS = ['Back', 'Soundtrack', 'New', 'Import', 'Remix'] as const;
 const ROW_ACTIONS = ['Play', 'Edit', 'Export', 'Delete'] as const;
 type TopAction = (typeof TOP_ACTIONS)[number];
 type RowAction = (typeof ROW_ACTIONS)[number];
-const TOP_START = 1;
+const TOP_START = 2;
 const ROW_H = 104;
 const LIST_Y = HEADER_H + 12;
 const VISIBLE_ROWS = 6;
@@ -89,6 +89,8 @@ export class BeatMapsScene extends Phaser.Scene {
     addBackdrop(this);
     const header = addHeader(this, 'Beat Maps', () => this.runTop('Back'));
     if (header.back) this.topButtons.push(header.back);
+    // Nicole Yazmin's original soundtrack, next to Back (the title sits in the middle).
+    this.topButtons.push(addUiButton(this, 196 + 12 + 100, HEADER_H / 2 - 2, 'Soundtrack', () => this.runTop('Soundtrack'), { width: 200, height: 56, size: 24 }));
     const labels: TopAction[] = ['New', 'Import', 'Remix'];
     labels.forEach((label, i) => {
       const x = GAME_W - 20 - 66 - (labels.length - 1 - i) * 144;
@@ -183,6 +185,7 @@ export class BeatMapsScene extends Phaser.Scene {
     const width = 760;
     const height = 328;
     const tips: [string, string][] = [
+      ['Soundtrack', "Play Nicole Yazmin's original songs."],
       ['New', 'Chart one of the songs, or your own audio file.'],
       ['Remix', 'Start from a copy of a story level.'],
       ['Import', 'Load a .berrybeat.json file someone shared.'],
@@ -332,6 +335,9 @@ export class BeatMapsScene extends Phaser.Scene {
   private runTop(action: TopAction): void {
     if (this.modal || this.busy || isLeaving(this)) return;
     switch (action) {
+      case 'Soundtrack':
+        this.chooseSoundtrack();
+        break;
       case 'New':
         this.chooseSong();
         break;
@@ -444,6 +450,42 @@ export class BeatMapsScene extends Phaser.Scene {
     if (!this.scene.isActive()) return;
     this.busy = false;
     this.openComposer({ chart: newChart(key, 120, 0, name) });
+  }
+
+  /** Nicole Yazmin's six songs, each once, with the beat map made for it. */
+  private chooseSoundtrack(): void {
+    this.openModal({
+      title: 'Original soundtrack',
+      lines: [`Music by ${OST_ARTIST}`],
+      layout: 'column',
+      options: SOUNDTRACK.map((entry) => {
+        const song = getSong(entry.song);
+        const best = getBest(entry.chartId);
+        return {
+          label: song?.title ?? entry.song,
+          detail: `${OST_ARTIST}   ${song?.bpm ?? ''} bpm${best ? `   best ${best.rank}` : ''}`,
+          action: () => this.playSoundtrack(entry.chartId, entry.chartUrl),
+        };
+      }),
+    });
+  }
+
+  private playSoundtrack(chartId: string, chartUrl: string): void {
+    this.busy = true;
+    loadStoryChart(chartUrl).then(
+      (chart) => {
+        if (!this.scene.isActive()) return;
+        this.busy = false;
+        const data: PlayData = { chart, returnTo: { scene: SceneKeys.BeatMaps, data: { select: chartId } } };
+        music.stop(250);
+        goTo(this, SceneKeys.Play, data);
+      },
+      (error: unknown) => {
+        if (!this.scene.isActive()) return;
+        this.busy = false;
+        showToast(this, error instanceof Error ? error.message : 'Could not load that song', CSS.miss, 4000);
+      },
+    );
   }
 
   private chooseRemix(): void {
