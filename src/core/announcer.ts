@@ -1,15 +1,39 @@
 import type Phaser from 'phaser';
 import type { AbilityId } from '../story/types';
 import { getSettings } from './settings';
-import { sampleBuffer, startSfx, type SfxName, type Voice } from './sfx';
+import { busInput, isRecordMove, sampleBuffer, startRecordMove, startSfx, type SfxName, type Voice } from './sfx';
 import { getAudioContext } from './songs';
 
 /**
- * Battle hype: the MC, the crowd and the stingers. Game code reports what
- * happened as a HypeEvent; cueFor turns it into sounds, and HypeMixer keeps
- * them from piling up: one stinger at a time, one crowd reaction at a time,
- * and the MC never talks over itself. Hit sounds do not go through here, so
- * they stay crisp whatever the mixer is doing.
+ * Battle hype: the MC, the DJ, the crowd and the stingers. Game code reports
+ * what happened as a HypeEvent; cueFor turns it into sounds, and HypeMixer
+ * keeps them from piling up: one stinger at a time, one crowd reaction at a
+ * time, and the MC never talks over itself. Hit sounds do not go through
+ * here, so they stay crisp whatever the mixer is doing.
+ *
+ * What plays when (stinger parts share one channel; delays in seconds):
+ *
+ *   combo 10        chirp scratch
+ *   combo 25        baby scratch, crossfader-cut horn .36            song dips .2
+ *   combo 50, 75    boom, transformer scratch, horn .7, cheer, "COMBO!"   .45
+ *   combo 100+      slam, scratch flourish .2, horn .85, roar, "THE CROWD GOES WILD!"  .6
+ *   round 1         needle drop, "ROUND ONE!"
+ *   rounds 2+       the song spun back, needle drop .62, "ROUND TWO!" .8   song cut for the spinback
+ *   round won       boom, fanfare, roar                                   .4
+ *   round lost      falling sting, boom .17, "ohh"                        .2
+ *   hype start      riser, baby scratch .08, sub drop .48, horn, roar, "HYPE!"  .55
+ *   hype end        the song spun back ("ohh" too if a miss broke it)    song cut for the spinback
+ *   flawless        chirp, cheer, "FLAWLESS!"
+ *   ability         whoosh, the ability's hit and a boom .12, cheer       .25
+ *   lets dance      needle drop, "LET'S DANCE!"
+ *   battle won      slam, horn, roar, "WINNER!"                           .6
+ *   battle lost     falling sting, boom .17, "ohh", "OH NO!"              .3
+ *   fail            the song braked to a stop, boom .9, "ohh", "OH NO!"
+ *   results         victory or defeat stinger, roar or "ohh"
+ *   crew won        victory stinger, slam, roar, "THE CROWD GOES WILD!"
+ *
+ * The spinback and the brake are made live from the battle song (see
+ * HypeAudio); elsewhere they fall back to prepared samples.
  */
 export type HypeEvent =
   | { kind: 'combo'; combo: number }
@@ -53,6 +77,8 @@ export interface Cue {
   parts: CuePart[];
   /** How far the song dips under the cue, 0..1. */
   duck?: number;
+  /** Seconds the dip lasts; by default until the cue's stingers and crowd finish. */
+  duckLength?: number;
 }
 
 const fx = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'fx', delay });
@@ -83,48 +109,77 @@ export function roundLine(round: number, total: number): SfxName {
   return lines[Math.min(round, lines.length - 1)];
 }
 
+/** How long a spinback holds the song down: it comes back as the needle drops. */
+const SPINBACK_CUT = 0.62;
+
 export function cueFor(event: HypeEvent): Cue {
   switch (event.kind) {
     case 'combo': {
       const tier = comboTier(event.combo);
-      if (tier <= 1) return { priority: 1, parts: [fx('combo'), sting('scratch')] };
-      if (tier === 2) return { priority: 2, parts: [fx('combo'), sting('scratch'), sting('airhorn', 0.3)] };
-      if (tier === 3) return { priority: 3, duck: 0.3, parts: [fx('combo'), sting('scratch'), sting('airhorn', 0.3), crowd('crowdCheer', 0.2), mc('mcCombo', 0.45)] };
-      return { priority: 4, duck: 0.4, parts: [fx('combo'), sting('impact'), sting('airhorn', 0.1), crowd('crowdCheer', 0.1), mc('mcCrowdWild', 0.35)] };
+      if (tier <= 1) return { priority: 1, parts: [fx('combo'), sting('djChirp')] };
+      if (tier === 2) return { priority: 2, duck: 0.2, parts: [fx('combo'), sting('djBaby'), sting('djCut', 0.36)] };
+      if (tier === 3) {
+        return {
+          priority: 3,
+          duck: 0.45,
+          parts: [fx('combo'), sting('boom'), sting('djTransform', 0.05), sting('airhorn', 0.7), crowd('crowdCheer', 0.15), mc('mcCombo', 0.55)],
+        };
+      }
+      return {
+        priority: 4,
+        duck: 0.6,
+        parts: [fx('combo'), sting('slam'), sting('djFlare', 0.2), sting('airhorn', 0.85), crowd('crowdRoar', 0.1), mc('mcCrowdWild', 0.75)],
+      };
     }
     case 'roundIntro':
-      return { priority: 3, parts: [mc(roundLine(event.round, event.total))] };
+      // The first round drops the needle; later ones are a DJ fill: the song spun back, then dropped back in.
+      if (event.round === 0) return { priority: 3, parts: [sting('needleDrop'), mc(roundLine(event.round, event.total), 0.25)] };
+      return {
+        priority: 5,
+        duck: 0.85,
+        duckLength: SPINBACK_CUT,
+        parts: [sting('djRewind'), sting('needleDrop', SPINBACK_CUT), mc(roundLine(event.round, event.total), 0.8)],
+      };
     case 'roundWon':
-      return { priority: 4, duck: 0.25, parts: [sting('roundWin'), crowd('crowdCheer', 0.1)] };
+      return { priority: 4, duck: 0.4, parts: [sting('boom'), sting('roundWin'), crowd('crowdRoar', 0.05)] };
     case 'roundLost':
-      return { priority: 4, parts: [sting('roundLose'), crowd('crowdOhh', 0.05)] };
+      return { priority: 4, duck: 0.2, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05)] };
     case 'hypeStart':
-      // The riser lands at about half a second: the drop, the horn and the MC hit there.
-      return { priority: 5, duck: 0.35, parts: [fx('hype'), sting('drop', 0.48), sting('airhorn', 0.5), crowd('crowdCheer', 0.45), mc('mcHype', 0.55)] };
+      // A scratch over the riser, into the drop at about half a second: the sub, the horn and the MC hit there.
+      return {
+        priority: 5,
+        duck: 0.55,
+        parts: [fx('hype'), sting('djBaby', 0.08), sting('subDrop', 0.48), sting('airhorn', 0.52), crowd('crowdRoar', 0.45), mc('mcHype', 0.6)],
+      };
     case 'hypeEnd':
-      return { priority: 2, parts: [fx('hypeOut'), sting(event.broken ? 'tapeStop' : 'scratchDown')] };
+      return {
+        priority: 2,
+        duck: 0.7,
+        duckLength: SPINBACK_CUT,
+        parts: [fx('hypeOut'), sting('djRewind'), ...(event.broken ? [crowd('crowdOhh', 0.2)] : [])],
+      };
     case 'flawless':
-      return { priority: 3, parts: [fx('bonus'), crowd('crowdCheer', 0.1), mc('mcFlawless', 0.1)] };
+      return { priority: 3, parts: [fx('bonus'), sting('djChirp'), crowd('crowdCheer', 0.1), mc('mcFlawless', 0.1)] };
     case 'flairFull':
       return { priority: 1, parts: [fx('ready')] };
     case 'ability':
-      return { priority: 3, duck: 0.2, parts: [fx('whoosh'), sting(ABILITY_HITS[event.ability], 0.12), crowd('crowdCheer', 0.2)] };
+      return { priority: 3, duck: 0.25, parts: [fx('whoosh'), sting(ABILITY_HITS[event.ability], 0.12), sting('boom', 0.12), crowd('crowdCheer', 0.2)] };
     case 'bigMiss':
       return { priority: 1, parts: [crowd('crowdOhh')] };
     case 'letsDance':
-      return { priority: 2, parts: [mc('mcLetsDance')] };
+      return { priority: 2, parts: [sting('needleDrop'), mc('mcLetsDance', 0.25)] };
     case 'battleWon':
-      return { priority: 6, duck: 0.4, parts: [sting('airhorn'), crowd('crowdCheer'), mc('mcWinner', 0.25)] };
+      return { priority: 6, duck: 0.6, parts: [sting('slam'), sting('airhorn', 0.05), crowd('crowdRoar'), mc('mcWinner', 0.35)] };
     case 'battleLost':
-      return { priority: 6, parts: [sting('roundLose'), crowd('crowdOhh', 0.05), mc('mcOhNo', 0.3)] };
+      return { priority: 6, duck: 0.3, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05), mc('mcOhNo', 0.4)] };
     case 'fail':
-      return { priority: 7, parts: [sting('scratchStop'), crowd('crowdOhh', 0.3), mc('mcOhNo', 0.6)] };
+      return { priority: 7, parts: [sting('djBrake'), sting('boom', 0.9), crowd('crowdOhh', 0.4), mc('mcOhNo', 0.8)] };
     case 'resultsWon':
-      return { priority: 6, parts: [sting('victory'), crowd('crowdCheer', 0.15)] };
+      return { priority: 6, parts: [sting('victory'), crowd('crowdRoar', 0.15)] };
     case 'resultsLost':
       return { priority: 6, parts: [sting('defeat'), crowd('crowdOhh', 0.1)] };
     case 'crewWon':
-      return { priority: 6, parts: [sting('victory'), crowd('crowdCheer', 0.2), mc('mcCrowdWild', 0.7)] };
+      return { priority: 6, parts: [sting('victory'), sting('slam'), crowd('crowdRoar', 0.2), mc('mcCrowdWild', 0.7)] };
   }
 }
 
@@ -135,7 +190,7 @@ export type PlayFn = (sound: SfxName, delay: number) => Voice | null;
 const MC_WAIT = 1.2;
 /** A short breath between two MC lines. */
 const MC_GAP = 0.12;
-const DUCK_ATTACK = 0.08;
+const DUCK_ATTACK = 0.02;
 const DUCK_RELEASE = 0.45;
 
 interface Busy {
@@ -190,7 +245,7 @@ export class HypeMixer {
       const end = this.claim(channel, parts, cue.priority, now);
       if (end !== null) loudest = Math.max(loudest, end);
     }
-    if (cue.duck && loudest > now) this.duckFor(cue.duck, now, loudest);
+    if (cue.duck && loudest > now) this.duckFor(cue.duck, now, cue.duckLength !== undefined ? now + cue.duckLength : loudest);
   }
 
   /** Call every frame: starts a waiting MC line once the line before it is done. */
@@ -287,6 +342,18 @@ const BED_GLIDE = 0.6;
 const BED_QUIET = 0.12;
 const BED_LOUD = 0.55;
 
+/** The battle song and where it is, so the DJ can spin it back or brake it. */
+export type SongTap = () => { buffer: AudioBuffer; time: number } | null;
+
+/** Plays hype sounds through the hype limiter; the record moves are made from the song when there is one. */
+function hypePlayer(game: Phaser.Game, song: SongTap = () => null): PlayFn {
+  return (sound, delay) => {
+    const playing = isRecordMove(sound) ? song() : null;
+    if (playing && isRecordMove(sound)) return startRecordMove(game, sound, playing.buffer, playing.time + delay, delay);
+    return startSfx(game, sound, delay, 1, 'hype');
+  };
+}
+
 /**
  * The hype for one battle scene: the mixer wired to Web Audio, and a crowd
  * bed that swells with the player's streak and how far the bar leans their
@@ -299,12 +366,10 @@ export class HypeAudio {
   private bedWanted = false;
   private energy = 0;
 
-  constructor(game: Phaser.Game) {
+  /** `song` lets the DJ spin back or brake the battle song itself. */
+  constructor(game: Phaser.Game, song?: SongTap) {
     this.game = game;
-    this.mixer = new HypeMixer(
-      (sound, delay) => startSfx(game, sound, delay),
-      () => getSettings().announcer,
-    );
+    this.mixer = new HypeMixer(hypePlayer(game, song), () => getSettings().announcer);
   }
 
   private get now(): number {
@@ -362,7 +427,7 @@ export class HypeAudio {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
     gain.gain.setTargetAtTime(this.bedLevel(), ctx.currentTime, 0.4);
-    source.connect(gain).connect(ctx.destination);
+    source.connect(gain).connect(busInput(ctx, 'hype'));
     source.start(ctx.currentTime, Math.random() * buffer.duration);
     source.onended = () => gain.disconnect();
     this.bed = { source, gain };
@@ -371,5 +436,5 @@ export class HypeAudio {
 
 /** A one-off cue outside a battle (the results screens). */
 export function playHype(game: Phaser.Game, event: HypeEvent): void {
-  new HypeMixer((sound, delay) => startSfx(game, sound, delay), () => getSettings().announcer).cue(cueFor(event), getAudioContext(game).currentTime);
+  new HypeMixer(hypePlayer(game), () => getSettings().announcer).cue(cueFor(event), getAudioContext(game).currentTime);
 }

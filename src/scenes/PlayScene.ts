@@ -352,7 +352,9 @@ export class PlayScene extends Phaser.Scene {
 
     preloadSamples(this.game);
     // Like hype mode, the crowd and MC are for battles, not the Coach's lessons.
-    this.hypeAudio = this.rival && this.story?.segment?.kind !== 'lesson' ? new HypeAudio(this.game) : null;
+    // The DJ spins back and brakes the battle song itself.
+    const song = () => (this.conductor ? { buffer: this.conductor.buffer, time: this.conductor.time } : null);
+    this.hypeAudio = this.rival && this.story?.segment?.kind !== 'lesson' ? new HypeAudio(this.game, song) : null;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('blur', this.onBlur);

@@ -1,3 +1,5 @@
+import { masterInput } from './sfx';
+
 /**
  * Plays one decoded song and reports the playback position from the audio
  * clock, so notes stay in sync regardless of frame rate. Supports a silent
@@ -22,7 +24,7 @@ export class Conductor {
     this.buffer = buffer;
     this.gain = ctx.createGain();
     this.gain.gain.value = volume;
-    this.gain.connect(ctx.destination);
+    this.gain.connect(masterInput(ctx));
   }
 
   get duration(): number {
