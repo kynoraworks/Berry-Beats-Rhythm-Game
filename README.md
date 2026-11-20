@@ -43,15 +43,30 @@ Keys, volume, scroll speed, audio offset and a reduce-motion switch are under Op
 
 ### Story mode
 
-Six stages, each unlocked by clearing the one before: a tutorial with the Coach, then five dance battles.
+It is November in Berry Town. Berry, a quiet Blackberry in a purple hoodie, has hidden in his room since the summer his best friend Blueberry left for Fruit City. When the Coach hands him a ticket to the Grand Dance at the end of the Line, Raspberry drags him onto the train. The full story, cast and every line of dialogue are in [`docs/STORY_BIBLE.md`](docs/STORY_BIBLE.md).
 
-| Rival | Where | How they dance and battle |
-| --- | --- | --- |
-| Raspberry | Her room, then the rooftop and the club | An all-rounder |
-| Pear | A street corner | A b-boy: laid-back and heavy, with long freezes. Starts loose and finishes strong |
-| Dr. Lemon | His lab | A mad scientist: jittery and twitchy. Swings between flawless streaks and meltdowns |
+- **The Line:** 12 stops, each opened by winning the one before. The train is the hub: pick a stop on the route map and ride. Allies who join sit on the bench with Berry.
+- **A stop:** step off at the station, talk to the local who knows the way out, walk the street, look around, then face the stop's fruit in a dance battle. You must win to move on; a loss shows a line from the rival and you go again.
+- **Gimmicks:** every fruit fights in its own way, from Banana's sliding notes to Dragon Fruit's flashes and Pineapple's double-cost misses.
+- **Flair and your backup:** hits fill the Flair meter. When it is full, press `Space` (or tap the meter) to fire your backup's ability for 8 beats. Choose the backup on the train or in the pause menu.
+- **The Grand Stage:** the last stop is a 5v5 crew battle. Order your four allies against Blueberry's crew, then Berry dances the deciding round.
 
-Each stage opens and closes with a short conversation. Click, tap or press `Enter` to move it on.
+| Stop | Fruit | Gimmick | Joins your crew with |
+| --- | --- | --- | --- |
+| 1 Berry Town | Raspberry | none | Steady: wider timing windows |
+| 2 Peel Street | Banana | notes slide in from the next lane | |
+| 3 Graffiti Corner | Pear | starts slow, finishes strong | Second Wind: double score in the back half of a round |
+| 4 Vine Crossing | Grape | notes in pairs | |
+| 5 Citrus Labs | Dr. Lemon | flawless streaks, then a meltdown that shakes your notes | Eureka: the next 8 notes score triple |
+| 6 Lantern Market | Plum | long rests | |
+| 7 The Club | Dragon Fruit | flashes hide your arrows | |
+| 8 Rooftop | Watermelon | long holds | Rind: shrugs off your next 3 misses |
+| 9 The Tunnel | Coconut | your Flair charges slower | |
+| 10 Orange Plaza | Orange | rapid bursts, then rests | |
+| 11 Pineapple Hall | Pineapple | misses cost double | |
+| 12 Grand Stage | Blueberry | the 5v5 crew battle | |
+
+Dialogue moves on with a click, a tap or `Enter`; `Esc` skips a scene. Options has a Reduce motion switch, which also turns Dragon Fruit's flashes into smoke, and Reset story.
 
 ### How a battle works
 
@@ -125,16 +140,26 @@ Project layout:
 | Path | Contents |
 | --- | --- |
 | `src/core` | Shared code: chart format, scoring engine, battle rules, audio clock, settings, saves, UI helpers |
-| `src/scenes` | One file per screen: title, menu, level select, options, play, results, beat maps, composer |
+| `src/scenes` | One file per screen: title, menu, the train, stations and streets, lineup, play, results, ending, options, beat maps, composer |
+| `src/story` | The story as data: cast, stops, dialogue (from the bible), places, progress, gimmicks, abilities, the crew battle |
+| `src/explore` | Walking, doors and painted stand-in backgrounds for stations and streets |
 | `src/play` | Play field rendering: notes, dancers, rival profiles, HUD, dialogue, stage effects |
 | `src/composer` | Beat map editor logic and widgets |
 | `public/assets` | Art, music and font used at runtime (generated, see below) |
-| `public/charts` | Story mode beat maps |
+| `public/charts` | Story beat maps: `tutorial.json` and `stop01.json` to `stop12.json` |
+| `docs` | The story bible and the background art spec |
 | `tools` | Scripts that generate assets and charts |
 | `tests` | Unit tests and the browser smoke test |
 | `archive` | The original Unity project, concept art, game art and music masters |
 
-Handy URLs while developing: `?scene=Menu` jumps to a scene, `?scene=Play&level=tutorial&autoplay=1` watches a level play itself, and `&at=30` starts 30 seconds in.
+Handy URLs while developing: `?scene=Menu` jumps to a scene, `?scene=Play&level=stop04&autoplay=1` watches a stop's battle play itself (add `&story=1` for its dialogue), and `&at=30` starts 30 seconds in. Note that `story=1` with autoplay can mark a stop cleared in your save.
+
+### Changing the story
+
+- **Dialogue** lives in `src/story/script.ts` and must match `docs/STORY_BIBLE.md` word for word: `tests/story.test.ts` parses the bible and fails on any difference, on lines over 90 characters, unknown speakers, or expressions other than neutral and bold. Edit the bible first, then the script.
+- **Station and street lines** that are not in the bible are in `src/story/places.ts`; `tests/places.test.ts` holds them to the same rules.
+- **A stop** is an entry in `src/story/stops.ts` (station, fruit, role, song, stage, time of day, gimmick) plus a chart in `public/charts` and its places in `src/story/places.ts`.
+- **Art** is optional at runtime: anything missing is drawn as a stand-in. To add or replace a picture, put the PNG in `public/assets/img` and list it in `src/core/assets.ts`; `tests/assets.test.ts` checks the list against the folder. Sizes and layout for stations and streets are in `docs/EXPLORE_ART.md`.
 
 ### Regenerating assets and charts
 
@@ -143,7 +168,7 @@ Runtime assets are built from the archived originals and committed, so this is o
 ```bash
 pip install pillow fonttools numpy
 python3 tools/prepare_assets.py     # backgrounds, HUD, music, font, icons, share image
-python3 tools/build_characters.py   # Blackberry, Raspberry, Coach, Pear and Dr. Lemon sprite sheets
+python3 tools/build_characters.py   # every dancer's sprite sheet (full and lite layouts)
 python3 tools/make_crowd.py         # crowd silhouettes, built from the dancers
 ```
 
@@ -170,7 +195,8 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 - Beat maps are JSON measured in beats, instead of binary files tied to the Unity build.
 - Hold notes are single long notes rather than runs of small ones.
 - The rival is scored too, so the tug-of-war bar from the original mockups is a real contest with turns and rounds.
-- Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged. The Coach, the Pear, Dr. Lemon, the new stage backgrounds and the judgement lettering were made the same way.
+- Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. Blackberry's 21 original frames are unchanged. The Coach, the Pear and Dr. Lemon (51 frames), the nine other fruits (18 frames each), the portraits, the stations, streets and stages, and the judgement lettering were made the same way.
+- The story grew from a handful of test levels into a 12-stop journey with dialogue, exploration, per-fruit gimmicks, crew abilities and a 5v5 finale, written up in `docs/STORY_BIBLE.md`.
 - The story levels have new charts for Nicole Yazmin's tracks, generated from the audio by `tools/analyze_audio.py`. The old test levels were timed to a placeholder song that is not part of the game.
 - The menu's "Online" entry, which was never built, is replaced by Beat Maps.
 
