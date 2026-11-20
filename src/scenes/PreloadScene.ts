@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { parseChart } from '../core/chart';
+import { optionalImages, optionalSheets } from '../core/assets';
 import { LEVELS, loadLevelChart } from '../core/levels';
+import { stopForChart } from '../story/stops';
 import { addText } from '../core/ui';
 import type { PlayData } from '../core/flow';
 
@@ -60,6 +62,9 @@ export class PreloadScene extends Phaser.Scene {
     this.load.image(Tex.arrowDown, `${IMG}arrow_ui_down.png`);
     this.load.image(Tex.logo, `${IMG}logo.png`);
     this.load.image(Tex.titleBg, `${IMG}title_bg.jpg`);
+    // Art that is drawn bit by bit: only what is listed as present is requested.
+    for (const optional of optionalSheets()) sheet(optional.key, optional.file, optional.frameWidth, optional.frameHeight);
+    for (const optional of optionalImages()) this.load.image(optional.key, IMG + optional.file);
   }
 
   create(): void {
@@ -85,6 +90,7 @@ export class PreloadScene extends Phaser.Scene {
     for (const [key, texture] of [
       [Anim.raspberrySit, Tex.raspberrySit],
       [Anim.coachSit, Tex.coachSit],
+      [Anim.watermelonSit, Tex.watermelonSit],
       [Anim.pearSit, Tex.pearSit],
       [Anim.lemonSit, Tex.lemonSit],
     ] as const) {
@@ -109,6 +115,8 @@ export class PreloadScene extends Phaser.Scene {
    * Normally goes to the title screen. For development and automated tests the
    * URL can jump straight to a scene: `?scene=Menu`, or `?scene=Play&level=tutorial&autoplay=1`
    * (`&chart=charts/some.json` plays any chart file, `&at=30` starts 30 seconds in).
+   * `level` takes a stop's chart id too (`level=stop05`); add `&story=1` to play it as the
+   * story does, with its dialogue, its win lines and the rematch after a loss.
    */
   private async startFirstScene(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
@@ -119,11 +127,13 @@ export class PreloadScene extends Phaser.Scene {
       const chartUrl = params.get('chart');
       try {
         const chart = chartUrl ? parseChart(await (await fetch(chartUrl)).json()) : await loadLevelChart(level);
+        const stop = chartUrl ? undefined : stopForChart(level.id);
         const data: PlayData = {
           chart,
-          returnTo: { scene: SceneKeys.LevelSelect },
+          returnTo: { scene: SceneKeys.LevelSelect, data: stop ? { levelId: stop.id } : undefined },
           autoplay: params.get('autoplay') === '1',
           startAt: Number(params.get('at')) || undefined,
+          story: stop && params.get('story') === '1' ? { stop: stop.id, segment: stop.number === 1 ? 1 : 0 } : undefined,
         };
         this.scene.start(SceneKeys.Play, data);
         return;

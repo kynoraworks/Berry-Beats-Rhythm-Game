@@ -1,5 +1,6 @@
 import type { Chart } from './chart';
 import type { Stats } from './engine';
+import type { StoryRef } from '../story/flow';
 
 /** Data passed between scenes with `goTo(scene, key, data)`. */
 
@@ -18,12 +19,14 @@ export interface PlayData {
   practice?: boolean;
   /** The game plays itself (used by automated tests and demos). */
   autoplay?: boolean;
+  /** Part of the story: which stop and which of its segments this is. */
+  story?: StoryRef;
 }
 
 /** Outcome of a dance battle against a rival who is scored too. */
 export interface BattleSummary {
   rivalName: string;
-  /** Texture key of the rival's sprite sheet (51-frame berry layout), for the results screen. */
+  /** Texture key of the rival's sprite sheet, for the results screen (its layout is looked up from the key). */
   rivalTexture: string;
   playerRounds: number;
   rivalRounds: number;

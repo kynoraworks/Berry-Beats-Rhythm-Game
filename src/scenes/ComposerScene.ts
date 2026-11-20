@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex, type Lane } from '../core/config';
-import { beatToSec, newChart, secToBeat, type Chart, type RivalKind } from '../core/chart';
+import { FRUITS, beatToSec, newChart, secToBeat, type Chart, type FruitId, type RivalKind } from '../core/chart';
+import { CAST } from '../story/cast';
 import { Conductor } from '../core/conductor';
 import type { ComposerData, PlayData } from '../core/flow';
 import { music } from '../core/music';
@@ -56,8 +57,12 @@ interface Recording {
 }
 
 const RATES = [0.5, 0.75, 1] as const;
-const RIVALS: RivalKind[] = ['raspberry', 'pear', 'lemon', 'dancer', 'none'];
-const RIVAL_LABELS: Record<RivalKind, string> = { raspberry: 'Raspberry', pear: 'Pear', lemon: 'Dr. Lemon', dancer: 'Coach', none: 'None (solo)' };
+const RIVALS: RivalKind[] = [...FRUITS, 'dancer', 'none'];
+const RIVAL_LABELS: Record<RivalKind, string> = {
+  ...(Object.fromEntries(FRUITS.map((fruit) => [fruit, CAST[fruit].name])) as Record<FruitId, string>),
+  dancer: 'Coach',
+  none: 'None (solo)',
+};
 /** Depth of the toolbars and side panels, above the timeline. */
 const CHROME_DEPTH = 20;
 const HELP_DEPTH = 900;

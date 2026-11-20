@@ -2,8 +2,10 @@ import Phaser from 'phaser';
 import { seededRandom } from '../core/battle';
 import { PX, Tex, type Lane } from '../core/config';
 import type { RivalKind } from '../core/chart';
+import { LITE_SHEETS } from '../story/cast';
+import { characterSheet } from '../story/placeholders';
+import type { SheetLayout } from '../story/types';
 import { Depth } from './layout';
-import { rivalProfile } from './rivals';
 
 /** Hitting the same lane again within this time switches to the alternate move. */
 const REPEAT_WINDOW = 1.2;
@@ -203,6 +205,39 @@ const BERRY: FrameSet = {
   defeat: [31],
   hype: 32,
 };
+
+/**
+ * The lite layout of the newer fruits: 18 frames in two rows of nine.
+ * 0-2 idle (stand, dip, accent), 3-4 left, 5-6 right, 7-8 up, 9-10 down,
+ * 11-12 stumble, 13 victory, 14 defeat, 15-17 the fruit's signature move.
+ */
+const LITE: FrameSet = {
+  idle: [0, 1, 2],
+  groove: [0, 1, 0, 2],
+  lanes: [
+    [3, 4],
+    [7, 8],
+    [9, 10],
+    [5, 6],
+  ],
+  stumble: [11, 12],
+  // The signature plays as a sequence ending on its last frame, like the berries' spin.
+  spin: [15, 16, 17],
+  victory: [13],
+  defeat: [14],
+};
+
+const LAYOUTS: Record<SheetLayout, FrameSet> = { berry: BERRY, lite: LITE };
+
+/** Layout of a sheet, from its texture key. Stand-ins and the older sheets use the berry layout. */
+export function layoutOf(texture: string): SheetLayout {
+  return LITE_SHEETS.has(texture) ? 'lite' : 'berry';
+}
+
+/** Frames other screens show a dancer in: victory loop, defeat and a confident pose. */
+export function poseFrames(texture: string): { victory: number[]; defeat: number; boast: number } {
+  return layoutOf(texture) === 'lite' ? { victory: [13], defeat: 14, boast: 16 } : { victory: [29, 30], defeat: 31, boast: 41 };
+}
 
 // The instructor from the original test scene. Frame numbers come from the Unity dancer asset.
 const INSTRUCTOR: FrameSet = {
@@ -555,7 +590,6 @@ export function createRival(scene: Phaser.Scene, kind: RivalKind, x: number, y: 
     // The original art: frames are 160x160 with the feet at y=137 and the body centred near x=84.
     return new Dancer(scene, x, y, Tex.dancer, INSTRUCTOR, 3, 84 / 160, 137 / 160);
   }
-  const sheet = rivalProfile(kind).sheet;
-  const texture = scene.textures.exists(sheet) ? sheet : Tex.raspberry;
-  return new Dancer(scene, x, y, texture, BERRY, PX, 0.5, BERRY_ORIGIN_Y, STYLES[kind], { ...options, seed: `${options.seed ?? ''}:${kind}` });
+  const { texture, layout } = kind === 'dancer' ? { texture: Tex.instructor, layout: 'berry' as const } : characterSheet(scene, kind);
+  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[kind], { ...options, seed: `${options.seed ?? ''}:${kind}` });
 }

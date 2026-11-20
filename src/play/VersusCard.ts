@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, GAME_H, GAME_W, Tex } from '../core/config';
 import { addBody, addText } from '../core/ui';
-import { BERRY_ORIGIN_Y, BerryFrame } from './characters';
+import { BERRY_ORIGIN_Y, BerryFrame, layoutOf, poseFrames } from './characters';
 import { Depth } from './layout';
 import type { RivalProfile } from './rivals';
 
@@ -32,8 +32,9 @@ export class VersusCard {
       if (trait) parts.push(addBody(scene, 0, 92, trait, 26, { color: CSS.cream, stroke: true }));
       return scene.add.container(0, 560, parts);
     };
-    this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Blackberry', CSS.blue, false);
-    this.right = side(rivalTexture, look.versusFrame, rivalName, look.css, true, look.trait);
+    this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Berry', CSS.blue, false);
+    const pose = layoutOf(rivalTexture) === 'lite' ? poseFrames(rivalTexture).boast : look.versusFrame;
+    this.right = side(rivalTexture, pose, rivalName, look.css, true, look.trait);
     this.versus = addText(scene, GAME_W / 2, 330, 'VS', 128, { color: CSS.yellow });
     this.layer = scene.add.container(0, 0, [dim, this.left, this.right, this.versus]).setDepth(Depth.overlay + 5);
     this.update(0);

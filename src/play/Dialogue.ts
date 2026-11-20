@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, GAME_H, GAME_W, Tex } from '../core/config';
-import type { DialogueLine } from '../core/levels';
+import { COLORS, CSS, FONT, GAME_H, GAME_W, Tex } from '../core/config';
 import { hint } from '../core/mobile';
 import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { UI_SCALE, UiButton, addBody, addBox, addIcon, addText, addUiButton } from '../core/ui';
-import { BerryFrame } from './characters';
+import { CAST, portraitFrame, speakerName } from '../story/cast';
+import type { Line } from '../story/types';
 
 const MARGIN = 36;
 const GAP = 12;
@@ -26,27 +26,19 @@ const LIGATURE = /(f)(?=[fijl])/g;
 /** Presses this soon after a line appears are ignored, so one tap cannot skip two lines. */
 const GUARD_MS = 140;
 
-export interface Speaker {
-  name: string;
-  /** Colour of the name tag. */
-  color: number;
-  /** Dark lettering, for a tag too pale for the usual cream. */
-  darkText?: boolean;
-  /** Sprite sheet in the shared berry layout, used when there are no drawn portraits. */
-  texture: string | null;
-  /** First of this speaker's two frames in the portrait sheet: neutral, then bold. */
-  portraitFrame: number;
-}
-
 export interface DialogueOptions {
-  lines: DialogueLine[];
-  player: Speaker;
-  rival: Speaker;
+  lines: readonly Line[];
   depth: number;
+  /** Berry's bold face has his hood down (the last scene of the story). */
+  hoodDown?: boolean;
   /** Called as each line starts, so the stage can light whoever is speaking. */
-  onSpeaker: (who: DialogueLine['who']) => void;
+  onLine: (line: Line) => void;
   onDone: () => void;
 }
+
+/** Size of a portrait frame, and how much it is enlarged in the box. */
+const PORTRAIT_SIZE = 64;
+const PORTRAIT_SCALE = 3;
 
 /** Retry and Restart go straight back into the song without repeating the conversation. */
 let skipIntro = false;
@@ -75,6 +67,8 @@ export class Dialogue {
   private readonly box: Phaser.GameObjects.NineSlice;
   private readonly portraitBox: Phaser.GameObjects.NineSlice;
   private readonly portrait: Phaser.GameObjects.Image;
+  private readonly stand: Phaser.GameObjects.Graphics;
+  private readonly standLetter: Phaser.GameObjects.Text;
   private readonly tag: Phaser.GameObjects.NineSlice;
   private readonly nameText: Phaser.GameObjects.Text;
   private readonly body: Phaser.GameObjects.Text;
@@ -99,6 +93,8 @@ export class Dialogue {
 
     this.portraitBox = addBox(scene, 0, GAME_H - MARGIN - PORTRAIT_BOX, PORTRAIT_BOX, PORTRAIT_BOX, 'panel');
     this.portrait = scene.add.image(0, 0, Tex.blackberry, 0);
+    this.stand = scene.add.graphics();
+    this.standLetter = addText(scene, 0, 0, '', 112, { color: CSS.cream });
     this.box = addBox(scene, 0, BOX_Y, BOX_W, BOX_H, 'panel_light');
     this.tag = addBox(scene, 0, BOX_Y - 28, 200, 48, 'tag');
     this.nameText = addText(scene, 0, BOX_Y - 4, '', 24, { stroke: false, color: CSS.cream });
@@ -107,7 +103,7 @@ export class Dialogue {
     this.help = addBody(scene, 0, BOX_Y + BOX_H - 30, hint('Enter: next   Esc: skip', 'Tap: next'), 18, { color: '#8a7f9c', origin: [0, 0.5] });
     this.skip = addUiButton(scene, GAME_W - 104, 52, 'Skip', () => this.finish(), { width: 160, height: 56, size: 24, sfx: 'back' });
     this.layer = scene.add
-      .container(0, 0, [this.portraitBox, this.portrait, this.box, this.tag, this.nameText, this.body, this.next, this.help, this.skip.container])
+      .container(0, 0, [this.portraitBox, this.stand, this.standLetter, this.portrait, this.box, this.tag, this.nameText, this.body, this.next, this.help, this.skip.container])
       .setDepth(options.depth);
     if (!this.calm) scene.tweens.add({ targets: this.next, y: this.next.y + 8, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
@@ -164,9 +160,9 @@ export class Dialogue {
     this.next.setVisible(false);
     this.body.setText('');
 
-    const speaker = line.who === 'player' ? this.options.player : this.options.rival;
-    // Blackberry's portrait sits on the left, the rival's on the right, like the stage.
-    const onLeft = line.who === 'player';
+    const character = CAST[line.who];
+    // Berry's portrait sits on the left, everyone else's on the right, like the stage.
+    const onLeft = line.who === 'berry';
     const portraitX = onLeft ? MARGIN : GAME_W - MARGIN - PORTRAIT_BOX;
     const boxX = onLeft ? MARGIN + PORTRAIT_BOX + GAP : MARGIN;
     this.portraitBox.setX(portraitX);
@@ -174,38 +170,56 @@ export class Dialogue {
     this.body.setX(boxX + 32);
     this.help.setX(boxX + 32);
     this.next.setX(boxX + BOX_W - 44);
-    this.setPortrait(speaker, line.mood === 'bold', portraitX + PORTRAIT_BOX / 2, !onLeft);
+    this.setPortrait(line, portraitX + PORTRAIT_BOX / 2);
 
     // Wrap the whole line up front, so words do not jump to the next row as they type out.
     this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
 
-    this.nameText.setText(speaker.name).setColor(speaker.darkText ? CSS.ink : CSS.cream);
+    this.nameText.setText(speakerName(line)).setColor(character.darkTag ? CSS.ink : CSS.cream);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;
     const tagX = onLeft ? boxX + 24 : boxX + BOX_W - 24 - tagWidth;
-    this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(speaker.color);
+    this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(character.tag);
     this.nameText.setX(tagX + tagWidth / 2);
-    this.options.onSpeaker(line.who);
+    this.options.onLine(line);
   }
 
-  private setPortrait(speaker: Speaker, bold: boolean, centerX: number, faceLeft: boolean): void {
+  /** The speaker's drawn portrait, or a stand-in in their colour while it is not drawn yet. */
+  private setPortrait(line: Line, centerX: number): void {
     const centerY = GAME_H - MARGIN - PORTRAIT_BOX / 2;
-    const image = this.portrait;
-    const frame = speaker.portraitFrame + (bold ? 1 : 0);
-    // The portrait sheet may be older than the cast: a speaker without a frame in it uses the close-up below.
-    if (this.scene.textures.exists(Tex.portraits) && this.scene.textures.get(Tex.portraits).has(String(frame))) {
-      image.setTexture(Tex.portraits, frame).setCrop().setOrigin(0.5).setScale(3).setFlipX(false);
-      image.setPosition(centerX, centerY).setVisible(true);
+    const frame = portraitFrame(line, this.options.hoodDown);
+    const sheet = this.scene.textures.exists(Tex.portraits) ? this.scene.textures.get(Tex.portraits) : null;
+    // A hood-down frame that is not drawn yet falls back to his usual bold face.
+    const usable = sheet?.has(String(frame)) ? frame : line.who === 'berry' && sheet?.has(String(portraitFrame(line))) ? portraitFrame(line) : null;
+    if (usable !== null) {
+      this.portrait.setTexture(Tex.portraits, usable).setOrigin(0.5).setScale(PORTRAIT_SCALE).setPosition(centerX, centerY).setVisible(true);
+      this.stand.setVisible(false);
+      this.standLetter.setVisible(false);
       return;
     }
-    if (!speaker.texture) {
-      image.setVisible(false);
-      return;
-    }
-    // No drawn portraits yet: a close-up of the dance sprite's head and shoulders.
-    // Berry-layout frames are 64x64 with the head roughly in rows 12 to 44.
-    image.setTexture(speaker.texture, bold ? BerryFrame.fingerGuns : 0).setFlipX(faceLeft);
-    image.setCrop(12, 10, 40, 36).setOrigin(0.5, 28 / 64).setScale(5);
-    image.setPosition(centerX, centerY).setVisible(true);
+    this.portrait.setVisible(false);
+    const character = CAST[line.who];
+    const size = PORTRAIT_SIZE * PORTRAIT_SCALE;
+    const left = centerX - size / 2;
+    const top = centerY - size / 2;
+    const bold = line.mood === 'bold';
+    // A bust in the speaker's colour: shoulders, a head and their initial, drawn in blocks.
+    this.stand
+      .clear()
+      .fillStyle(COLORS.ink, 1)
+      .fillRect(left, top, size, size)
+      .fillStyle(character.color, bold ? 1 : 0.8)
+      .fillRect(left + 24, top + 138, size - 48, size - 138)
+      .fillRect(left + 48, top + 30, size - 96, 108)
+      .fillStyle(0xffffff, 0.18)
+      .fillRect(left + 48, top + 30, size - 96, 12)
+      .setVisible(true);
+    const initial = (line.who === 'npc' ? speakerName(line) : character.name).replace(/^Dr\.\s*/, '').charAt(0).toUpperCase();
+    this.standLetter
+      .setText(bold ? `${initial}!` : initial)
+      .setFontFamily(FONT)
+      .setPosition(centerX, top + 86)
+      .setColor(character.darkTag ? CSS.ink : CSS.cream)
+      .setVisible(true);
   }
 
   private advance(): void {

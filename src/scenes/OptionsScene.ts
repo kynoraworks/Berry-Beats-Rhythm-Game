@@ -7,6 +7,7 @@ import { playSfx } from '../core/sfx';
 import { UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addSlider, addText, addToggle, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { FocusFrame, addSectionTitle, addStepArrow, type Bounds } from '../menus/kit';
 import { OffsetTest } from '../menus/offsetTest';
+import { resetStory } from '../story/progress';
 
 interface OptionsData {
   returnTo?: string;
@@ -55,6 +56,7 @@ export class OptionsScene extends Phaser.Scene {
   private slot = 0;
   private rebinding = false;
   private resetArmed = false;
+  private storyResetArmed = false;
   /** Set when the capture listener has dealt with a key, so the menu handlers skip it. */
   private consumed = false;
   private test: OffsetTest | null = null;
@@ -77,6 +79,7 @@ export class OptionsScene extends Phaser.Scene {
     this.slot = 0;
     this.rebinding = false;
     this.resetArmed = false;
+    this.storyResetArmed = false;
     this.consumed = false;
     this.test = null;
     this.slotTexts = [];
@@ -139,7 +142,8 @@ export class OptionsScene extends Phaser.Scene {
       addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Press Enter to change one.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
     }
 
-    this.addButtonRow(DESC.x + DESC.w / 2, 668, 'Reset to defaults', 400, 'Put every option and key back to how it started.', () => this.reset());
+    this.addButtonRow(DESC.x + DESC.w / 2 - 156, 668, 'Reset options', 296, 'Put every option and key back to how it started.', () => this.reset());
+    this.addButtonRow(DESC.x + DESC.w / 2 + 156, 668, 'Reset story', 296, 'Start the story again from stop 1. Your best scores are kept.', () => this.resetStoryProgress());
 
     this.rows.forEach((row) => row.refresh());
     this.setFocus(0, false);
@@ -333,6 +337,7 @@ export class OptionsScene extends Phaser.Scene {
     if (next !== this.focus) {
       if (sound) playSfx(this.game, 'move');
       this.resetArmed = false;
+      this.storyResetArmed = false;
     }
     this.focus = next;
     this.say(this.rows[next].hint);
@@ -365,6 +370,19 @@ export class OptionsScene extends Phaser.Scene {
     if (isLeaving(this) || !this.idle()) return;
     if (sound) playSfx(this.game, 'back');
     goTo(this, this.returnTo);
+  }
+
+  private resetStoryProgress(): void {
+    if (!this.storyResetArmed) {
+      this.storyResetArmed = true;
+      playSfx(this.game, 'move');
+      this.say('Press again to start the story over. Scores are kept.', CSS.miss);
+      return;
+    }
+    this.storyResetArmed = false;
+    resetStory();
+    playSfx(this.game, 'select');
+    this.say('Story reset. The train is back at Berry Town.', CSS.perfect);
   }
 
   private reset(): void {

@@ -13,10 +13,14 @@ export interface ChartNote {
   d?: number;
 }
 
-/** Who dances on the rival's side. 'dancer' is the Coach. */
-export type RivalKind = 'raspberry' | 'pear' | 'lemon' | 'dancer' | 'none';
+/** The fruits of the story, in the order they are met. */
+export const FRUITS = ['raspberry', 'banana', 'pear', 'grape', 'lemon', 'plum', 'dragonfruit', 'watermelon', 'coconut', 'orange', 'pineapple', 'blueberry'] as const;
+export type FruitId = (typeof FRUITS)[number];
 
-const RIVAL_KINDS: readonly string[] = ['raspberry', 'pear', 'lemon', 'dancer', 'none'];
+/** Who dances on the rival's side. 'dancer' is the Coach. */
+export type RivalKind = FruitId | 'dancer' | 'none';
+
+const RIVAL_KINDS: readonly string[] = [...FRUITS, 'dancer', 'none'];
 
 export interface Chart {
   format: 1;

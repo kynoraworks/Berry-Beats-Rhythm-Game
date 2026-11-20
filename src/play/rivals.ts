@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, Tex } from '../core/config';
-import type { RivalKind } from '../core/chart';
+import type { FruitId, RivalKind } from '../core/chart';
+import { CAST, type IconShape } from '../story/cast';
+import { characterSheet } from '../story/placeholders';
 
 export type Rival = Exclude<RivalKind, 'none'>;
 
@@ -25,6 +27,8 @@ export interface RivalProfile {
   bar?: [string, string];
   /** Pixel map of her marker on the bar (omitted: the raspberry icon). */
   icon?: string[];
+  /** Colours for the letters of a generated icon's map (B body, A accent, H highlight). */
+  iconColors?: Record<string, string>;
 }
 
 // Marker icons are drawn at 24x24 like the berry icons. Letters pick a colour
@@ -83,51 +87,54 @@ const ICON_SIZE = 24;
 const ICON_OUTLINE = '#14182e';
 const ICON_RIM = '#f4ffe6';
 
-const PROFILES: Record<Rival, RivalProfile> = {
-  raspberry: { name: 'Raspberry', color: COLORS.pink, css: CSS.pink, tag: COLORS.pink, portraitFrame: 2, sheet: Tex.raspberry, versusFrame: 41, trait: 'All-rounder' },
-  // The Coach only demonstrates: her turns keep the default rival colour, only her name tag is her own.
-  dancer: { name: 'Coach', color: COLORS.pink, css: CSS.pink, tag: 0x2fb8a6, portraitFrame: 4, sheet: Tex.instructor, versusFrame: 41, trait: '' },
-  pear: {
-    name: 'Pear',
-    color: 0xa8d84a,
-    css: '#a8d84a',
-    tag: 0x5f9422,
-    portraitFrame: 6,
-    sheet: Tex.pear,
-    versusFrame: 44,
-    trait: 'Finishes strong',
-    bar: ['#a8d84a', '#7aa82e'],
-    icon: PEAR_ICON,
-  },
-  lemon: {
-    name: 'Dr. Lemon',
-    color: 0xffe14a,
-    css: '#ffe14a',
-    tag: 0xf2c81e,
-    darkTagText: true,
-    portraitFrame: 8,
-    sheet: Tex.lemon,
-    versusFrame: 41,
-    trait: 'Unpredictable',
-    bar: ['#ffe14a', '#e0b422'],
-    icon: LEMON_ICON,
-  },
-};
+/** How each rival looks. Built from the cast list, with the hand-drawn bar icons where there are any. */
+function profileFor(kind: Rival): RivalProfile {
+  if (kind === 'dancer') {
+    // The Coach only demonstrates: her turns keep the default rival colour, only her name tag is her own.
+    const coach = CAST.coach;
+    return { name: coach.name, color: COLORS.pink, css: CSS.pink, tag: coach.tag, portraitFrame: coach.portrait, sheet: Tex.instructor, versusFrame: 41, trait: '' };
+  }
+  const character = CAST[kind];
+  const hand = kind === 'pear' ? PEAR_ICON : kind === 'lemon' ? LEMON_ICON : undefined;
+  return {
+    name: character.name,
+    color: character.color,
+    css: character.css,
+    tag: character.tag,
+    darkTagText: character.darkTag,
+    portraitFrame: character.portrait,
+    sheet: character.sheet ?? Tex.raspberry,
+    versusFrame: kind === 'pear' ? 44 : 41,
+    trait: character.trait,
+    // Raspberry keeps the original pink bar art and berry icon.
+    bar: kind === 'raspberry' ? undefined : character.bar,
+    icon: kind === 'raspberry' ? undefined : (hand ?? drawnIcon(kind)),
+    iconColors: hand ? undefined : { B: character.css, A: character.accent, H: '#fff6e0' },
+  };
+}
+
+const PROFILES = new Map<Rival, RivalProfile>();
 
 /** Charts without a rival character are Raspberry's. */
 export function rivalProfile(kind: RivalKind | undefined): RivalProfile {
-  return PROFILES[kind === undefined || kind === 'none' ? 'raspberry' : kind];
+  const key: Rival = kind === undefined || kind === 'none' ? 'raspberry' : kind;
+  let profile = PROFILES.get(key);
+  if (!profile) {
+    profile = profileFor(key);
+    PROFILES.set(key, profile);
+  }
+  return profile;
 }
 
 /**
- * Sprite sheet to draw a rival with. A rival whose own art is not loaded
- * borrows Raspberry's, so the stage still plays. Null only for the Coach's
- * original art, which is in a different layout.
+ * Sprite sheet to draw a rival with: their own, or a stand-in in their colour
+ * until it is drawn. Null only for the Coach's original art, which is in a
+ * different layout.
  */
 export function rivalTexture(scene: Phaser.Scene, kind: RivalKind): string | null {
   if (kind === 'dancer') return scene.textures.exists(Tex.instructor) ? Tex.instructor : null;
-  const sheet = rivalProfile(kind).sheet;
-  return scene.textures.exists(sheet) ? sheet : Tex.raspberry;
+  if (kind === 'none') return null;
+  return characterSheet(scene, kind).texture;
 }
 
 /**
@@ -153,7 +160,8 @@ export function rivalBarTexture(scene: Phaser.Scene, kind: RivalKind): string {
 
 /** Texture and frame for a rival's marker on the bar. */
 export function rivalIcon(scene: Phaser.Scene, kind: RivalKind): { key: string; frame?: number } {
-  const map = rivalProfile(kind).icon;
+  const profile = rivalProfile(kind);
+  const map = profile.icon;
   if (!map) return { key: Tex.berries, frame: 1 };
   const key = `icon_rival_${kind}`;
   if (scene.textures.exists(key)) return { key };
@@ -186,10 +194,63 @@ export function rivalIcon(scene: Phaser.Scene, kind: RivalKind): { key: string; 
     for (let x = 0; x < ICON_SIZE; x++) {
       const cell = cells[y][x];
       if (cell === 0) continue;
-      ctx.fillStyle = cell === 1 ? ICON_RIM : cell === 2 ? ICON_OUTLINE : (ICON_COLORS[cell] ?? ICON_OUTLINE);
+      ctx.fillStyle = cell === 1 ? ICON_RIM : cell === 2 ? ICON_OUTLINE : (profile.iconColors?.[cell] ?? ICON_COLORS[cell] ?? ICON_OUTLINE);
       ctx.fillRect(x, y, 1, 1);
     }
   }
   canvas.refresh();
   return { key };
+}
+
+/**
+ * A bar marker for a fruit that has no hand-drawn one: a simple shape in the
+ * fruit's colours, drawn as a letter map so it gets the same outline as the others.
+ */
+function drawnIcon(kind: FruitId): string[] {
+  const shape: IconShape = CAST[kind].icon;
+  const rows: string[][] = Array.from({ length: ICON_SIZE }, () => Array.from({ length: ICON_SIZE }, () => '.'));
+  const put = (x: number, y: number, letter: string) => {
+    if (x >= 0 && y >= 0 && x < ICON_SIZE && y < ICON_SIZE) rows[y][x] = letter;
+  };
+  const disc = (cx: number, cy: number, r: number, letter = 'B') => {
+    for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) if (x * x + y * y <= r * r + r * 0.6) put(cx + x, cy + y, letter);
+    put(cx - Math.ceil(r / 2), cy - Math.ceil(r / 2), 'H');
+  };
+  switch (shape) {
+    case 'bunch':
+      for (const [x, y] of [[9, 9], [15, 9], [12, 13], [6, 13], [18, 13], [9, 17], [15, 17], [12, 20]]) disc(x, y, 3);
+      put(12, 4, 'A');
+      put(12, 5, 'A');
+      put(13, 5, 'A');
+      break;
+    case 'crescent':
+      for (let i = 0; i < 18; i++) {
+        const angle = Math.PI * (0.15 + (i / 17) * 0.7);
+        const x = Math.round(12 - Math.cos(angle) * 9);
+        const y = Math.round(6 + Math.sin(angle) * 11);
+        for (let t = -1; t <= 1; t++) put(x, y + t, 'B');
+      }
+      put(4, 9, 'A');
+      put(20, 9, 'A');
+      break;
+    case 'crown':
+      disc(12, 15, 6);
+      for (const [x, y] of [[9, 5], [12, 3], [15, 5], [10, 7], [12, 6], [14, 7], [11, 8], [13, 8]]) put(x, y, 'A');
+      break;
+    case 'spiky':
+      disc(12, 13, 7);
+      for (const [x, y] of [[5, 8], [19, 8], [4, 15], [20, 15], [8, 20], [16, 20], [12, 4]]) put(x, y, 'A');
+      break;
+    case 'big':
+      disc(12, 13, 9);
+      for (let y = 7; y <= 19; y += 3) put(12, y, 'A');
+      break;
+    default:
+      disc(12, 13, 7);
+      put(12, 5, 'A');
+      put(13, 5, 'A');
+      put(13, 4, 'A');
+      break;
+  }
+  return rows.map((row) => row.join(''));
 }

@@ -21,7 +21,6 @@ import { Conductor } from '../core/conductor';
 import { Engine, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
 import { LaneInput } from '../core/input';
-import { levelForChart, type DialogueLine, type LevelDef } from '../core/levels';
 import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
@@ -30,13 +29,19 @@ import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { createPlayer, createRival, type Dancer } from '../play/characters';
-import { Dialogue, consumeSkipIntro, skipNextIntro, type Speaker } from '../play/Dialogue';
+import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
+import { CAST } from '../story/cast';
+import { segmentAt } from '../story/flow';
+import { stageTexture } from '../story/placeholders';
+import { markCleared } from '../story/progress';
+import { nextRef, playSegment } from '../story/run';
+import type { Line } from '../story/types';
 
 type State = 'loading' | 'playing' | 'paused' | 'resuming' | 'ended';
 
@@ -69,8 +74,6 @@ const PAUSE_SONG_SPARE = 'menu';
 const LISTENER_TINT = 0x7a7896;
 /** Tempo of the standing idle while no music is playing. */
 const IDLE_BPM = 77;
-/** Accent colour of Blackberry's name tag. */
-const PLAYER_TAG = 0x6f7cff;
 
 export class PlayScene extends Phaser.Scene {
   private playData!: PlayData;
@@ -111,7 +114,8 @@ export class PlayScene extends Phaser.Scene {
   private pauseLayer!: Phaser.GameObjects.Container;
   private pauseFocus!: FocusGroup;
   private dialogue: Dialogue | null = null;
-  private storyLevel: LevelDef | undefined;
+  /** The story segment being played, if this is part of the story. */
+  private story: ReturnType<typeof segmentAt> = null;
   private buffer: AudioBuffer | null = null;
   private introDone = true;
   private loadingBack: UiButton | null = null;
@@ -148,7 +152,7 @@ export class PlayScene extends Phaser.Scene {
     this.errorCount = 0;
     this.countIndex = 0;
     this.dialogue = null;
-    this.storyLevel = undefined;
+    this.story = null;
     this.buffer = null;
     this.introDone = true;
     this.loadingBack = null;
@@ -166,19 +170,22 @@ export class PlayScene extends Phaser.Scene {
     this.speed = BASE_SCROLL_SPEED * settings.scrollSpeed;
     this.offsetSec = settings.audioOffsetMs / 1000;
     const chart = this.chart;
-    const level = levelForChart(chart.id);
+    const story = (this.story = this.playData.practice ? null : segmentAt(this.playData.story));
+    const segment = story?.segment;
     const startAt = this.playData.startAt ?? 0;
     const rivalKind = chart.rivalCharacter ?? 'raspberry';
     const rivalChart = rivalKind === 'none' ? [] : (chart.rival ?? []);
     const hasRival = rivalKind !== 'none';
     const isCoach = rivalKind === 'dancer';
     this.rivalLook = rivalProfile(rivalKind);
-    this.rivalName = level?.rivalName ?? this.rivalLook.name;
+    this.rivalName = this.rivalLook.name;
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
-    const isBattle = hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && (level?.battle ?? true);
+    const isBattle = hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && segment?.kind !== 'lesson';
+    // A lesson cannot be failed: the Coach just keeps counting.
+    const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson';
 
-    this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail: settings.noFail || !!this.playData.practice });
+    this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail });
     if (hasRival) {
       this.rivalEngine = new Engine(toTimedNotes(chart, rivalChart), { noFail: true });
       const notes = this.rivalEngine.notes;
@@ -200,7 +207,9 @@ export class PlayScene extends Phaser.Scene {
     this.lastNoteEnd = ends.reduce((latest, end) => Math.max(latest, end), 0);
 
     const playerX = hasRival ? PLAYER_X : GAME_W / 2;
-    this.stage = new StageFx(this, chart.stage ?? level?.stage ?? Tex.room, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
+    let stageKey = segment?.stage ?? chart.stage ?? Tex.room;
+    if (story && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, story.stop.station, story.stop.time, CAST[story.stop.fruit].color);
+    this.stage = new StageFx(this, stageKey, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     this.player = createPlayer(this, playerX, FLOOR_Y);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
@@ -234,8 +243,7 @@ export class PlayScene extends Phaser.Scene {
 
     // Story stages open with a conversation, unless this is a retry of one just seen.
     const retry = consumeSkipIntro();
-    this.storyLevel = level && !this.playData.practice && !this.playData.autoplay ? level : undefined;
-    const intro = this.storyLevel && !retry && startAt === 0 ? this.storyLevel.intro : [];
+    const intro = segment && !retry && startAt === 0 ? segment.before : [];
     if (intro.length > 0) {
       this.introDone = false;
       this.touchLanes?.setGuideVisible(false);
@@ -351,30 +359,19 @@ export class PlayScene extends Phaser.Scene {
   // Conversations before and after a story stage
   // ---------------------------------------------------------------------
 
-  private speakers(): { player: Speaker; rival: Speaker } {
-    const look = this.rivalLook;
-    return {
-      player: { name: 'Blackberry', color: PLAYER_TAG, texture: Tex.blackberry, portraitFrame: 0 },
-      rival: {
-        name: this.rivalName,
-        color: look.tag,
-        darkText: look.darkTagText,
-        texture: rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry'),
-        portraitFrame: look.portraitFrame,
-      },
-    };
-  }
-
   /** Run a conversation over the stage, lighting whoever is speaking. */
-  private startDialogue(lines: DialogueLine[], onDone: () => void): void {
+  private startDialogue(lines: readonly Line[], onDone: () => void, hoodDown = false): void {
+    const onStage = this.story?.stop.fruit;
     this.dialogue = new Dialogue(this, {
       lines,
-      ...this.speakers(),
+      hoodDown,
       depth: Depth.overlay + 6,
-      onSpeaker: (who) => {
-        this.stage.setTurn(who);
-        this.player.sprite.setTint(who === 'player' ? 0xffffff : LISTENER_TINT);
-        this.rival?.sprite.setTint(who === 'rival' ? 0xffffff : LISTENER_TINT);
+      onLine: (line) => {
+        // Berry and the stop's fruit are on stage. Anyone else speaks from the wings.
+        const side = line.who === 'berry' ? 'player' : this.rival && line.who === onStage ? 'rival' : null;
+        this.stage.setTurn(side ?? 'both');
+        this.player.sprite.setTint(side === 'player' ? 0xffffff : LISTENER_TINT);
+        this.rival?.sprite.setTint(side === 'rival' ? 0xffffff : LISTENER_TINT);
       },
       onDone: () => {
         this.dialogue = null;
@@ -448,6 +445,23 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
+  /** Play the next segment of the story, or go back to the train if this was the last. */
+  private continueStory(): void {
+    const ref = this.playData.story;
+    const next = ref ? nextRef(ref) : null;
+    if (!next) {
+      this.quit();
+      return;
+    }
+    playSegment(this, next, { autoplay: this.playData.autoplay }).catch(() => this.quit());
+  }
+
+  /** Straight back into a lost battle, without its opening conversation. */
+  private rematch(): void {
+    if (isLeaving(this)) return;
+    this.restart();
+  }
+
   private restart(): void {
     // The player has just seen this stage's opening: go straight back into the song.
     skipNextIntro();
@@ -488,15 +502,34 @@ export class PlayScene extends Phaser.Scene {
     this.player.finish(playerOnTop);
     this.rival?.finish(!playerOnTop);
     this.stage.setTurn(playerOnTop ? 'player' : 'rival');
-    // A story stage closes with a word from the rival before the results.
-    const outro = this.storyLevel ? (playerOnTop ? this.storyLevel.outroWin : this.storyLevel.outroLose) : [];
     const toResults = () => goTo(this, SceneKeys.Results, results, 400);
+    let outro: readonly Line[] = [];
+    let after = toResults;
+    let hoodDown = false;
+    const segment = this.story?.segment;
+    if (this.story && segment?.kind === 'lesson') {
+      // The lesson flows straight into the rest of the stop.
+      outro = segment.after;
+      after = () => this.continueStory();
+    } else if (this.story && segment?.kind === 'battle') {
+      // The story only moves on after a won battle. A loss earns a line of banter and a rematch.
+      // A chart without rival notes has no battle to win: getting through it is enough.
+      if (playerOnTop && (summary ? summary.won : true)) {
+        markCleared(this.story.stop);
+        outro = segment.win;
+        hoodDown = segment.hoodDown;
+        after = this.story.last ? toResults : () => this.continueStory();
+      } else {
+        outro = segment.lose;
+        after = () => this.rematch();
+      }
+    }
     const wrapUp = () => {
-      if (outro.length === 0 || isLeaving(this)) toResults();
+      if (outro.length === 0 || isLeaving(this)) after();
       else {
         this.countText.setText('');
         this.pauseButton.setVisible(false);
-        this.startDialogue(outro, toResults);
+        this.startDialogue(outro, after, hoodDown);
       }
     };
     if (failed) {

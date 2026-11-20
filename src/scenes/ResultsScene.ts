@@ -2,15 +2,17 @@ import Phaser from 'phaser';
 import { CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { accuracy, rankFor, type Judgement } from '../core/engine';
 import type { ResultsData } from '../core/flow';
-import { LEVELS, isUnlocked, levelForChart } from '../core/levels';
+import { levelForChart } from '../core/levels';
 import { music } from '../core/music';
 import { submitScore } from '../core/saves';
 import { getSettings, updateSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
-import { BERRY_ORIGIN_Y, BerryFrame } from '../play/characters';
+import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
+import { isStopOpen } from '../story/progress';
+import { STOPS, stopById } from '../story/stops';
 
 const ROWS: [Judgement, string, string][] = [
   ['perfect', 'Perfect', CSS.perfect],
@@ -69,7 +71,7 @@ export class ResultsScene extends Phaser.Scene {
     let newBest = false;
     // A run that scored nothing (possible with No Fail) is not a clear. A custom map that
     // happens to carry a story level's id must not write to that level's record either.
-    const fromStory = play.returnTo.scene === SceneKeys.LevelSelect;
+    const fromStory = play.story !== undefined || play.returnTo.scene === SceneKeys.LevelSelect;
     const borrowsStoryId = levelForChart(play.chart.id) !== undefined && !fromStory;
     if (!failed && !play.practice && !play.autoplay && stats.score > 0 && !borrowsStoryId) {
       newBest = submitScore(play.chart.id, {
@@ -162,10 +164,10 @@ export class ResultsScene extends Phaser.Scene {
     const unsaved = play.practice ? 'Test play: the score is not saved' : play.autoplay ? 'Autoplay: the score is not saved' : '';
     if (unsaved) addBody(this, RANK_X, 532 + badges.length * 34, unsaved, 20, { color: CSS.grey });
 
-    // Clearing a story stage offers the next one, if it is open.
-    const level = fromStory ? levelForChart(play.chart.id) : undefined;
-    const nextIndex = level && !failed ? LEVELS.indexOf(level) + 1 : -1;
-    const next = nextIndex > 0 && nextIndex < LEVELS.length && isUnlocked(nextIndex) ? LEVELS[nextIndex] : undefined;
+    // Winning a story battle offers the next stop, once it is open.
+    const stop = stopById(play.story?.stop);
+    const nextIndex = stop && !failed && battle?.won !== false ? STOPS.indexOf(stop) + 1 : -1;
+    const next = nextIndex > 0 && nextIndex < STOPS.length && isStopOpen(nextIndex) ? STOPS[nextIndex] : undefined;
 
     const openedAt = performance.now();
     const guarded = (action: () => void) => () => {
@@ -184,7 +186,7 @@ export class ResultsScene extends Phaser.Scene {
       ],
       [play.practice ? 'Back to editor' : 'Continue', back, undefined],
     ];
-    if (next) entries.push(['Next stage', guarded(() => this.leave(SceneKeys.LevelSelect, { levelId: next.id })), 'icon_next']);
+    if (next) entries.push(['Next stop', guarded(() => this.leave(SceneKeys.LevelSelect, { levelId: next.id })), 'icon_next']);
     const width = entries.length > 2 ? 272 : 288;
     const step = width + 24;
     this.choices = entries.map(([label, action, icon], i) => addUiButton(this, GAME_W / 2 + (i - (entries.length - 1) / 2) * step, BUTTON_Y, label, action, { width, icon }));
@@ -205,7 +207,8 @@ export class ResultsScene extends Phaser.Scene {
 
   /** A dancer beside the title, celebrating or slumped. */
   private addDancer(x: number, texture: string, celebrating: boolean, flip: boolean): void {
-    const frames = celebrating ? BerryFrame.victory : [BerryFrame.defeat];
+    const poses = poseFrames(texture);
+    const frames = celebrating ? poses.victory : [poses.defeat];
     const sprite = this.add.sprite(x, 204, texture, frames[0]).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(3).setFlipX(flip);
     if (frames.length > 1) {
       let step = 0;

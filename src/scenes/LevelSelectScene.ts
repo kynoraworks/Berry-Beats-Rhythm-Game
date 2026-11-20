@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import type { Chart } from '../core/chart';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
-import type { PlayData } from '../core/flow';
-import { LEVELS, isUnlocked, loadLevelChart, type LevelDef } from '../core/levels';
+import { loadStoryChart } from '../core/levels';
 import { onSwipe } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
 import { getBest } from '../core/saves';
@@ -10,6 +9,12 @@ import { playSfx } from '../core/sfx';
 import { UiButton, addBody, addBox, addHeader, addHints, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addMenuArrow, type MenuArrow } from '../menus/arrows';
 import { formatScore } from '../menus/kit';
+import { CAST } from '../story/cast';
+import { firstSegment } from '../story/flow';
+import { characterSheet } from '../story/placeholders';
+import { isCleared, isStopOpen, nextStopIndex } from '../story/progress';
+import { playSegment } from '../story/run';
+import { ROLE_LABELS, STOPS, stopTeaser } from '../story/stops';
 
 interface LevelSelectData {
   levelId?: string;
@@ -31,26 +36,13 @@ const POLE_W = 560;
 const WIPE_MS = 300;
 const MAX_DIFFICULTY = 5;
 
-/** Seated art for each opponent, with the standing dance sprite as a stand-in. */
-const SEATS: Record<LevelDef['rival'], { sit: string; anim: string; stand: string }> = {
-  coach: { sit: Tex.coachSit, anim: Anim.coachSit, stand: Tex.instructor },
-  raspberry: { sit: Tex.raspberrySit, anim: Anim.raspberrySit, stand: Tex.raspberry },
-  pear: { sit: Tex.pearSit, anim: Anim.pearSit, stand: Tex.pear },
-  lemon: { sit: Tex.lemonSit, anim: Anim.lemonSit, stand: Tex.lemon },
-};
+/** Widest a stop's name may be on the panel. */
+const NAME_W = PANEL.w - 56;
 
-/** Name tag colour per opponent, and whether the name reads better in dark ink on it. */
-const TAGS: Record<LevelDef['rival'], { tint: number; dark: boolean }> = {
-  coach: { tint: COLORS.lilac, dark: true },
-  raspberry: { tint: COLORS.pink, dark: false },
-  pear: { tint: 0xa8d84a, dark: true },
-  lemon: { tint: 0xffe14a, dark: true },
-};
+const OPENED_KEY = 'berrybeats.opened.v3';
 
-const OPENED_KEY = 'berrybeats.opened.v2';
-
-/** Remembered between visits. */
-let lastIndex = 0;
+/** Remembered between visits; the first visit starts at the next stop to play. */
+let lastIndex: number | null = null;
 
 /** Ids of the levels the player has already been shown as open, or null on a first visit. */
 function readOpened(): Set<string> | null {
@@ -106,8 +98,8 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   init(data: LevelSelectData): void {
-    const requested = LEVELS.findIndex((level) => level.id === data?.levelId);
-    this.index = requested >= 0 ? requested : Math.min(lastIndex, LEVELS.length - 1);
+    const requested = STOPS.findIndex((stop) => stop.id === data?.levelId);
+    this.index = requested >= 0 ? requested : Math.min(lastIndex ?? nextStopIndex(), STOPS.length - 1);
     lastIndex = this.index;
     this.busy = false;
     this.run++;
@@ -131,7 +123,7 @@ export class LevelSelectScene extends Phaser.Scene {
       goTo(this, SceneKeys.Menu);
     };
     addHeader(this, 'Story', toMenu);
-    addHints(this, 'Left / Right: choose a stage     Enter: play     Esc: back', 'Swipe or tap the arrows to choose a stage, then tap Play');
+    addHints(this, 'Left / Right: choose a stop     Enter: play     Esc: back', 'Swipe or tap the arrows to choose a stop, then tap Play');
 
     this.buildPanel();
     this.statusText = addBody(this, PANEL_CX, PANEL.y + PANEL.h + 44, '', 24, { stroke: true, bold: true });
@@ -204,8 +196,8 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private loadCharts(): void {
     const run = this.run;
-    LEVELS.forEach((level, i) => {
-      loadLevelChart(level).then(
+    STOPS.forEach((stop, i) => {
+      loadStoryChart(stop.chartUrl).then(
         (chart) => this.onChart(run, i, chart),
         () => this.onChart(run, i, null),
       );
@@ -219,21 +211,21 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   private isLocked(): boolean {
-    return !isUnlocked(this.index);
+    return !isStopOpen(this.index);
   }
 
   /** Work out which levels opened since the last visit and announce the first of them. */
   private noteNewlyOpened(): void {
-    const open = LEVELS.map((_, i) => i).filter((i) => isUnlocked(i));
+    const open = STOPS.map((_, i) => i).filter((i) => isStopOpen(i));
     const seen = readOpened();
-    writeOpened(open.map((i) => LEVELS[i].id));
+    writeOpened(open.map((i) => STOPS[i].id));
     // A first visit has nothing to compare against, so nothing is announced.
     if (seen === null) return;
-    const opened = open.filter((i) => !seen.has(LEVELS[i].id));
+    const opened = open.filter((i) => !seen.has(STOPS[i].id));
     if (opened.length === 0) return;
     for (const i of opened) this.fresh.add(i);
     const first = opened[0];
-    const name = LEVELS[first].name;
+    const name = STOPS[first].station;
     this.time.delayedCall(450, () => {
       playSfx(this.game, 'bonus');
       this.statusText.setText(`${name} is now open!`).setColor(CSS.yellow);
@@ -242,23 +234,25 @@ export class LevelSelectScene extends Phaser.Scene {
   }
 
   private refreshPanel(): void {
-    const level = LEVELS[this.index];
+    const stop = STOPS[this.index];
     const chart = this.charts[this.index];
     const locked = this.isLocked();
+    const fruit = CAST[stop.fruit];
 
-    this.countText.setText(`Stage ${this.index + 1} of ${LEVELS.length}`);
-    this.nameText.setText(level.name).setAlpha(locked ? 0.55 : 1);
-    this.blurbText.setText(level.blurb).setAlpha(locked ? 0.55 : 1);
-    const tag = TAGS[level.rival];
-    this.rivalTag.setTint(tag.tint);
-    this.rivalText.setText(`${level.battle ? 'vs' : 'with'} ${level.rivalName}`).setColor(tag.dark ? CSS.ink : CSS.cream);
+    this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}`);
+    this.nameText.setText(stop.station).setFontSize(64).setAlpha(locked ? 0.55 : 1);
+    // Long station names step down in size until they fit the panel.
+    for (let size = 56; this.nameText.width > NAME_W && size >= 32; size -= 8) this.nameText.setFontSize(size);
+    this.blurbText.setText(stopTeaser(stop)).setAlpha(locked ? 0.55 : 1);
+    this.rivalTag.setTint(fruit.tag);
+    this.rivalText.setText(`vs ${fruit.name}`).setColor(fruit.darkTag ? CSS.ink : CSS.cream);
 
     this.playButton.setVisible(!locked);
     this.lockedButton.setVisible(locked);
     if (locked) this.lockedZone.setInteractive();
     else this.lockedZone.disableInteractive();
     this.lockText.setVisible(locked);
-    if (locked) this.lockText.setText(`Clear ${LEVELS[this.index - 1].name} to open`);
+    if (locked) this.lockText.setText(`Win at ${STOPS[this.index - 1].station} to open`);
     this.newTag.setVisible(!locked && this.fresh.has(this.index));
     this.infoText.setVisible(!locked);
     this.bestText.setVisible(!locked);
@@ -270,47 +264,41 @@ export class LevelSelectScene extends Phaser.Scene {
       pip.setAlpha((on ? 1 : 0.45) * (locked ? 0.6 : 1)).setTint(on ? 0xffffff : 0x6a5a86);
     });
     if (chart) this.infoText.setText(`${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM`);
-    else this.infoText.setText(chart === null ? 'Chart not available' : 'Loading...');
+    else this.infoText.setText(chart === null ? 'This stop is not ready yet' : 'Loading...');
 
-    const best = getBest(level.id);
+    const best = getBest(stop.chartId);
     if (best) {
       const flag = best.fullCombo ? '   Full combo!' : '';
       this.bestText.setText(`Best ${formatScore(best.score)}   Rank ${best.rank}${flag}`).setColor(CSS.yellow);
     } else {
-      this.bestText.setText('No score yet').setColor(CSS.cream);
+      this.bestText.setText(isCleared(stop.id) ? 'Cleared' : 'Not cleared yet').setColor(CSS.cream);
     }
 
     this.left.image.setAlpha(this.index > 0 ? 1 : 0.25);
-    this.right.image.setAlpha(this.index < LEVELS.length - 1 ? 1 : 0.25);
+    this.right.image.setAlpha(this.index < STOPS.length - 1 ? 1 : 0.25);
   }
 
-  /** Seat the stage's opponent beside Berry. A locked stage only shows her outline. */
+  /** Seat the stop's fruit beside Berry. A locked stop only shows their outline. */
   private refreshRival(index: number): void {
-    const seat = SEATS[LEVELS[index].rival];
+    const id = STOPS[index].fruit;
+    const seat = CAST[id].seat;
     const rival = this.rival;
-    if (this.textures.exists(seat.sit) && this.anims.exists(seat.anim)) {
+    if (seat && this.textures.exists(seat.texture) && this.anims.exists(seat.anim)) {
       rival.setVisible(true).setOrigin(0.5).setPosition(RIVAL_X, BERRY_Y);
       rival.play(seat.anim, true);
-    } else if (this.textures.exists(seat.stand)) {
-      // No seated art yet: she stands at the bench instead. Frames are 64x64 with the feet on row 62.
-      rival.anims.stop();
-      rival
-        .setVisible(true)
-        .setTexture(seat.stand, 0)
-        .setOrigin(0.5, 63 / 64)
-        .setPosition(RIVAL_X, FLOOR_Y);
     } else {
-      rival.setVisible(false);
-      return;
+      // No seated art yet: they stand at the bench. Frames are 64x64 with the feet on row 62.
+      rival.anims.stop();
+      rival.setVisible(true).setTexture(characterSheet(this, id).texture, 0).setOrigin(0.5, 63 / 64).setPosition(RIVAL_X, FLOOR_Y);
     }
-    if (isUnlocked(index)) rival.clearTint().setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);
+    if (isStopOpen(index)) rival.clearTint().setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);
     else rival.setTint(COLORS.ink).setTintMode(Phaser.TintModes.FILL).setAlpha(0.85);
   }
 
   private change(dir: number): void {
     if (this.busy || isLeaving(this)) return;
     const next = this.index + dir;
-    if (next < 0 || next >= LEVELS.length) return;
+    if (next < 0 || next >= STOPS.length) return;
     this.busy = true;
     (dir < 0 ? this.left : this.right).flash();
     playSfx(this.game, 'move');
@@ -349,7 +337,7 @@ export class LevelSelectScene extends Phaser.Scene {
     // The original played each level's song as it came up. Wait a beat so flicking through stays quiet.
     // A locked level keeps its song a surprise.
     this.preview?.remove();
-    const song = isUnlocked(next) ? (LEVELS[next].song as MusicKey) : 'level_select';
+    const song = isStopOpen(next) ? (STOPS[next].song as MusicKey) : 'level_select';
     this.preview = this.time.delayedCall(500, () => music.play(song, 500));
   }
 
@@ -364,20 +352,17 @@ export class LevelSelectScene extends Phaser.Scene {
     }
     this.busy = true;
     const run = this.run;
-    const level = LEVELS[this.index];
+    const stop = STOPS[this.index];
     playSfx(this.game, 'select');
     this.statusText.setText('Loading...').setColor(CSS.cream);
     try {
-      const chart = await loadLevelChart(level);
-      if (run !== this.run || !this.scene.isActive()) return;
       this.preview?.remove();
-      music.stop();
-      const data: PlayData = { chart, returnTo: { scene: SceneKeys.LevelSelect, data: { levelId: level.id } } };
-      goTo(this, SceneKeys.Play, data);
-    } catch {
+      await playSegment(this, { stop: stop.id, segment: firstSegment(stop, isCleared(stop.id)) });
+      if (run === this.run) music.stop();
+    } catch (error) {
       if (run !== this.run || !this.scene.isActive()) return;
       playSfx(this.game, 'back');
-      this.statusText.setText(`${level.name} could not be loaded`).setColor(CSS.miss);
+      this.statusText.setText(error instanceof Error ? error.message : `${stop.station} could not be loaded`).setColor(CSS.miss);
       this.busy = false;
     }
   }

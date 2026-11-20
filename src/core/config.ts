@@ -76,6 +76,18 @@ export const Tex = {
   stageLab: 'stage_lab',
   pearSit: 'pear_sit', // optional seated sprites for the train, like raspberry_sit
   lemonSit: 'lemon_sit',
+  // New fruits in the lite 18-frame layout (576x128, 64x64 cells, feet on row 62; see play/characters.ts).
+  // Each is optional: it is loaded only once listed in core/assets.ts, and a placeholder dances until then.
+  banana: 'banana',
+  grape: 'grape',
+  plum: 'plum',
+  dragonfruit: 'dragonfruit',
+  watermelon: 'watermelon',
+  coconut: 'coconut',
+  orange: 'orange',
+  pineapple: 'pineapple',
+  blueberry: 'blueberry',
+  watermelonSit: 'watermelon_sit',
   instructor: 'instructor', // 51 frames, 64x64, same layout as blackberry: the Coach redrawn in the berry style
   stageRaspberry: 'stage_raspberry', // 256x160 stage backgrounds laid out like room: top band to row 27, platform top at row 137
   stageRooftop: 'stage_rooftop',
@@ -95,8 +107,10 @@ export const Tex = {
   // Framed like berry_sit (body centred on x=38, feet on row 66): draw at Berry's y, about 34 train pixels along the bench.
   raspberrySit: 'raspberry_sit',
   coachSit: 'coach_sit',
-  // Dialogue portraits, 6 frames of 64x64, busts standing on the bottom edge:
-  // 0 Blackberry neutral, 1 Blackberry bold, 2 Raspberry neutral, 3 Raspberry bold, 4 Coach neutral, 5 Coach bold.
+  // Dialogue portraits, 64x64 frames in one row, busts standing on the bottom edge. Neutral then bold:
+  // 0/1 Blackberry, 2/3 Raspberry, 4/5 Coach, 6/7 Pear, 8/9 Lemon, 10/11 Banana, 12/13 Grape, 14/15 Plum,
+  // 16/17 Dragon Fruit, 18/19 Watermelon, 20/21 Coconut, 22/23 Orange, 24/25 Pineapple, 26/27 Blueberry,
+  // 28 the generic station NPC, 29 Blackberry hood down (bold). Frames not drawn yet get a placeholder.
   portraits: 'portraits',
   ui: 'ui', // 128x128 atlas of UI pieces from the original composer (buttons, panels); not sliced into frames
   missSplash: 'miss_splash', // 10 frames, 211x164
@@ -116,5 +130,6 @@ export const Anim = {
   coachSit: 'coach-sit-loop',
   pearSit: 'pear-sit-loop',
   lemonSit: 'lemon-sit-loop',
+  watermelonSit: 'watermelon-sit-loop',
   missSplash: 'miss-splash',
 } as const;
