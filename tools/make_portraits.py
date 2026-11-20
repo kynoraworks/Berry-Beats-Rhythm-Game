@@ -30,7 +30,9 @@ Frames 0-3 (Blackberry and Raspberry) and 29 were regenerated in November
 2026 for their redesign (Berry with his hood half up, Raspberry in sporty
 streetwear), from their design sheets and frames 4-9 and 26-27 as a style
 reference, converted at 10.4; the first versions are in
-archive/generated-sprites/v1/portraits_v1.png.
+archive/generated-sprites/v1/portraits_v1.png. Frames 26-27 (Blueberry) were
+replaced the same month for his redesign as Berry's mirror (cap backwards,
+open hoodie, hood down), from the design round that chose his look.
 Frames 10-29 were generated three characters (or the extras) to a 3x2 sheet
 from a design lineup of the new fruits and frames 0-9 as a style reference,
 converted at an art pixel of 10.6 source pixels with one palette per character.

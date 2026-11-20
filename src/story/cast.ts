@@ -151,7 +151,8 @@ export const CAST: Record<CharacterId, CharacterDef> = {
   coconut: fruit('coconut', 'Coconut', 0xc89a6a, 0x8a6038, { portrait: 20, trait: 'Hard shell', icon: 'round', accent: '#f4ead8', tag: 0x7a5230, gimmick: 'hardShell' }),
   orange: fruit('orange', 'Orange', 0xff9a2e, 0xd96a10, { portrait: 22, trait: 'Rapid fire', icon: 'round', accent: '#4fd62f', tag: 0xe8780f, gimmick: 'bursts' }),
   pineapple: fruit('pineapple', 'Pineapple', 0xf0b83a, 0xb87f14, { portrait: 24, trait: 'Unforgiving', icon: 'crown', accent: '#4fb83a', tag: 0xc98a12, darkTag: true, gimmick: 'doubleMiss' }),
-  blueberry: fruit('blueberry', 'Blueberry', 0x4cb4ff, 0x2a78c8, { portrait: 26, trait: 'Never misses', icon: 'berry', accent: '#4fd62f', tag: 0x2f7fd8, gimmick: 'clean' }),
+  // Berry's mirror: the full 51-frame layout, so the last round of the crew battle is a true mirror match.
+  blueberry: fruit('blueberry', 'Blueberry', 0x4cb4ff, 0x2a78c8, { portrait: 26, trait: 'Never misses', icon: 'berry', accent: '#4fd62f', tag: 0x2f7fd8, gimmick: 'clean', layout: 'berry' }),
 };
 
 /** The fruits whose sheets use the lite layout. */

@@ -37,7 +37,7 @@ import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, 
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
-import { CrewScoreboard } from '../play/CrewScoreboard';
+import { effectCards } from '../play/fighterCard';
 import { HypeMode } from '../play/HypeMode';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
@@ -48,7 +48,7 @@ import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
 import { rivalLevelFor, stopById, stopForChart } from '../story/stops';
-import { crewLineup, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
+import { endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
 import { markCleared, markSeen } from '../story/progress';
@@ -103,7 +103,6 @@ export class PlayScene extends Phaser.Scene {
   private playData!: RuledPlayData;
   /** A round of the crew battle, when this is one. */
   private crew: CrewRoundPlay | null = null;
-  private crewBoard: CrewScoreboard | null = null;
   /** Song time where play starts: 0, or a crew round's first bar. */
   private origin = 0;
   private rules: BattleRules = NO_RULES;
@@ -168,7 +167,6 @@ export class PlayScene extends Phaser.Scene {
   init(data: RuledPlayData): void {
     this.playData = data;
     this.crew = data.crew ?? null;
-    this.crewBoard = null;
     this.origin = data.crew?.start ?? 0;
     this.rules = NO_RULES;
     this.effects = null;
@@ -268,7 +266,16 @@ export class PlayScene extends Phaser.Scene {
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     this.player = createPlayer(this, playerX, FLOOR_Y, crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
-    this.hud = new Hud(this, { rivalScore: isBattle, rounds, rival: rivalKind });
+    const session = crew ? getSession() : null;
+    this.hud = new Hud(this, {
+      rivalScore: isBattle,
+      rounds,
+      rival: rivalKind,
+      player: crew?.ally ?? 'berry',
+      crew: crew ? { round: crew.round, results: session?.results ?? [] } : null,
+      gimmick: this.rules.gimmick,
+    });
+    this.hud.setBattle(this.battle, 60 / chart.bpm);
     if (this.rivalEngine) {
       this.rivalField = new NoteField(this, RIVAL_LANES, this.rivalEngine.notes, true);
       this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y, { seed: chart.id, calm: settings.reduceMotion });
@@ -306,6 +313,9 @@ export class PlayScene extends Phaser.Scene {
       });
     }
 
+    // The Flair meter sits first in the HUD's effects rack.
+    if (this.rules.ability && this.rules.abilityOwner) this.hud.setRackOffset(1);
+
     // Hype: the player's streak reward in a battle (not in the Coach's lessons).
     if (this.rival && segment?.kind !== 'lesson') {
       this.hype = new HypeMode(this, {
@@ -324,13 +334,8 @@ export class PlayScene extends Phaser.Scene {
 
     this.countText = addText(this, GAME_W / 2, 390, '', 64).setDepth(Depth.overlay);
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
-    if (tag) addBody(this, 104, 54, tag, 22, { origin: [0, 0], color: CSS.yellow, bold: true, stroke: true }).setDepth(Depth.hud);
+    if (tag) addBody(this, GAME_W / 2, 212, tag, 22, { color: CSS.yellow, bold: true, stroke: true }).setDepth(Depth.hud);
 
-    if (crew) {
-      const session = getSession();
-      this.crewBoard = new CrewScoreboard(this, GAME_W / 2, 204, crewLineup(session?.order ?? []), 0.7, false).setDepth(Depth.hud);
-      this.crewBoard.update(session?.results ?? [], crew.round);
-    }
 
     this.buildPauseMenu();
     this.setupInput();
@@ -751,7 +756,6 @@ export class PlayScene extends Phaser.Scene {
     if (failed) return lose;
     const state = recordRound(result, this.engine.stats.health);
     const session = getSession();
-    this.crewBoard?.update(session?.results ?? [], null);
     if (state === 'lost') return lose;
     if (state === 'won') {
       if (final) markCleared(final);
@@ -1097,8 +1101,25 @@ export class PlayScene extends Phaser.Scene {
       this.stage.update(beat, dt);
       this.hype?.update(time, dt, this.speed, this.state === 'playing');
       const progress = this.crew ? (time - this.crew.start) / (this.crew.end - this.crew.start) : time / conductor.duration;
-      this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, Phaser.Math.Clamp(progress, 0, 1), beat, dt);
+      this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, { time, beat, progress: Phaser.Math.Clamp(progress, 0, 1), effects: this.effectList(time) }, dt);
+      this.playerField.setOutline(this.state === 'playing' && this.effects?.steadyOn(time) ? COLORS.yellow : null);
     }
+  }
+
+  /** The effect cards for the HUD right now: the enemy's pressure, the ability running, hype. */
+  private effectList(time: number): ReturnType<typeof effectCards> {
+    if (this.state !== 'playing') return [];
+    const effects = this.effects;
+    const scramble = effects?.scrambleStatus(time) ?? { beats: 0, left: 0 };
+    return effectCards({
+      ability: effects?.abilityStatus(time) ?? null,
+      scrambleBeats: scramble.beats,
+      scrambleLeft: scramble.left,
+      meltdown: effects?.meltdownNow(time) ?? false,
+      hype: this.hype?.active ? { left: this.hype.left(time), streak: this.engine.stats.combo } : null,
+      flash: effects?.flashStatus(time) ?? null,
+      gimmick: this.rules.gimmick,
+    });
   }
 
   private updateCountdown(rawTime: number): void {

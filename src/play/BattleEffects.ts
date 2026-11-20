@@ -16,6 +16,7 @@ import {
   abilitySeconds,
   flairCapacity,
 } from '../story/abilities';
+import type { AbilityState } from './fighterCard';
 import { flairRate, flashSchedule, inWindow, jitterOffset, meltdownWindows, missDamage, slidePlan, slideProgress, type BattleRules, type TimedWindow } from '../story/gimmicks';
 import { FlairWidget } from './FlairWidget';
 import { FlashCurtain } from './FlashCurtain';
@@ -205,6 +206,45 @@ export class BattleEffects {
     }
     // Rind's shield goes with the ability; nothing else lingers.
     if (!this.active(time) && engine.mods.shield > 0) engine.mods.shield = 0;
+  }
+
+  /** The running ability, for the HUD's effect cards; null when none is running. */
+  abilityStatus(time: number): AbilityState | null {
+    const id = this.rules.ability;
+    if (!id || !this.active(time)) return null;
+    const left = Math.max(0, this.activeUntil - time);
+    return {
+      id,
+      name: ABILITIES[id].name,
+      beats: Math.max(1, Math.ceil(left / this.beat - 1e-6)),
+      left: Math.min(1, left / this.abilityLength),
+      eurekaLeft: this.eurekaLeft,
+      shields: this.setup.engine.mods.shield,
+      backHalf: this.inBackHalf(time),
+    };
+  }
+
+  /** Beats of scramble left (Eureka's aftermath), with the share left; zero when none. */
+  scrambleStatus(time: number): { beats: number; left: number } {
+    const left = this.scrambleUntil - time;
+    if (left <= 0) return { beats: 0, left: 0 };
+    const length = EUREKA_SCRAMBLE_BEATS * this.beat;
+    return { beats: Math.max(1, Math.ceil(left / this.beat - 1e-6)), left: Math.min(1, left / length) };
+  }
+
+  /** Dr. Lemon is in one of his meltdowns. */
+  meltdownNow(time: number): boolean {
+    return inWindow(this.meltdowns, time) !== null;
+  }
+
+  /** Dragon Fruit's flash: being warned, glaring, or neither. */
+  flashStatus(time: number): 'warn' | 'flash' | null {
+    return this.curtain?.state(time) ?? null;
+  }
+
+  /** Steady is running (the HUD outlines the receptors). */
+  steadyOn(time: number): boolean {
+    return this.rules.ability === 'steady' && this.active(time);
   }
 
   /** Stop everything at the end of the song. */

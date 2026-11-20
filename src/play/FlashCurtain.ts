@@ -68,6 +68,17 @@ export class FlashCurtain {
     if (this.project && alpha > 0) this.cover.setScale(1, this.project(this.height) / this.height);
   }
 
+  /** What the player should be told right now: the warning strip is pulsing, the glare is up, or neither. */
+  state(time: number): 'warn' | 'flash' | null {
+    for (let i = this.next; i < this.windows.length; i++) {
+      const window = this.windows[i];
+      if (time < window.warn) return null;
+      if (time < window.start) return 'warn';
+      if (time < window.end) return 'flash';
+    }
+    return null;
+  }
+
   /** Hide everything (for the end of the song). */
   clear(): void {
     this.cover.setAlpha(0);

@@ -37,6 +37,17 @@ tools/pixelize_sprites.py and the character's palette. Sheet d holds frames
 The first versions (Blackberry's 21 original 2021 sprites plus 30 generated
 frames, and the first Raspberry) are kept in archive/generated-sprites/v1
 with their sources and palettes: blackberry_v1.png and raspberry_v1.png.
+
+Blueberry was redesigned the same month as Berry's mirror (an open royal-blue
+hoodie with the hood down, a cap worn backwards, eyes showing, grey joggers)
+and moved from the lite layout to the full 51-frame one, so the final round of
+the crew battle is a true mirror match. His nine sheets (blueberry_a..i) were
+drawn from his design sheet plus the NEW Berry's six poses for those slots,
+and converted at 10.45 with palette_blueberry.png (15 colours, from sheet a
+via tools/derive_palette.py). His spin slots (21-24) are the Trio Turn done
+alone: step-slide, spin from behind, spin, and the drop on one knee. His first
+lite sheet and its sources are in archive/generated-sprites/v1
+(blueberry_v1.png, blueberry_lite_a.png, blueberry_lite_b.png).
 The 2021 sprites themselves are still in archive/unity-project.
 
 The Coach (instructor.png) is the tutorial's instructor redrawn in the berry
@@ -102,8 +113,8 @@ The Lemon is a mad scientist doctor who dances with a flask of pink liquid.
 
 Lite sheets
 -----------
-The other story fruits (Banana, Grape, Blueberry, Dragon Fruit, Watermelon,
-Plum, Coconut, Orange, Pineapple) only dance against Berry, so they get a
+The other story fruits (Banana, Grape, Dragon Fruit, Watermelon, Plum,
+Coconut, Orange, Pineapple; Blueberry until November 2026) only dance against Berry, so they get a
 smaller 18-frame layout (64x64 cells, 9 per row, 576x128, feet on row 62):
 
    0-2   idle (stand, dip, accent)
@@ -121,7 +132,6 @@ the Dragon Fruit's sparks. Idle frames are centred on the feet; the rest are
 centred on their bounding box. Signature moves:
   banana       slips on a peel, flies flat in the air, lands in the splits
   grape        the bunch squeezes into a ball, bursts into a fan, lands pointing
-  blueberry    the Trio Turn alone: step-slide, spin, drop
   dragonfruit  scarf whip, cape flourish with sparks, theatrical bow
   watermelon   crouch, belly bounce in the air, landing wobble
   plum         tai-chi crane stance, low lantern sweep, palms together
@@ -167,6 +177,7 @@ def standard(prefix: str) -> dict[int, tuple[str, int]]:
 # Both were checked frame by frame: 11-12 point down-left on screen and 13-14 down-right.
 BLACKBERRY = standard("blackberry")
 RASPBERRY = standard("raspberry")
+BLUEBERRY = standard("blueberry")
 PEAR = standard("pear")
 LEMON = standard("lemon")
 LEMON |= {38: ("lemon_j", 2), 41: ("lemon_j", 3), 42: ("lemon_j", 4)}
@@ -177,7 +188,7 @@ LIFT = {29: 8, 32: 3, 38: 7}
 # The idle loops need this: the body sways but the feet must not slide.
 FEET_ANCHORED = {0, 1, 2, 45, 46, 47, 48, 49, 50}
 # Per-frame horizontal nudges, in pixels, where the generated pose sat off-centre.
-NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}, "instructor": {}, "pear": {}, "lemon": {}}
+NUDGE_X: dict[str, dict[int, int]] = {"blackberry": {}, "raspberry": {}, "blueberry": {}, "instructor": {}, "pear": {}, "lemon": {}}
 
 
 def cell_of(sheet: Image.Image, index: int) -> Image.Image:
@@ -230,7 +241,6 @@ LITE_ANCHORED = {0, 1, 2}
 LITE_LIFT = {
     "banana": {8: 5, 13: 6, 16: 8},
     "grape": {8: 5, 13: 6, 16: 4},
-    "blueberry": {8: 5, 13: 6},
     "dragonfruit": {8: 5, 13: 6},
     "watermelon": {8: 5, 13: 6, 16: 6},
     "plum": {8: 4, 13: 5},
@@ -265,6 +275,7 @@ def build_lite(name: str) -> None:
 if __name__ == "__main__":
     build("blackberry", BLACKBERRY, None)
     build("raspberry", RASPBERRY, None)
+    build("blueberry", BLUEBERRY, None)
     build("instructor", INSTRUCTOR, None)
     build("pear", PEAR, None)
     build("lemon", LEMON, None)

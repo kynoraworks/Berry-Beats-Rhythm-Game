@@ -5,12 +5,12 @@ import { music } from '../core/music';
 import { getSettings } from '../core/settings';
 import { playSfx, preloadSamples } from '../core/sfx';
 import { UiButton, addBody, addBox, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { LEAF_FRAMES, MenuTex, PAPER_BORDER, PAPER_SPINE, REEL_FRAMES, REEL_HOLES } from '../menu/art';
-import { menuLayout, type MenuLayout, type Placement } from '../menu/layout';
+import { DECK, LEAF_FRAMES, MenuTex, TAPE, TAPE_REEL_FRAMES, TAPE_TINT, tapeTexture, type TapeColor } from '../menu/art';
+import { SUB_EM, deckRect, fitText, labelRoom, menuLayout, neighbour, tapeRect, type MenuLayout, type Placement } from '../menu/layout';
 import { getProgress, isStoryComplete, nextStopIndex } from '../story/progress';
 import { STOPS } from '../story/stops';
 
-/** One line of the tracklist: a menu entry. */
+/** One tape on the desk: a menu entry. */
 interface Track {
   side: 0 | 1;
   title: string;
@@ -20,20 +20,21 @@ interface Track {
 }
 
 const INK = '#2b1a33';
-const FADED = '#7a6276';
-const MARKER_RED = '#c8344a';
-const RULE = 0xead2c0;
-/** Reel frames per second while the tape plays, and how much faster a wind is. */
+const FADED = '#6a5266';
+const ID_INK = '#2b1a33';
+/** Reel frames per second while a tape plays, and how much faster a wind is. */
 const REEL_FPS = 6;
 const WIND = 5;
+/** Art pixels a chosen tape lifts off the desk. */
+const LIFT = 2;
 
-/** Remembered between visits so backing out of a sub-menu lands on the same track. */
+/** Remembered between visits so backing out of a sub-menu lands on the same tape. */
 let lastIndex = 0;
 
 const SYNC_NOTE_KEY = 'berrybeats.syncNote.v1';
 
-/** The tracklist for the player's save: Continue only appears once the story has started. */
-function buildTracks(): Track[] {
+/** The tapes for the player's save: Continue only appears once the story has started. */
+export function buildTracks(): Track[] {
   const progress = getProgress();
   const started = progress.cleared.length > 0 || progress.seen.length > 0 || progress.talked.length > 0 || progress.inspected.length > 0;
   const sideA: Track[] = [];
@@ -53,18 +54,26 @@ function buildTracks(): Track[] {
   ];
 }
 
-interface RowView {
-  highlight: Phaser.GameObjects.NineSlice;
-  highlightWidth: number;
-  titleX: number;
-  titleY: number;
+/** Each kind of tape keeps its colour whatever the save holds. */
+function tapeColor(track: Track): TapeColor {
+  if (track.scene === SceneKeys.BeatMaps) return 'yellow';
+  if (track.scene === SceneKeys.Options) return 'green';
+  return track.title === 'Story' && track.data ? 'blue' : 'pink';
+}
+
+interface TapeView {
+  container: Phaser.GameObjects.Container;
+  shadow: Phaser.GameObjects.Rectangle;
+  reels: Phaser.GameObjects.Sprite[];
+  restY: number;
+  color: TapeColor;
 }
 
 /**
- * The main menu: Berry's desk at night, seen from above, with a mixtape's
- * tracklist as the menu. Every object is its own layer, laid out for the size
- * the canvas is drawn at (src/menu/layout.ts): on a phone the tracklist grows
- * and the props make room. The tape's reels turn to the menu music.
+ * The main menu: Berry's desk at night, seen from above. Every choice is a
+ * cassette with a hand-written label; picking one lifts it and turns its
+ * reels, and playing it slots it into the tape player. Every object is its
+ * own layer, laid out for the size the canvas is drawn at (src/menu/layout.ts).
  */
 export class MenuScene extends Phaser.Scene {
   private tracks: Track[] = [];
@@ -72,13 +81,15 @@ export class MenuScene extends Phaser.Scene {
   private layout!: MenuLayout;
   /** Everything built from the layout, destroyed and rebuilt when the screen size changes. */
   private built: (Phaser.GameObjects.GameObject | UiButton)[] = [];
-  private rows: RowView[] = [];
-  private paper: Phaser.GameObjects.Container | null = null;
-  private tape: Phaser.GameObjects.Container | null = null;
-  private reels: Phaser.GameObjects.Sprite[] = [];
+  private tapes: TapeView[] = [];
+  private deck: Phaser.GameObjects.Container | null = null;
+  private deckReels: Phaser.GameObjects.Sprite[] = [];
+  private loaded: Phaser.GameObjects.Rectangle | null = null;
   private tick: Phaser.GameObjects.Image | null = null;
   private drift: Phaser.GameObjects.Container | null = null;
   private reelPhase = 0;
+  private deckPhase = 0;
+  private deckSpeed = 0;
   private reelBoost = 1;
   private boostUntil = 0;
   private busy = false;
@@ -96,13 +107,15 @@ export class MenuScene extends Phaser.Scene {
     this.tracks = buildTracks();
     this.index = Phaser.Math.Clamp(lastIndex, 0, this.tracks.length - 1);
     this.built = [];
-    this.rows = [];
-    this.reels = [];
-    this.paper = null;
-    this.tape = null;
+    this.tapes = [];
+    this.deck = null;
+    this.deckReels = [];
+    this.loaded = null;
     this.tick = null;
     this.drift = null;
     this.reelPhase = 0;
+    this.deckPhase = 0;
+    this.deckSpeed = 0;
     this.reelBoost = 1;
     this.boostUntil = 0;
     this.busy = false;
@@ -120,15 +133,17 @@ export class MenuScene extends Phaser.Scene {
       clearLetterbox();
     });
 
-    onSwipe(this, { up: () => this.move(1), down: () => this.move(-1) });
+    onSwipe(this, { up: () => this.move('down'), down: () => this.move('up'), left: () => this.move('right'), right: () => this.move('left') });
     menuKeys(this, {
-      up: () => this.move(-1),
-      down: () => this.move(1),
+      up: () => this.move('up'),
+      down: () => this.move('down'),
+      left: () => this.move('left'),
+      right: () => this.move('right'),
       confirm: () => this.play(this.index),
       back: () => this.eject(),
     });
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
-      if (dy !== 0 && !isLeaving(this)) this.move(dy > 0 ? 1 : -1);
+      if (dy !== 0 && !isLeaving(this)) this.move(dy > 0 ? 'right' : 'left');
     });
     this.showSyncNoteOnce();
   }
@@ -136,8 +151,13 @@ export class MenuScene extends Phaser.Scene {
   override update(_time: number, delta: number): void {
     if (this.reelBoost !== 1 && this.time.now > this.boostUntil) this.reelBoost = 1;
     this.reelPhase += (delta / 1000) * REEL_FPS * this.reelBoost;
-    const frame = Phaser.Math.Wrap(Math.floor(this.reelPhase), 0, REEL_FRAMES);
-    for (const reel of this.reels) reel.setFrame(frame);
+    const frame = Phaser.Math.Wrap(Math.floor(this.reelPhase), 0, TAPE_REEL_FRAMES);
+    this.tapes[this.index]?.reels.forEach((reel) => reel.setFrame(frame));
+    if (this.deckSpeed !== 0) {
+      this.deckPhase += (delta / 1000) * this.deckSpeed;
+      const deckFrame = Phaser.Math.Wrap(Math.floor(this.deckPhase), 0, TAPE_REEL_FRAMES);
+      for (const reel of this.deckReels) reel.setFrame(deckFrame);
+    }
   }
 
   /** How many screen pixels one canvas pixel takes up right now. */
@@ -152,9 +172,8 @@ export class MenuScene extends Phaser.Scene {
 
   private build(): void {
     this.clear();
-    const sides: [number, number] = [this.tracks.filter((t) => t.side === 0).length, this.tracks.filter((t) => t.side === 1).length];
     const scale = this.displayScale();
-    const layout = menuLayout(scale, sides);
+    const layout = menuLayout(scale, this.tracks.length);
     this.layout = layout;
     paintLetterbox(scale);
 
@@ -165,14 +184,20 @@ export class MenuScene extends Phaser.Scene {
     }
     for (const leaf of layout.leaves) this.keep(this.add.image(leaf.x, leaf.y, MenuTex.leaves, leaf.frame).setScale(4));
     this.prop(MenuTex.headphones, layout.props.headphones);
-    this.buildTape(layout.props.cassette);
     this.prop(MenuTex.polaroid, layout.props.polaroid);
     this.prop(MenuTex.pencil, layout.props.pencil);
+    this.buildDeck(layout.deck);
     this.prop(MenuTex.marker, layout.props.marker);
+    this.buildSticker();
+    this.buildTapes();
     this.prop(MenuTex.lamp, layout.props.lamp);
     this.drift = this.keep(this.add.container(0, 0));
-    this.buildSticker();
-    this.buildPaper();
+    this.keep(
+      addBody(this, layout.hint.x, layout.hint.y, hint('Arrows to pick a tape, Enter to play it', 'Tap a tape to play it'), layout.hint.size, {
+        color: '#f3dcc4',
+        stroke: true,
+      }),
+    );
     this.buildButtons();
     this.select(this.index, 'none');
     this.scheduleLeaf();
@@ -185,12 +210,13 @@ export class MenuScene extends Phaser.Scene {
     this.leafTimer = null;
     for (const part of this.built) part.destroy();
     this.built = [];
-    this.rows = [];
-    this.reels = [];
-    this.paper = null;
-    this.tape = null;
+    this.tapes = [];
+    this.deck = null;
+    this.deckReels = [];
+    this.loaded = null;
     this.tick = null;
     this.drift = null;
+    this.deckSpeed = 0;
   }
 
   private keep<T extends Phaser.GameObjects.GameObject | UiButton>(part: T): T {
@@ -200,23 +226,68 @@ export class MenuScene extends Phaser.Scene {
 
   private prop(key: string, place: Placement): Phaser.GameObjects.Image | null {
     if (!place.visible) return null;
-    return this.keep(this.add.image(place.x, place.y, key).setScale(place.scale));
+    return this.keep(this.add.image(place.x, place.y, key).setScale(place.scale).setAngle(place.angle ?? 0));
   }
 
-  /** The cassette with its two reels, which turn in update(). */
-  private buildTape(place: Placement): void {
+  /** The tape player, with a coloured window for the tape that goes in and its two spindles. */
+  private buildDeck(place: Placement): void {
     if (!place.visible) return;
-    const tape = this.keep(this.add.container(place.x, place.y));
-    const body = this.add.image(0, 0, MenuTex.cassette).setScale(place.scale);
-    tape.add(body);
-    const w = body.width;
-    const h = body.height;
-    for (const [hx, hy] of REEL_HOLES) {
-      const reel = this.add.sprite((hx - w / 2) * place.scale, (hy - h / 2) * place.scale, MenuTex.reel, 0).setScale(place.scale);
-      tape.add(reel);
-      this.reels.push(reel);
+    const s = place.scale;
+    const deck = this.keep(this.add.container(place.x, place.y));
+    const body = this.add.image(0, 0, MenuTex.deck).setScale(s);
+    const at = (x: number, y: number): [number, number] => [Math.round((x - DECK.w / 2) * s), Math.round((y - DECK.h / 2) * s)];
+    const [bx, by] = at(DECK.bay.x, DECK.bay.y);
+    const loaded = this.add.rectangle(bx, by, DECK.bay.w * s, DECK.bay.h * s, 0xffffff, 0.55).setOrigin(0).setVisible(false);
+    deck.add([body, loaded]);
+    for (const [x, y] of DECK.spindles) {
+      const [rx, ry] = at(x, y);
+      const reel = this.add.sprite(rx, ry, MenuTex.tapeReel, 0).setScale(s);
+      deck.add(reel);
+      this.deckReels.push(reel);
     }
-    this.tape = tape;
+    this.deck = deck;
+    this.loaded = loaded;
+  }
+
+  /** One cassette per menu entry, each with a hand-written label and turning reels. */
+  private buildTapes(): void {
+    const layout = this.layout;
+    const s = layout.tapeScale;
+    const counters = [0, 0];
+    this.tracks.forEach((track, i) => {
+      const slot = layout.tapes[i];
+      const color = tapeColor(track);
+      const rect = tapeRect(slot, s);
+      // The shadow stays on the desk while its tape lifts, so it is drawn first.
+      const shadow = this.keep(this.add.rectangle(rect.x + 2 * s, rect.y + 2 * s, rect.w, rect.h, 0x1a0c1c, 0.4).setOrigin(0).setVisible(false));
+      const container = this.keep(this.add.container(slot.x, slot.y));
+      const at = (x: number, y: number): [number, number] => [Math.round((x - TAPE.w / 2) * s), Math.round((y - TAPE.h / 2) * s)];
+      container.add(this.add.image(0, 0, tapeTexture(color)).setScale(s));
+      const reels = TAPE.hubs.map(([x, y]) => {
+        const [rx, ry] = at(x, y);
+        return this.add.sprite(rx, ry, MenuTex.tapeReel, 0).setScale(s);
+      });
+      container.add(reels);
+
+      const label = TAPE.label;
+      const [lx, ly] = at(label.x, label.y);
+      const left = lx + layout.labelPad;
+      const top = ly + layout.labelPad * 0.5;
+      container.add(addText(this, left, top + layout.titleSize * 0.55, track.title.toUpperCase(), layout.titleSize, { color: INK, stroke: false, origin: [0, 0.5] }));
+      const subSize = fitText(track.sub, layout.subSize, labelRoom(layout), SUB_EM);
+      container.add(addBody(this, left, top + layout.titleSize * 1.15 + layout.subSize * 0.6, track.sub, subSize, { color: FADED, origin: [0, 0.5] }));
+      const number = `${track.side === 0 ? 'A' : 'B'}${++counters[track.side]}`;
+      const [ix, iy] = at(8, 38);
+      container.add(addText(this, ix, iy, number, layout.idSize, { color: ID_INK, stroke: false, origin: [0, 0.5] }));
+
+      const zone = this.keep(this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0).setInteractive({ useHandCursor: true }));
+      zone.on(Phaser.Input.Events.POINTER_OVER, () => {
+        if (i !== this.index && !this.busy) this.select(i, 'pointer');
+      });
+      zone.on(Phaser.Input.Events.POINTER_UP, () => this.play(i));
+      this.tapes.push({ container, shadow, reels, restY: slot.y, color });
+    });
+    this.tick = this.keep(this.add.image(0, 0, MenuTex.tick).setScale(Math.max(3, s - 2)).setOrigin(0.5));
   }
 
   private buildSticker(): void {
@@ -228,76 +299,6 @@ export class MenuScene extends Phaser.Scene {
     }
   }
 
-  /** The J-card: paper, ruled lines, the tracklist, the highlighter and the marker tick. */
-  private buildPaper(): void {
-    const layout = this.layout;
-    const { paper } = layout;
-    const cx = paper.x + paper.w / 2;
-    const cy = paper.y + paper.h / 2;
-    const container = this.keep(this.add.container(cx, cy));
-    this.paper = container;
-    const at = (x: number, y: number): [number, number] => [x - cx, y - cy];
-
-    const sheet = this.add.nineslice(-paper.w / 2, -paper.h / 2, MenuTex.paper, undefined, paper.w / PX, paper.h / PX, PAPER_SPINE, PAPER_BORDER, PAPER_BORDER, PAPER_BORDER);
-    container.add(sheet.setOrigin(0).setScale(PX));
-
-    const rules = this.add.graphics();
-    rules.fillStyle(RULE, 1);
-    const left = paper.x + layout.spine + PX * 2;
-    const right = paper.x + paper.w - PAPER_BORDER * PX;
-    for (const row of layout.rows) {
-      const [rx, ry] = at(left, row.y + row.h - PX);
-      rules.fillRect(rx, ry, right - left, PX);
-    }
-    container.add(rules);
-
-    const [hx, hy] = at(layout.header.x, layout.header.y);
-    container.add(addBody(this, hx, hy, 'Berry Beats mixtape vol. 1', layout.header.size, { color: FADED, origin: [0, 0.5] }));
-
-    const titleX = paper.x + layout.spine + 28;
-    const spineX = paper.x + layout.spine * 0.36;
-    const counters = [0, 0];
-    this.tracks.forEach((track, i) => {
-      const row = layout.rows[i];
-      const number = `${track.side === 0 ? 'A' : 'B'}${++counters[track.side]}`;
-      if (row.side) {
-        const [sx, sy] = at(titleX, row.y - layout.sideSize * 0.7);
-        container.add(addText(this, sx, sy, row.side.toUpperCase(), layout.sideSize, { color: MARKER_RED, stroke: false, origin: [0, 0.5] }));
-      }
-      const titleY = row.y + row.h * 0.4;
-      const highlightWidth = right - titleX + 8;
-      const [lx, ly] = at(titleX - 14, titleY);
-      const highlight = this.add.nineslice(lx, ly, MenuTex.highlight, undefined, highlightWidth / PX, 7, 6, 6, 0, 0).setOrigin(0, 0.5);
-      highlight.setScale(PX, (layout.titleSize * 1.15) / 7).setVisible(false);
-      container.add(highlight);
-      const [ix, iy] = at(spineX, titleY);
-      container.add(addText(this, ix, iy, number, layout.idSize, { color: MARKER_RED, stroke: false }));
-      const [tx, ty] = at(titleX, titleY);
-      container.add(addText(this, tx, ty, track.title.toUpperCase(), layout.titleSize, { color: INK, stroke: false, origin: [0, 0.5] }));
-      const [bx, by] = at(titleX, row.y + row.h * 0.76);
-      container.add(addBody(this, bx, by, track.sub, layout.subSize, { color: FADED, origin: [0, 0.5] }));
-      this.rows.push({ highlight, highlightWidth, titleX, titleY });
-
-      const zone = this.keep(this.add.zone(row.x, row.y, row.w, row.h).setOrigin(0).setInteractive({ useHandCursor: true }));
-      zone.on(Phaser.Input.Events.POINTER_OVER, () => {
-        if (i !== this.index && !this.busy) this.select(i, 'pointer');
-      });
-      zone.on(Phaser.Input.Events.POINTER_UP, () => this.play(i));
-    });
-
-    const tick = this.add.image(0, 0, MenuTex.tick).setScale(3).setOrigin(0.5);
-    container.add(tick);
-    this.tick = tick;
-
-    const [nx, ny] = at(layout.hint.x, layout.hint.y);
-    container.add(
-      addBody(this, nx, ny, hint('Up / Down to pick, Enter to play', 'Tap a track to play it'), layout.hint.size, {
-        color: FADED,
-        wrapWidth: paper.w - layout.spine - 40,
-      }),
-    );
-  }
-
   private buildButtons(): void {
     const b = this.layout.buttons;
     this.keep(addUiButton(this, b.title.x, b.title.y, 'Title', () => this.eject(), { width: b.w, height: b.h, size: b.size, icon: 'icon_back', sfx: null }));
@@ -307,46 +308,41 @@ export class MenuScene extends Phaser.Scene {
   }
 
   // -------------------------------------------------------------------------
-  // Choosing and playing a track
+  // Choosing and playing a tape
   // -------------------------------------------------------------------------
 
-  private move(step: number): void {
+  private move(direction: 'left' | 'right' | 'up' | 'down'): void {
     if (this.busy || isLeaving(this)) return;
-    const next = Phaser.Math.Wrap(this.index + step, 0, this.tracks.length);
-    this.select(next, step < 0 ? 'rewind' : 'forward');
+    const next = neighbour(this.index, this.tracks.length, direction);
+    if (next === this.index) return;
+    this.select(next, next < this.index ? 'rewind' : 'forward');
   }
 
-  /** Highlight a track: the highlighter swipes across it and the marker ticks it. */
+  /** Pick a tape: it lifts off the desk, its reels turn and the marker ticks it. */
   private select(index: number, how: 'none' | 'pointer' | 'rewind' | 'forward'): void {
+    const previous = this.index;
     this.index = index;
     lastIndex = index;
     this.dismissSyncNote();
     const reduce = getSettings().reduceMotion;
-    this.rows.forEach((row, i) => {
-      row.highlight.setVisible(i === index);
-      if (i !== index) return;
-      if (reduce || how === 'none') {
-        row.highlight.setSize(row.highlightWidth / PX, 7);
-        return;
-      }
-      this.tweens.addCounter({
-        from: 6,
-        to: row.highlightWidth / PX,
-        duration: 160,
-        ease: 'Quad.easeOut',
-        onUpdate: (tween) => row.highlight.setSize(Math.round(tween.getValue() ?? 6), 7),
-      });
+    const s = this.layout.tapeScale;
+    this.tapes.forEach((tape, i) => {
+      const chosen = i === index;
+      tape.shadow.setVisible(chosen);
+      const y = chosen ? tape.restY - LIFT * s : tape.restY;
+      this.tweens.killTweensOf(tape.container);
+      if (reduce || how === 'none' || (i !== index && i !== previous)) tape.container.setY(y);
+      else this.tweens.add({ targets: tape.container, y, duration: 120, ease: 'Quad.easeOut' });
+      if (!chosen) tape.reels.forEach((reel) => reel.setFrame(0));
     });
-    const row = this.rows[index];
-    if (this.tick && this.paper && row) {
-      const cx = this.layout.paper.x + this.layout.paper.w / 2;
-      const cy = this.layout.paper.y + this.layout.paper.h / 2;
-      this.tick.setPosition(this.layout.paper.x + this.layout.spine * 0.76 - cx, row.titleY - 4 - cy);
+    const tape = this.tapes[index];
+    if (this.tick && tape) {
+      const rect = tapeRect({ x: tape.container.x, y: tape.restY - LIFT * s }, s);
+      this.tick.setPosition(rect.x + rect.w - 6 * s, rect.y + 6 * s).setDepth(1);
       const full = this.tick.frame.width;
+      this.tweens.killTweensOf(this.tick);
       if (reduce || how === 'none') this.tick.setCrop();
-      else {
-        this.tweens.addCounter({ from: 0, to: full, duration: 140, delay: 60, onUpdate: (tween) => this.tick?.setCrop(0, 0, tween.getValue() ?? full, this.tick.frame.height) });
-      }
+      else this.tweens.addCounter({ from: 0, to: full, duration: 140, delay: 60, onUpdate: (tween) => this.tick?.setCrop(0, 0, tween.getValue() ?? full, this.tick.frame.height) });
     }
     if (how === 'rewind' || how === 'forward') {
       this.wind(how === 'rewind' ? -WIND : WIND, 260);
@@ -362,40 +358,73 @@ export class MenuScene extends Phaser.Scene {
     this.boostUntil = this.time.now + ms;
   }
 
-  /** Press play: the reels spin up, the card flips, and the chosen screen opens. */
+  /** Play a tape: it flies into the player, the player clunks shut and spins up, and the chosen screen opens. */
   private play(index: number): void {
     if (this.busy || isLeaving(this)) return;
     const track = this.tracks[index];
-    if (!track) return;
+    const tape = this.tapes[index];
+    if (!track || !tape) return;
     if (index !== this.index) this.select(index, 'none');
     this.busy = true;
     lastIndex = index;
     this.input.enabled = false;
-    playSfx(this.game, 'tapePlay');
-    this.wind(WIND * 1.6, 600);
+    this.tick?.setVisible(false);
     const leave = () => goTo(this, track.scene, track.data, 200);
-    if (getSettings().reduceMotion || !this.paper) {
-      this.time.delayedCall(180, leave);
+    const load = () => {
+      playSfx(this.game, 'tapePlay');
+      this.loaded?.setFillStyle(TAPE_TINT[tape.color], 0.7).setVisible(true);
+      this.deckSpeed = REEL_FPS * WIND;
+    };
+    const deck = this.layout.deck;
+    if (getSettings().reduceMotion || !this.deck || !deck.visible) {
+      load();
+      this.time.delayedCall(220, leave);
       return;
     }
-    this.time.delayedCall(140, () => {
-      playSfx(this.game, 'paperFlip');
-      this.tweens.add({ targets: this.paper, scaleX: 0, duration: 200, ease: 'Sine.easeIn', onComplete: leave });
+    // Fly the tape over the player's window, shrinking it to the window's width, then push it in.
+    const box = deckRect(deck);
+    const bayX = box.x + (DECK.bay.x + DECK.bay.w / 2) * deck.scale;
+    const bayY = box.y + (DECK.bay.y + DECK.bay.h / 2) * deck.scale;
+    const fit = (DECK.bay.w * deck.scale) / (TAPE.w * this.layout.tapeScale);
+    tape.shadow.setVisible(false);
+    tape.container.setDepth(2);
+    this.wind(WIND * 1.6, 500);
+    this.tweens.add({
+      targets: tape.container,
+      x: bayX,
+      y: bayY,
+      scale: fit,
+      duration: 320,
+      ease: 'Quad.easeInOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: tape.container,
+          scaleY: 0,
+          alpha: 0,
+          duration: 110,
+          ease: 'Quad.easeIn',
+          onComplete: () => {
+            load();
+            this.tweens.add({ targets: this.deck, y: deck.y + deck.scale, duration: 60, yoyo: true });
+            this.time.delayedCall(380, leave);
+          },
+        });
+      },
     });
   }
 
-  /** Back to the title screen: the tape ejects first. */
+  /** Back to the title screen: the player ejects first. */
   private eject(): void {
     if (this.busy || isLeaving(this)) return;
     this.busy = true;
     this.input.enabled = false;
     playSfx(this.game, 'tapeEject');
     const leave = () => goTo(this, SceneKeys.Title);
-    if (!this.tape || getSettings().reduceMotion) {
+    if (!this.deck || getSettings().reduceMotion) {
       this.time.delayedCall(150, leave);
       return;
     }
-    this.tweens.add({ targets: this.tape, y: this.tape.y - 18, scale: 1.06, duration: 140, ease: 'Back.easeOut', yoyo: true, hold: 60, onComplete: leave });
+    this.tweens.add({ targets: this.deck, y: this.deck.y - 14, duration: 120, ease: 'Back.easeOut', yoyo: true, hold: 60, onComplete: leave });
   }
 
   // -------------------------------------------------------------------------

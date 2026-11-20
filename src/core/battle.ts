@@ -414,6 +414,12 @@ export class Battle {
     return tally.count === 0 ? 0 : (tally.weight / tally.count) * 100;
   }
 
+  /** How many judgements a side has in a round (or in the whole battle when `round` is omitted). */
+  judged(side: Side, round?: number): number {
+    const tally = round === undefined ? this.totals[side] : this.tallies[side][round];
+    return tally?.count ?? 0;
+  }
+
   /** Who had the better accuracy in a round. An exact tie goes to the player. */
   roundWinner(round: number): Side {
     return this.accuracy('rival', round) > this.accuracy('player', round) ? 'rival' : 'player';

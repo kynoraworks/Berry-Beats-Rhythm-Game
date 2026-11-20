@@ -41,6 +41,9 @@ export class NoteField {
   private readonly backing: Phaser.GameObjects.Rectangle;
   /** The hype camera's tilt, when there is one. */
   private projection: FieldProjection | null = null;
+  /** A frame around the receptors while an ability widens the timing. */
+  private readonly outline: Phaser.GameObjects.Graphics;
+  private outlineColor: number | null = null;
 
   /** `dim` draws the field slightly faded, used for the rival's side. */
   constructor(scene: Phaser.Scene, lanes: number[], notes: PlayNote[], dim = false) {
@@ -63,6 +66,7 @@ export class NoteField {
     this.shade = scene.add.rectangle(left, 0, width, GAME_H, COLORS.night, 1).setOrigin(0).setDepth(Depth.effects + 1).setAlpha(0);
 
     this.holdGfx = scene.add.graphics().setDepth(Depth.holds);
+    this.outline = scene.add.graphics().setDepth(Depth.receptors - 0.5).setVisible(false);
     lanes.forEach((x, lane) => {
       this.receptors.push(
         scene.add
@@ -103,6 +107,19 @@ export class NoteField {
   /** Where a flat y is drawn right now (it moves while the hype camera is tilted). */
   projectY(flatY: number): number {
     return this.projection ? this.projection.screenY(flatY) : flatY;
+  }
+
+  /** Frame the receptors in a colour (Steady's wider timing), or take the frame away with null. */
+  setOutline(color: number | null): void {
+    if (color === this.outlineColor) return;
+    this.outlineColor = color;
+    const g = this.outline.clear().setVisible(color !== null);
+    if (color === null) return;
+    const left = this.lanes[0] - 56;
+    const width = this.lanes[3] - this.lanes[0] + 112;
+    const half = 52;
+    g.lineStyle(6, color, 1).strokeRect(left, RECEPTOR_Y - half, width, half * 2);
+    g.fillStyle(color, 0.14).fillRect(left, RECEPTOR_Y - half, width, half * 2);
   }
 
   /** Fade the field back (it stays readable) or bring it forward again. */

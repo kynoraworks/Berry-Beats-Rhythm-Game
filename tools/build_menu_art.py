@@ -17,7 +17,9 @@ pieces to public/assets/img/menu/:
   headphones.png  headphones with their coiled cable
   cassette.png    the tape, with its two reel holes empty
   reel.png        a reel hub in 4 rotation steps (it has 6 teeth, so 4 steps of 15 degrees loop)
-  polaroid.png    the trio's summer photo
+  polaroid.png    the trio's summer photo: Berry, Raspberry and Blueberry aged
+                  about seven in Berry's garden (trio_summer.png), framed here
+                  (build_polaroid)
   pencil.png, marker.png
   leaves.png      4 single leaves in 20x20 cells, for drifting
   tick.png        the red marker tick drawn next to the chosen track
@@ -44,7 +46,6 @@ PIECES = {
     "lamp": ("propsA.png", (254, 62, 816, 621), 74),
     "headphones": ("propsA.png", (1173, 21, 1707, 723), 62),
     "cassette": ("propsA.png", (130, 829, 747, 1243), 58),
-    "polaroid": ("propsB.png", (139, 24, 623, 492), 48),
     "pencil": ("propsB.png", (777, 109, 1267, 431), 44),
     # The marker and its cap, together.
     "marker": ("propsB.png", (1424, 94, 1931, 425), 38),
@@ -103,6 +104,32 @@ def drop_specks(image: Image.Image, min_size: int = 3) -> Image.Image:
 
 def cut(sheet: str, box: tuple[int, int, int, int]) -> Image.Image:
     return Image.open(SRC / sheet).convert("RGBA").crop(box)
+
+
+def build_polaroid() -> None:
+    """The summer photo in a cream polaroid frame, 48x46: a 1-pixel outline, a thin border and a wide bottom.
+
+    trio_summer.png is a chunky pixel-art drawing of the three as small children
+    (about 40 big pixels across), so sampling it straight to the 44x38 window
+    keeps their faces readable. The frame is drawn straight rather than tilted:
+    rotating art this small would smear the faces.
+    """
+    width, height, win_w, win_h = 48, 46, 44, 38
+    raw = Image.open(SRC / "trio_summer.png").convert("RGB")
+    crop_w = round(raw.height * win_w / win_h)
+    raw = raw.crop(((raw.width - crop_w) // 2, 0, (raw.width - crop_w) // 2 + crop_w, raw.height))
+    colors = 28
+    q = raw.quantize(colors=colors, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    palette = np.array(q.getpalette()[: colors * 3], dtype=np.uint8).reshape(-1, 3)
+    index, _ = mode_downsample(np.array(q), None, win_w, win_h, colors)
+    # Faded like an old print: a little of the paper colour mixed into every pixel.
+    photo = (palette[index].astype(np.float32) * 0.86 + np.array([250, 236, 210], np.float32) * 0.14).round().astype(np.uint8)
+    out = np.zeros((height, width, 4), dtype=np.uint8)
+    out[:, :] = (58, 30, 54, 255)
+    out[1:-1, 1:-1] = (250, 238, 214, 255)
+    out[2:2 + win_h, 2:2 + win_w, :3] = photo
+    out[-3:-1, 2:-2] = (232, 216, 188, 255)
+    Image.fromarray(out).save(OUT / "polaroid.png")
 
 
 def build_desk() -> None:
@@ -208,8 +235,8 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     build_desk()
     for name, (sheet, box, width) in PIECES.items():
-        # The photo needs more colours than the other props to keep three faces readable.
-        pixelize(cut(sheet, box), width, colors=32 if name == "polaroid" else 20).save(OUT / f"{name}.png")
+        pixelize(cut(sheet, box), width, colors=20).save(OUT / f"{name}.png")
+    build_polaroid()
     build_light()
     build_reel()
     build_leaves()

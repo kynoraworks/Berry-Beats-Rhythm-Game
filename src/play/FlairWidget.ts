@@ -6,13 +6,14 @@ import type { FruitId } from '../story/types';
 import { Depth } from './layout';
 
 const X = 12;
-const Y = 86;
-const W = 272;
-const H = 68;
+/** Under the fighter card's HP bar, the first card of the effects rack. */
+const Y = 126;
+const W = 252;
+const H = 64;
 const PORTRAIT = 48;
-const TRACK_X = X + 76;
+const TRACK_X = X + 72;
 const TRACK_Y = Y + 44;
-const TRACK_W = W - 92;
+const TRACK_W = W - 86;
 const TRACK_H = 14;
 
 /**
@@ -47,8 +48,8 @@ export class FlairWidget {
     this.face = sheet?.has(String(character.portrait + 1))
       ? scene.add.image(faceX, faceY, Tex.portraits, character.portrait + 1).setScale(PORTRAIT / 64)
       : scene.add.rectangle(faceX, faceY, PORTRAIT, PORTRAIT, character.color);
-    this.label = addText(scene, TRACK_X, Y + 22, abilityName, 20, { origin: [0, 0.5], color: CSS.cream });
-    this.prompt = addText(scene, X + W - 14, Y + 22, touch ? 'Tap!' : 'Space!', 20, { origin: [1, 0.5], color: CSS.yellow }).setVisible(false);
+    this.label = addText(scene, TRACK_X, Y + 20, abilityName, 24, { origin: [0, 0.5], color: CSS.cream });
+    this.prompt = addText(scene, X + W - 12, Y + 20, touch ? 'Tap!' : 'Space!', 24, { origin: [1, 0.5], color: CSS.yellow }).setVisible(false);
     const track = scene.add.rectangle(TRACK_X, TRACK_Y, TRACK_W, TRACK_H, COLORS.ink).setOrigin(0, 0.5).setStrokeStyle(3, COLORS.night);
     this.fill = scene.add.rectangle(TRACK_X, TRACK_Y, 0, TRACK_H - 4, character.color).setOrigin(0, 0.5);
     this.layer = scene.add.container(0, 0, [this.box, this.glow, this.face, this.label, this.prompt, track, this.fill]).setDepth(Depth.hud);
