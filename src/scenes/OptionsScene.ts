@@ -27,9 +27,9 @@ interface Row {
   confirm?(): void;
 }
 
-const LEFT: Bounds = { x: 40, y: 112, w: 624, h: 400 };
+const LEFT: Bounds = { x: 40, y: 112, w: 624, h: 448 };
 const RIGHT: Bounds = { x: 680, y: 112, w: 560, h: 588 };
-const DESC: Bounds = { x: 40, y: 528, w: 624, h: 92 };
+const DESC: Bounds = { x: 40, y: 568, w: 624, h: 68 };
 const ROW_H = 48;
 const ROW_DY = 52;
 const KEY_DY = 54;
@@ -109,22 +109,23 @@ export class OptionsScene extends Phaser.Scene {
     this.addSlider(LEFT, leftY(0), 'Music volume', 'How loud the songs and the menu music are.', (s) => percent(s.musicVolume), (s) => s.musicVolume, (s, d) => ({
       musicVolume: step(s.musicVolume, d, 0.05, 0, 1),
     }));
-    this.addSlider(LEFT, leftY(1), 'Sound volume', 'How loud menu sounds and hit sounds are.', (s) => percent(s.sfxVolume), (s) => s.sfxVolume, (s, d) => ({
+    this.addSlider(LEFT, leftY(1), 'Sound volume', 'How loud menu sounds, hit sounds and the crowd are.', (s) => percent(s.sfxVolume), (s) => s.sfxVolume, (s, d) => ({
       sfxVolume: step(s.sfxVolume, d, 0.05, 0, 1),
     }));
     this.addToggle(LEFT, leftY(2), 'Hit sounds', 'Play a sound each time you hit a note.', 'hitSounds');
+    this.addToggle(LEFT, leftY(3), 'Announcer', 'The MC calls out rounds, hype and wins. The crowd follows Sound volume.', 'announcer');
 
-    addSectionTitle(this, LEFT.x + 32, leftY(2) + 56, LEFT.w - 64, 'Timing');
+    addSectionTitle(this, LEFT.x + 32, leftY(3) + 56, LEFT.w - 64, 'Timing');
     this.addSlider(
       LEFT,
-      leftY(2) + 108,
+      leftY(3) + 108,
       'Audio offset',
       'Raise it if your hits keep landing late, lower it if they land early.',
       (s) => `${s.audioOffsetMs > 0 ? '+' : ''}${Math.round(s.audioOffsetMs)} ms`,
       (s) => (s.audioOffsetMs + 500) / 1000,
       (s, d) => ({ audioOffsetMs: step(s.audioOffsetMs, d, 5, -500, 500) }),
     );
-    this.addAction(LEFT, leftY(2) + 160, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
+    this.addAction(LEFT, leftY(3) + 160, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
 
     const rightY = (i: number) => RIGHT.y + 88 + i * ROW_DY;
     addSectionTitle(this, RIGHT.x + 32, RIGHT.y + 36, RIGHT.w - 64, 'Gameplay');
@@ -230,7 +231,7 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, bounds, refresh, adjust });
   }
 
-  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion' | 'hypeCamera' | 'touchGuides'): void {
+  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'announcer' | 'noFail' | 'reduceMotion' | 'hypeCamera' | 'touchGuides'): void {
     const index = this.rows.length;
     const bounds = this.rowBounds(panel, y);
     const at = controls(panel);

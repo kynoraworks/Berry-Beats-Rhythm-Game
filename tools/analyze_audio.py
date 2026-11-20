@@ -4,11 +4,13 @@
 What it does
   1. Decodes each song in public/assets/audio with ffmpeg (mono, 44.1 kHz float),
      which is the same decode path browsers use for these files.
-  2. Measures tempo, drift and the first-beat offset of all six tracks.
+  2. Measures tempo, drift and the first-beat offset of every track: Nicole
+     Yazmin's six (77 BPM) and the twelve generated stop songs (96 to 140 BPM).
   3. Builds the beat maps in public/charts from the detected onsets, following
      a hand-written section plan per chart (who plays when, how dense, which
      lanes). Note positions and lanes come from the audio. The charts are the
-     Coach's tutorial and the twelve story stops, stop01 to stop12.
+     Coach's tutorial, the twelve story stops (stop01 to stop12, one song each)
+     and one Beat Maps chart per song of Nicole's soundtrack (ost_<song>).
   4. Validates every chart and prints a report. Exits non-zero on a violation.
 
 Run from the repo root:
@@ -42,14 +44,25 @@ AUDIO_DIR = ROOT / "public" / "assets" / "audio"
 CHART_DIR = ROOT / "public" / "charts"
 
 SR = 44100
-TRACKS = ["tutorial", "level1", "title", "menu", "level_select", "pause"]
+# Nicole Yazmin's original soundtrack.
+OST_TRACKS = ["tutorial", "level1", "title", "menu", "level_select", "pause"]
+# The generated stop songs and the tempo each was asked for. The tempo is searched
+# within 8% of that, so a song that came out a little off is still measured right.
+STOP_TRACKS = {
+    "berry_town": 100, "peel_street": 108, "graffiti_corner": 108, "vine_crossing": 104,
+    "citrus_labs": 132, "lantern_market": 96, "the_club": 126, "rooftop": 104,
+    "the_tunnel": 140, "orange_plaza": 128, "pineapple_hall": 134, "grand_stage": 117,
+}
+TRACKS = OST_TRACKS + list(STOP_TRACKS)
+ARTIST = {name: "Nicole Yazmin" for name in OST_TRACKS} | {name: "Berry Beats (generated)" for name in STOP_TRACKS}
 # These two were exported as loops that start exactly on beat 1 at sample 0
 # (their length is a whole number of beats), so they calibrate the detector.
 LOOP_TRACKS = ("level_select", "pause")
 
-# All six tracks pulse at 154 per minute, but the drum pattern repeats every 8
+# Nicole's six tracks pulse at 154 per minute, but the drum pattern repeats every 8
 # pulses and the snare falls on pulses 3 and 7. Read in 4/4 that is a 77 BPM
 # beat with the snare on 2 and 4, so charts use 77 (154 is the double-time reading).
+# For every track the "pulse" below is twice the charting tempo (eighth notes).
 BEATS_PER_BAR = 4
 SLOTS_PER_BEAT = 4  # charts are quantised to quarter beats (sixteenth notes)
 BAR_SLOTS = BEATS_PER_BAR * SLOTS_PER_BEAT
@@ -171,8 +184,8 @@ class Tempo:
     confidence: str = ""
 
 
-def coarse_pulse(track: Track) -> float:
-    """Best pulse in 100..200 BPM by folding the onset envelope over candidate periods."""
+def coarse_pulse(track: Track, lo: float = 100, hi: float = 200) -> float:
+    """Best pulse in lo..hi BPM by folding the onset envelope over candidate periods."""
     env = track.env["mid"] / np.percentile(track.env["mid"], 99) + track.env["high"] / np.percentile(track.env["high"], 99)
     fps = track.fast_fps
     width = int(0.5 * fps)
@@ -181,7 +194,7 @@ def coarse_pulse(track: Track) -> float:
     idx = np.arange(len(env))
     best = (0.0, 0.0)
     bins = 64
-    for bpm in np.arange(100, 200, 0.02):
+    for bpm in np.arange(lo, hi, 0.02):
         phase = ((idx / (60 / bpm * fps)) % 1 * bins).astype(int) % bins
         hist = np.bincount(phase, weights=env, minlength=bins) / np.maximum(np.bincount(phase, minlength=bins), 1)
         score = hist.max() / (hist.mean() + 1e-9)
@@ -190,8 +203,12 @@ def coarse_pulse(track: Track) -> float:
     return best[1]
 
 
-def measure_tempo(track: Track) -> Tempo:
-    pulse = coarse_pulse(track)
+def measure_tempo(track: Track, expected: float | None = None) -> Tempo:
+    """Tempo of a track. With `expected`, the beat is searched within 8% of it."""
+    if expected is None:
+        pulse = coarse_pulse(track)
+    else:
+        pulse = 2 * coarse_pulse(track, expected * 0.92, expected * 1.08)
     peaks = np.concatenate([track.raw_peaks["mid"], track.raw_peaks["high"]])
     times, weights = peaks[:, 0], peaks[:, 1]
     # Fit a straight line through onset time against sixteenth-grid index. Two passes.
@@ -211,6 +228,10 @@ def measure_tempo(track: Track) -> Tempo:
     keep = np.abs(err) < 0.02
     pulse_bpm = 60 / period / 2
     snapped = round(pulse_bpm) if abs(pulse_bpm - round(pulse_bpm)) < 0.01 else round(pulse_bpm, 3)
+    if expected is not None:
+        # Generated songs are made at a whole-number tempo: snap the beat to it when close.
+        beat = pulse_bpm / 2
+        snapped = 2 * round(beat) if abs(beat - round(beat)) < 0.05 else round(pulse_bpm, 3)
     # Drift if we use the snapped tempo instead of the fitted one.
     span = times[keep].max() - times[keep].min()
     drift = (60 / snapped / 2 - period) * (span / period)
@@ -507,24 +528,212 @@ PLANS = [
 ]
 
 
-# The twelve stops of the story (docs/STORY_BIBLE.md). Each chart shows its fruit's
-# gimmick where the gimmick lives in the chart; the visual ones come from the game.
+# The twelve stops of the story (docs/STORY_BIBLE.md), each on its own generated song.
+# Each chart shows its fruit's gimmick where the gimmick lives in the chart; the visual
+# ones come from the game. Bars here are bars of that song (2.4 s at 100 BPM, 1.7 s at
+# 140), so note counts per bar scale with the tempo. Sections past a song's end are
+# ignored by the charter.
+S = Section
+
+# Shared by the hold-heavy sections of Watermelon's chart.
+MELON = dict(max_hold=4, hold_sustain=0.25, hold_min=2, hold_tonal=0.02, floor=0.2)
+
+
+def lemon_block(b: int, dense: int) -> list[Section]:
+    """Eight bars of Dr. Lemon: the lead changes hands and density every bar or two."""
+    return [
+        S(b, b + 2, "trade", grid=2, notes=3 + dense, rival_notes=3 + dense, unit=1),
+        S(b + 2, b + 3, "both", grid=2, notes=3 + dense, rival_notes=3),
+        S(b + 3, b + 4, "rival", grid=1, rival_notes=5, floor=0.18),
+        S(b + 4, b + 5, "player", grid=1, notes=4 + dense, floor=0.18),
+        S(b + 5, b + 6, "both", grid=4, notes=2, rival_notes=2),
+        S(b + 6, b + 7, "player", grid=1, notes=4 + dense, bursts=1, floor=0.18),
+        S(b + 7, b + 8, "rival", grid=1, rival_notes=6, floor=0.18),
+    ]
+
+
+def plum_block(b: int, notes: int) -> list[Section]:
+    """Four bars of Plum: he shows a bar, the player answers for two, then nobody plays."""
+    return [
+        S(b, b + 1, "rival", grid=2, rival_notes=notes - 1),
+        S(b + 1, b + 3, "player", grid=2, notes=notes, holds=1, hold_sustain=0.4, hold_min=2),
+        S(b + 3, b + 4, "rest"),
+    ]
+
+
 PLANS += [
     # Stop 1, Raspberry: an even chart with no gimmick, the first boss.
     Plan(
-        "stop01", "level1", "Stop 1", "raspberry", 2, max_nps=4, solo_holds=False,
+        "stop01", "berry_town", "Stop 1", "raspberry", 2, max_nps=4, solo_holds=False,
         sections=[
-            Section(0, 4, "trade", grid=4, notes=4, rival_notes=4, unit=2),
-            Section(4, 12, "trade", grid=2, notes=5, rival_notes=5, unit=2, holds=2),
-            Section(12, 20, "both", grid=2, notes=6, rival_notes=5, doubles=0.5, holds=3),
-            Section(20, 24, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=1),
-            Section(24, 29, "both", grid=2, notes=7, rival_notes=5, doubles=0.5, holds=2),
+            S(0, 4, "trade", grid=4, notes=3, rival_notes=3, unit=2),
+            S(4, 16, "trade", grid=2, notes=4, rival_notes=4, unit=2, holds=1),
+            S(16, 32, "both", grid=2, notes=4, rival_notes=4, doubles=0.25, holds=2),
+            S(32, 40, "trade", grid=2, notes=5, rival_notes=5, unit=1, holds=1),
+            S(40, 50, "both", grid=2, notes=5, rival_notes=4, doubles=0.25, holds=1),
         ],
+        rank_lanes=True,
     ),
     # Stop 2, Banana: an easy warm-up. His notes slide in from the next lane in the game,
     # so the chart reads slowly: no doubles and no lane twice within a beat.
     Plan(
-        "stop02", "tutorial", "Stop 2", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
+        "stop02", "peel_street", "Stop 2", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
+        sections=[
+            S(0, 4, "trade", grid=4, notes=2, rival_notes=2, unit=2),
+            S(4, 20, "trade", grid=4, notes=3, rival_notes=3, unit=2, holds=1),
+            S(20, 36, "trade", grid=4, notes=3, rival_notes=3, unit=1, holds=1),
+            S(36, 45, "both", grid=4, notes=3, rival_notes=2),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 3, Pear: starts slow and finishes strong. Sparse trades over the intro,
+    # fuller trades in the groove, a held freeze on the break, both sides together last.
+    Plan(
+        "stop03", "graffiti_corner", "Stop 3", "pear", 2, max_nps=4, solo_holds=False, lane_gap=3,
+        sections=[
+            S(0, 4, "trade", grid=4, notes=2, rival_notes=2, unit=1),
+            S(4, 8, "trade", grid=2, notes=3, rival_notes=3, unit=1),
+            S(8, 14, "trade", grid=2, notes=4, rival_notes=4, unit=2),
+            S(14, 16, "both", grid=4, notes=2, rival_notes=2, holds=2, hold_sustain=0.6),
+            S(16, 24, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=1, hold_sustain=0.6),
+            S(24, 32, "both", grid=2, notes=4, rival_notes=4, doubles=0.5),
+            S(32, 38, "trade", grid=2, notes=5, rival_notes=5, unit=1, bursts=1),
+            S(38, 46, "both", grid=2, notes=6, rival_notes=5, bursts=1, doubles=0.5),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 4, Grape: notes arrive in pairs, on both sides, chords on the strong beats.
+    Plan(
+        "stop04", "vine_crossing", "Stop 4", "grape", 3, max_nps=6, solo_holds=False,
+        sections=[
+            S(0, 2, "rival", grid=2, rival_notes=4, rival_doubles=2, double_accent=0.6),
+            S(2, 8, "trade", grid=2, notes=4, rival_notes=4, unit=1, doubles=2, rival_doubles=2, double_accent=0.6),
+            S(8, 24, "trade", grid=2, notes=4, rival_notes=4, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+            S(24, 32, "both", grid=2, notes=4, rival_notes=3, doubles=2, rival_doubles=1, double_accent=0.6),
+            S(32, 43, "trade", grid=2, notes=5, rival_notes=4, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 5, Dr. Lemon: erratic. The lead and the density change every bar or two, with
+    # sixteenth breaks where the music leaves the beat, a held breakdown, then more of it.
+    Plan(
+        "stop05", "citrus_labs", "Stop 5", "lemon", 3, max_nps=5, solo_holds=False,
+        sections=[
+            S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1),
+            *lemon_block(4, 0),
+            *lemon_block(12, 1),
+            *lemon_block(20, 1),
+            S(28, 36, "both", grid=2, notes=4, rival_notes=3, bursts=1, doubles=0.5, floor=0.22),
+            S(36, 44, "trade", grid=4, notes=2, rival_notes=2, unit=1, holds=1, floor=0.15),
+            *lemon_block(44, 2),
+            S(52, 55, "both", grid=2, notes=4, rival_notes=3, floor=0.18),
+        ],
+        balance_lanes=True,
+    ),
+    # Stop 6, Plum: long rests and patient patterns. Every phrase leaves the player at
+    # least a bar of quiet, and some bars nobody plays at all.
+    Plan(
+        "stop06", "lantern_market", "Stop 6", "plum", 3, max_nps=4, solo_holds=False,
+        sections=[
+            *plum_block(0, 3),
+            *plum_block(4, 4),
+            *[s for b in range(8, 48, 4) for s in plum_block(b, 5)],
+            S(48, 57, "both", grid=2, notes=5, rival_notes=4, doubles=0.5, holds=1, hold_sustain=0.4, hold_min=2),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 7, Dragon Fruit: a flashy boss. Dense and syncopated, sixteenth bursts.
+    Plan(
+        "stop07", "the_club", "Stop 7", "dragonfruit", 4, max_nps=5, solo_holds=False,
+        sections=[
+            S(0, 4, "rival", grid=2, rival_notes=4),
+            S(4, 12, "trade", grid=2, notes=4, rival_notes=4, unit=1),
+            S(12, 20, "trade", grid=2, notes=5, rival_notes=5, unit=2, bursts=1, floor=0.22),
+            S(20, 28, "trade", grid=2, notes=6, rival_notes=5, unit=1, bursts=1, floor=0.2),
+            S(28, 36, "both", grid=2, notes=5, rival_notes=4, doubles=1),
+            S(36, 40, "both", grid=4, notes=2, rival_notes=2, holds=2, hold_sustain=0.6),
+            S(40, 44, "trade", grid=2, notes=5, rival_notes=5, unit=1, bursts=1, floor=0.2),
+            S(44, 54, "both", grid=2, notes=6, rival_notes=5, bursts=1, doubles=1),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 8, Watermelon: long holds of two to four beats on both sides, taps around them.
+    Plan(
+        "stop08", "rooftop", "Stop 8", "watermelon", 3, max_nps=4, solo_holds=False, hold_spacing=8,
+        sections=[
+            S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=2, rival_holds=2, **{**MELON, "hold_min": 1.5}),
+            S(4, 20, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=8, rival_holds=8, **MELON),
+            S(20, 32, "both", grid=2, notes=4, rival_notes=3, holds=6, rival_holds=6, **MELON),
+            S(32, 43, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=6, rival_holds=5, **MELON),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 9, Coconut: hard, steady and unrelenting. Eighth notes almost all the way,
+    # through the tunnel's breakdown and out the other side.
+    Plan(
+        "stop09", "the_tunnel", "Stop 9", "coconut", 4, max_nps=5, solo_holds=False,
+        sections=[
+            S(0, 4, "rival", grid=2, rival_notes=4),
+            S(4, 16, "both", grid=2, notes=4, rival_notes=4, doubles=0.25),
+            S(16, 32, "trade", grid=2, notes=5, rival_notes=5, unit=1, doubles=0.25),
+            S(32, 34, "both", grid=2, notes=4, rival_notes=4),
+            S(34, 40, "trade", grid=4, notes=3, rival_notes=3, unit=1, floor=0.12),
+            S(40, 58, "both", grid=2, notes=5, rival_notes=4, doubles=0.5, bursts=1),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 10, Orange: rapid bursts, then rests. A bar of sixteenth runs, then a bar of
+    # quiet while he fires his own; the song's two drops are quieter trades.
+    Plan(
+        "stop10", "orange_plaza", "Stop 10", "orange", 4, max_nps=6, solo_holds=False,
+        sections=[
+            S(0, 4, "trade", grid=2, notes=3, rival_notes=3, unit=1),
+            S(4, 24, "trade", grid=2, notes=3, rival_notes=3, unit=1, runs=1, floor=0.12),
+            S(24, 28, "trade", grid=4, notes=3, rival_notes=3, unit=2, floor=0.12),
+            S(28, 36, "trade", grid=2, notes=3, rival_notes=3, unit=1, runs=1, floor=0.12),
+            S(36, 40, "trade", grid=4, notes=3, rival_notes=3, unit=2, floor=0.12),
+            S(40, 53, "trade", grid=2, notes=4, rival_notes=4, unit=1, runs=1, floor=0.12),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 11, Pineapple: precise, clean and punishing. No gimmick shapes, just accuracy.
+    Plan(
+        "stop11", "pineapple_hall", "Stop 11", "pineapple", 5, max_nps=6, solo_holds=False,
+        sections=[
+            S(0, 2, "rival", grid=2, rival_notes=4),
+            S(2, 8, "both", grid=2, notes=4, rival_notes=3, floor=0.2),
+            S(8, 16, "both", grid=1, notes=6, rival_notes=4, bursts=2, runs=1, floor=0.15),
+            S(16, 24, "trade", grid=1, notes=7, rival_notes=6, unit=1, runs=1, bursts=1, floor=0.12),
+            S(24, 32, "both", grid=1, notes=6, rival_notes=4, bursts=2, runs=1, doubles=0.25, floor=0.15),
+            S(32, 40, "both", grid=1, notes=6, rival_notes=4, runs=1, bursts=1, doubles=0.25, floor=0.15),
+            S(40, 50, "both", grid=1, notes=7, rival_notes=4, bursts=2, runs=1, doubles=0.5, floor=0.15),
+            S(50, 55, "both", grid=2, notes=4, rival_notes=3, holds=1, floor=0.12),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 12, Blueberry: the hardest clean chart in the game, no gimmick.
+    Plan(
+        "stop12", "grand_stage", "Stop 12", "blueberry", 5, max_nps=6, solo_holds=False,
+        sections=[
+            S(0, 2, "rival", grid=2, rival_notes=4),
+            S(2, 8, "both", grid=2, notes=6, rival_notes=4, bursts=2, doubles=0.5),
+            S(8, 16, "trade", grid=1, notes=7, rival_notes=7, unit=1, floor=0.2),
+            S(16, 24, "both", grid=1, notes=6, rival_notes=5, doubles=1, runs=1, floor=0.15),
+            S(24, 28, "trade", grid=1, notes=7, rival_notes=7, unit=1, runs=1, floor=0.15),
+            S(28, 32, "both", grid=2, notes=5, rival_notes=4, holds=2, floor=0.15),
+            S(32, 48, "both", grid=1, notes=7, rival_notes=5, doubles=1, bursts=2, runs=1, holds=1, floor=0.15),
+        ],
+        rank_lanes=True,
+    ),
+]
+
+# Nicole Yazmin's original soundtrack, one beat map per song for the Beat Maps menu.
+# Each is the chart a story stop used before the stops got their own songs.
+PLANS += [
+    # Stop 2, Banana: an easy warm-up. His notes slide in from the next lane in the game,
+    # so the chart reads slowly: no doubles and no lane twice within a beat.
+    Plan(
+        "ost_tutorial", "tutorial", "Tutorial", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
         sections=[
             Section(0, 4, "trade", grid=4, notes=3, rival_notes=3, unit=1),
             Section(4, 12, "trade", grid=4, notes=4, rival_notes=4, unit=2, holds=1),
@@ -537,7 +746,7 @@ PLANS += [
         # The Pear starts slow and finishes strong, and so does his chart: sparse trades
         # over the intro, fuller trades in the groove, a held freeze on the break in
         # bar 11, then both sides together for the densest bars at the end.
-        "stop03", "level_select", "Stop 3", "pear", 2, max_nps=4, solo_holds=False,
+        "ost_level_select", "level_select", "Character Select", "pear", 2, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 2, "trade", grid=2, notes=4, rival_notes=4, unit=1),
             Section(2, 4, "trade", grid=2, notes=5, rival_notes=4, unit=1),
@@ -553,47 +762,26 @@ PLANS += [
         ],
         balance_lanes=True,
     ),
-    # Stop 4, Grape: notes arrive in pairs, on both sides, chords on the strong beats.
+    # Stop 7, Dragon Fruit: a flashy boss. Dense and syncopated on the sixteenth grid,
+    # nothing like stop 1 on the same song.
     Plan(
-        "stop04", "menu", "Stop 4", "grape", 3, max_nps=6, solo_holds=False,
+        "ost_level1", "level1", "Level 1", "dragonfruit", 4, max_nps=5, solo_holds=False,
         sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=5, rival_doubles=2, double_accent=0.6),
-            Section(1, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, doubles=2, rival_doubles=2, double_accent=0.6),
-            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
-            Section(12, 16, "both", grid=2, notes=6, rival_notes=5, doubles=2, rival_doubles=1, double_accent=0.6),
-            Section(16, 24, "trade", grid=2, notes=7, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 4, "trade", grid=2, notes=6, rival_notes=6, unit=1, bursts=1),
+            Section(4, 8, "trade", grid=1, notes=7, rival_notes=6, unit=2, floor=0.22),
+            Section(8, 12, "both", grid=2, notes=7, rival_notes=5, bursts=2, doubles=0.5, holds=1),
+            Section(12, 16, "trade", grid=1, notes=8, rival_notes=7, unit=1, floor=0.2),
+            Section(16, 20, "both", grid=1, notes=8, rival_notes=6, doubles=1),
+            Section(20, 24, "trade", grid=1, notes=8, rival_notes=8, unit=1, bursts=2),
+            Section(24, 29, "both", grid=1, notes=9, rival_notes=6, doubles=1, floor=0.2),
         ],
         rank_lanes=True,
-    ),
-    Plan(
-        # Dr. Lemon is erratic. The song runs in four-bar phrases that end on a syncopated
-        # break, so the plan changes hands and density every few bars: solo bursts, a quiet
-        # bar, and breaks charted on the sixteenth grid where the music leaves the beat.
-        "stop05", "pause", "Stop 5", "lemon", 3, max_nps=4, solo_holds=False,
-        sections=[
-            Section(0, 2, "trade", grid=2, notes=5, rival_notes=5, unit=1),
-            Section(2, 3, "both", grid=2, notes=5, rival_notes=5),
-            Section(3, 4, "rival", grid=1, rival_notes=6, floor=0.18),
-            Section(4, 6, "both", grid=2, notes=6, rival_notes=5, bursts=1),
-            Section(6, 7, "player", grid=1, notes=7),
-            Section(7, 8, "player", grid=1, notes=6, floor=0.18),
-            Section(8, 10, "trade", grid=1, notes=6, rival_notes=7, unit=1),
-            Section(10, 11, "both", grid=4, notes=3, rival_notes=3),
-            Section(11, 12, "both", grid=2, notes=7, rival_notes=6, bursts=2, holds=1),
-            Section(12, 15, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, floor=0.22),
-            Section(15, 16, "player", grid=4, notes=3, holds=1, floor=0.18),
-            Section(16, 19, "both", grid=1, notes=7, rival_notes=6, doubles=1),
-            Section(19, 20, "rival", grid=1, rival_notes=9),
-            Section(20, 23, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, floor=0.22),
-            Section(23, 24, "both", grid=1, notes=6, rival_notes=5, floor=0.18),
-            Section(24, 28, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=1, floor=0.15),
-        ],
-        balance_lanes=True,
     ),
     # Stop 6, Plum: long rests and patient patterns. Every phrase leaves the player at
     # least a bar of quiet, and some bars nobody plays at all.
     Plan(
-        "stop06", "title", "Stop 6", "plum", 3, max_nps=4, solo_holds=False,
+        "ost_title", "title", "Title Screen", "plum", 3, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 1, "rival", grid=4, rival_notes=3),
             Section(1, 2, "player", grid=4, notes=4),
@@ -615,72 +803,34 @@ PLANS += [
         ],
         rank_lanes=True,
     ),
-    # Stop 7, Dragon Fruit: a flashy boss. Dense and syncopated on the sixteenth grid,
-    # nothing like stop 1 on the same song.
     Plan(
-        "stop07", "level1", "Stop 7", "dragonfruit", 4, max_nps=5, solo_holds=False,
-        sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=6),
-            Section(1, 4, "trade", grid=2, notes=6, rival_notes=6, unit=1, bursts=1),
-            Section(4, 8, "trade", grid=1, notes=7, rival_notes=6, unit=2, floor=0.22),
-            Section(8, 12, "both", grid=2, notes=7, rival_notes=5, bursts=2, doubles=0.5, holds=1),
-            Section(12, 16, "trade", grid=1, notes=8, rival_notes=7, unit=1, floor=0.2),
-            Section(16, 20, "both", grid=1, notes=8, rival_notes=6, doubles=1),
-            Section(20, 24, "trade", grid=1, notes=8, rival_notes=8, unit=1, bursts=2),
-            Section(24, 29, "both", grid=1, notes=9, rival_notes=6, doubles=1, floor=0.2),
-        ],
-        rank_lanes=True,
-    ),
-    # Stop 8, Watermelon: long holds of one to four beats on both sides, taps around them.
-    Plan(
-        "stop08", "tutorial", "Stop 8", "watermelon", 3, max_nps=4, solo_holds=False, hold_spacing=8,
-        sections=[
-            Section(0, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, holds=2, rival_holds=2, max_hold=4, hold_sustain=0.3, hold_min=1.5, hold_tonal=0.03, floor=0.2),
-            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=4, rival_holds=4, max_hold=4, hold_sustain=0.3, hold_min=2, hold_tonal=0.03, floor=0.2),
-            Section(12, 20, "both", grid=2, notes=7, rival_notes=5, holds=5, rival_holds=4, max_hold=4, hold_sustain=0.3, hold_min=2, hold_tonal=0.03, floor=0.2),
-            Section(20, 24, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=3, rival_holds=2, max_hold=4, hold_sustain=0.3, hold_min=1.5, hold_tonal=0.03),
-        ],
-        rank_lanes=True,
-    ),
-    # Stop 9, Coconut: hard, steady and unrelenting. Eighth notes almost all the way.
-    Plan(
-        "stop09", "title", "Stop 9", "coconut", 4, max_nps=4, solo_holds=False,
-        sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=6),
-            Section(1, 8, "both", grid=2, notes=7, rival_notes=6, doubles=0.5),
-            Section(8, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, doubles=0.5),
-            Section(16, 24, "both", grid=2, notes=8, rival_notes=6, doubles=1, bursts=1),
-        ],
-        rank_lanes=True,
-    ),
-    # Stop 10, Orange: rapid bursts, then rests. A bar of sixteenth runs, then a bar of
-    # quiet while he fires his own.
-    Plan(
-        "stop10", "level_select", "Stop 10", "orange", 4, max_nps=6, solo_holds=False,
+        # Dr. Lemon is erratic. The song runs in four-bar phrases that end on a syncopated
+        # break, so the plan changes hands and density every few bars: solo bursts, a quiet
+        # bar, and breaks charted on the sixteenth grid where the music leaves the beat.
+        "ost_pause", "pause", "Pause Screen", "lemon", 3, max_nps=4, solo_holds=False,
         sections=[
             Section(0, 2, "trade", grid=2, notes=5, rival_notes=5, unit=1),
-            Section(2, 16, "trade", grid=2, notes=6, rival_notes=6, unit=1, runs=1, floor=0.12),
+            Section(2, 3, "both", grid=2, notes=5, rival_notes=5),
+            Section(3, 4, "rival", grid=1, rival_notes=6, floor=0.18),
+            Section(4, 6, "both", grid=2, notes=6, rival_notes=5, bursts=1),
+            Section(6, 7, "player", grid=1, notes=7),
+            Section(7, 8, "player", grid=1, notes=6, floor=0.18),
+            Section(8, 10, "trade", grid=1, notes=6, rival_notes=7, unit=1),
+            Section(10, 11, "both", grid=4, notes=3, rival_notes=3),
+            Section(11, 12, "both", grid=2, notes=7, rival_notes=6, bursts=2, holds=1),
+            Section(12, 15, "both", grid=2, notes=7, rival_notes=6, bursts=1, doubles=0.5, floor=0.22),
+            Section(15, 16, "player", grid=4, notes=3, holds=1, floor=0.18),
+            Section(16, 19, "both", grid=1, notes=7, rival_notes=6, doubles=1),
+            Section(19, 20, "rival", grid=1, rival_notes=9),
+            Section(20, 23, "both", grid=2, notes=8, rival_notes=7, bursts=2, doubles=1, floor=0.22),
+            Section(23, 24, "both", grid=1, notes=6, rival_notes=5, floor=0.18),
+            Section(24, 28, "trade", grid=2, notes=3, rival_notes=3, unit=1, holds=1, floor=0.15),
         ],
-        rank_lanes=True,
-    ),
-    # Stop 11, Pineapple: precise, clean and punishing. No gimmick shapes, just accuracy.
-    Plan(
-        "stop11", "pause", "Stop 11", "pineapple", 5, max_nps=5, solo_holds=False,
-        sections=[
-            Section(0, 1, "rival", grid=2, rival_notes=6),
-            Section(1, 4, "both", grid=2, notes=7, rival_notes=5, floor=0.2),
-            Section(4, 8, "both", grid=1, notes=9, rival_notes=6, bursts=1, floor=0.15),
-            Section(8, 12, "trade", grid=1, notes=10, rival_notes=8, unit=1, runs=1, floor=0.12),
-            Section(12, 16, "both", grid=1, notes=10, rival_notes=6, bursts=2, doubles=0.5, floor=0.15),
-            Section(16, 20, "both", grid=1, notes=10, rival_notes=6, runs=1, doubles=0.5, floor=0.15),
-            Section(20, 24, "both", grid=1, notes=10, rival_notes=7, bursts=2, doubles=1, floor=0.15),
-            Section(24, 28, "both", grid=2, notes=5, rival_notes=4, holds=1, floor=0.12),
-        ],
-        rank_lanes=True,
+        balance_lanes=True,
     ),
     # Stop 12, Blueberry: the hardest clean chart in the game, no gimmick.
     Plan(
-        "stop12", "menu", "Stop 12", "blueberry", 5, max_nps=5, solo_holds=False,
+        "ost_menu", "menu", "Main Menu", "blueberry", 5, max_nps=5, solo_holds=False,
         sections=[
             Section(0, 1, "rival", grid=2, rival_notes=7),
             Section(1, 4, "both", grid=2, notes=8, rival_notes=6, bursts=2, doubles=1),
@@ -1062,7 +1212,7 @@ def to_chart(plan: Plan, grid: Grid, player: list[Note], rival: list[Note]) -> d
         "format": 1,
         "id": plan.chart_id,
         "title": plan.title,
-        "artist": "Nicole Yazmin",
+        "artist": ARTIST[plan.song],
         "song": plan.song,
         "bpm": grid.bpm,
         "offset": grid.offset,
@@ -1242,7 +1392,7 @@ def main() -> int:
     args = parser.parse_args()
 
     tracks = {name: Track(name) for name in TRACKS}
-    tempos = {name: measure_tempo(tracks[name]) for name in TRACKS}
+    tempos = {name: measure_tempo(tracks[name], STOP_TRACKS.get(name)) for name in TRACKS}
     lead_fast = settle_offsets(tracks, tempos)
 
     # Detector lead per band, measured on the loop tracks (true grid phase 0).

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { playHype } from '../core/announcer';
 import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
 import { UiButton, addBackdrop, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
@@ -44,7 +45,10 @@ export class CrewEndScene extends Phaser.Scene {
   create(): void {
     fadeIn(this, 600);
     music.play('title', 800);
-    if (this.page === 'results') this.showResults();
+    if (this.page === 'results') {
+      this.showResults();
+      this.time.delayedCall(500, () => playHype(this.game, { kind: 'crewWon' }));
+    }
     else this.showCard();
     menuKeys(this, { confirm: () => this.button?.click(), back: () => this.button?.click() });
   }

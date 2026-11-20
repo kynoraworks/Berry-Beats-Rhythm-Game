@@ -17,6 +17,7 @@ import {
 } from '../core/battle';
 import { COLORS, CSS, GAME_W, SceneKeys, Tex, type Lane } from '../core/config';
 import { secToBeat, toTimedNotes, type Chart } from '../core/chart';
+import { HypeAudio, type HypeEvent } from '../core/announcer';
 import { Conductor } from '../core/conductor';
 import { Engine, START_HEALTH, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
@@ -24,7 +25,7 @@ import { LaneInput } from '../core/input';
 import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
-import { playSfx } from '../core/sfx';
+import { playSfx, preloadSamples, type SfxName } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
 import { onBackGesture } from '../core/backGesture';
@@ -48,7 +49,7 @@ import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
 import { rivalLevelFor, stopById, stopForChart } from '../story/stops';
-import { endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
+import { CREW_ROUNDS, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
 import { feetY } from '../explore/floors';
@@ -114,6 +115,8 @@ export class PlayScene extends Phaser.Scene {
   private chart!: Chart;
   private state: State = 'loading';
   private conductor: Conductor | null = null;
+  /** The MC, crowd and stingers of a battle. */
+  private hypeAudio: HypeAudio | null = null;
   private engine!: Engine;
   private laneInput: LaneInput | null = null;
   private touchLanes: TouchLanes | null = null;
@@ -135,6 +138,8 @@ export class PlayScene extends Phaser.Scene {
   private turnIndex = 0;
   private currentTurn: Turn = 'rest';
   private roundAnnounced = false;
+  /** True while the song is dipped under a hype cue, so it is put back afterwards. */
+  private ducked = false;
   private roundsSettled = 0;
   private introTime = 0;
   private versus: VersusCard | null = null;
@@ -177,6 +182,7 @@ export class PlayScene extends Phaser.Scene {
     this.chart = data.chart;
     this.state = 'loading';
     this.conductor = null;
+    this.hypeAudio = null;
     this.laneInput = null;
     this.rivalField = null;
     this.rival = null;
@@ -190,6 +196,7 @@ export class PlayScene extends Phaser.Scene {
     this.turnIndex = 0;
     this.currentTurn = 'rest';
     this.roundAnnounced = false;
+    this.ducked = false;
     this.roundsSettled = 0;
     this.introTime = 0;
     this.versus = null;
@@ -309,7 +316,7 @@ export class PlayScene extends Phaser.Scene {
         maxFires: crew ? 1 : undefined,
         hooks: {
           callout: (text, color) => hud.callout(text, color),
-          sfx: (name) => playSfx(this.game, name),
+          sfx: (name) => this.effectSfx(name),
           flash: (color, alpha) => this.stage.flash(color, alpha),
           cheer: () => {
             this.stage.cheer();
@@ -328,7 +335,7 @@ export class PlayScene extends Phaser.Scene {
         chart, engine: this.engine, stage: this.stage, player: this.player, rival: this.rival,
         playerField: this.playerField, rivalField: this.rivalField, playerLanes: PLAYER_LANES, rivalLanes: RIVAL_LANES, playerX, rivalX: RIVAL_X,
         camera: settings.hypeCamera && !settings.reduceMotion,
-        hooks: { sfx: (name) => playSfx(this.game, name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch() },
+        hooks: { sfx: (name) => this.hypeModeSfx(name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch() },
       });
     }
 
@@ -346,6 +353,9 @@ export class PlayScene extends Phaser.Scene {
     this.buildPauseMenu();
     this.setupInput();
 
+    preloadSamples(this.game);
+    // Like hype mode, the crowd and MC are for battles, not the Coach's lessons.
+    this.hypeAudio = this.rival && this.story?.segment?.kind !== 'lesson' ? new HypeAudio(this.game) : null;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanup, this);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('blur', this.onBlur);
@@ -457,6 +467,7 @@ export class PlayScene extends Phaser.Scene {
       this.versus = new VersusCard(this, this.rivalName, texture, look, label, player);
       playSfx(this.game, 'banner');
     }
+    this.hypeAudio?.setCrowd(true);
     this.showSongCredit();
     if (!this.playData.autoplay) {
       if (isTouch()) this.showTouchHint();
@@ -540,6 +551,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.state !== 'playing') return;
     this.state = 'paused';
     this.conductor.pause();
+    this.hypeAudio?.silence();
     if (this.laneInput) this.laneInput.enabled = false;
     this.touchLanes?.setGuideVisible(false);
     this.tweens.pauseAll();
@@ -613,6 +625,7 @@ export class PlayScene extends Phaser.Scene {
       if (this.laneInput) this.laneInput.enabled = true;
       this.touchLanes?.setGuideVisible(true);
       this.conductor?.resume();
+      this.hypeAudio?.setCrowd(true);
       this.state = 'playing';
       this.dropUnheldHolds();
     });
@@ -729,13 +742,13 @@ export class PlayScene extends Phaser.Scene {
     };
     if (failed) {
       this.conductor?.pause();
-      playSfx(this.game, 'fail');
+      this.cheer({ kind: 'fail' }, 'fail');
       if (!getSettings().reduceMotion) this.cameras.main.shake(350, 0.008);
       this.countText.setText('Failed').setColor(CSS.miss).setAlpha(1).setScale(1);
       this.time.delayedCall(1300, wrapUp);
     } else {
       if (summary) {
-        playSfx(this.game, summary.won ? 'cheer' : 'round');
+        this.cheer(summary.won ? { kind: 'battleWon' } : { kind: 'battleLost' }, summary.won ? 'cheer' : 'round');
         const yours = this.crew && this.crew.ally !== 'berry' ? `${CAST[this.crew.ally].name} takes it!` : 'You win!';
         this.hud.callout(summary.won ? yours : `${this.rivalName} wins!`, summary.won ? CSS.blue : this.rivalLook.css);
         this.stage.flash(summary.won ? COLORS.blue : this.rivalLook.color, 0.3);
@@ -783,6 +796,7 @@ export class PlayScene extends Phaser.Scene {
     this.stopRotateWatch?.();
     this.conductor?.destroy();
     this.conductor = null;
+    this.hypeAudio?.silence();
   }
 
   private readonly onVisibility = (): void => {
@@ -939,6 +953,8 @@ export class PlayScene extends Phaser.Scene {
         this.hud.showJudgement('miss', 0);
         this.player.stumble();
         playSfx(this.game, 'miss');
+        // Past the 25 milestone the crowd feels a broken streak.
+        if (this.nextMilestone > COMBO_MILESTONES[1]) this.cheer({ kind: 'bigMiss' });
         this.nextMilestone = COMBO_MILESTONES[0];
         continue;
       }
@@ -958,11 +974,32 @@ export class PlayScene extends Phaser.Scene {
         this.player.special();
         this.stage.flash(COLORS.yellow, 0.22);
         this.stage.punch();
-        playSfx(this.game, 'combo');
+        this.cheer({ kind: 'combo', combo }, 'combo');
         const index = COMBO_MILESTONES.indexOf(this.nextMilestone);
         this.nextMilestone = index >= 0 && index < COMBO_MILESTONES.length - 1 ? COMBO_MILESTONES[index + 1] : this.nextMilestone + 50;
       }
     }
+  }
+
+  /** Battle hype: the MC, crowd and stingers. Outside a battle only `fallback` plays. */
+  private cheer(event: HypeEvent, fallback?: SfxName): void {
+    if (this.hypeAudio) this.hypeAudio.event(event);
+    else if (fallback) playSfx(this.game, fallback);
+  }
+
+  /** Flair and abilities report through the hype mixer; their other sounds play as they are. */
+  private effectSfx(name: SfxName): void {
+    const ability = this.rules.ability;
+    if (name === 'flair') this.cheer({ kind: 'flairFull' }, 'flair');
+    else if (name === 'ability' && ability) this.cheer({ kind: 'ability', ability }, 'ability');
+    else playSfx(this.game, name);
+  }
+
+  /** Hype mode's riser and cheer become one hype cue; a miss (combo back to 0) ends it with a tape stop. */
+  private hypeModeSfx(name: SfxName): void {
+    if (name === 'hype') this.cheer({ kind: 'hypeStart' }, 'hype');
+    else if (name === 'hypeOut') this.cheer({ kind: 'hypeEnd', broken: this.engine.stats.combo === 0 }, 'hypeOut');
+    else if (!this.hypeAudio) playSfx(this.game, name);
   }
 
   private handleRivalEvents(events: JudgeEvent[]): void {
@@ -1004,7 +1041,7 @@ export class PlayScene extends Phaser.Scene {
       this.engine.adjustHealth(FLAWLESS_PUSH * flawless);
       this.hud.callout('Flawless!', CSS.perfect);
       this.stage.flash(COLORS.perfect, 0.2);
-      playSfx(this.game, 'bonus');
+      this.cheer({ kind: 'flawless' }, 'bonus');
     }
 
     const battle = this.battle;
@@ -1012,6 +1049,7 @@ export class PlayScene extends Phaser.Scene {
     if (!this.roundAnnounced && time >= battle.rounds[0].start - COUNT_STEP) {
       this.roundAnnounced = true;
       this.hud.callout('Round 1', CSS.cream);
+      if (!this.crew) this.cheer({ kind: 'roundIntro', round: 0, total: battle.rounds.length });
     }
     while (this.roundsSettled < battle.rounds.length && time >= battle.rounds[this.roundsSettled].end + ROUND_SETTLE) {
       this.settleRound(this.roundsSettled++, battle);
@@ -1034,15 +1072,19 @@ export class PlayScene extends Phaser.Scene {
     const mine = winner === 'player';
     this.hud.setRound(index, winner);
     this.hud.callout(mine ? 'Round to you!' : `Round to ${this.rivalName}`, mine ? CSS.blue : this.rivalLook.css);
-    if (index + 1 < battle.rounds.length) this.hud.callout(`Round ${index + 2}`, CSS.cream);
+    if (index + 1 < battle.rounds.length) {
+      this.hud.callout(`Round ${index + 2}`, CSS.cream);
+      // After the round's sting, so the MC is heard on its own.
+      if (!this.crew) this.time.delayedCall(900, () => this.state === 'playing' && this.cheer({ kind: 'roundIntro', round: index + 1, total: battle.rounds.length }));
+    }
     this.stage.flash(mine ? COLORS.blue : this.rivalLook.color, 0.28);
-    playSfx(this.game, 'round');
+    this.cheer(mine ? { kind: 'roundWon' } : { kind: 'roundLost' }, 'round');
     if (mine) {
       this.player.special();
       this.rival?.stumble();
       this.stage.cheer();
       this.stage.punch();
-      playSfx(this.game, 'cheer');
+      if (!this.hypeAudio) playSfx(this.game, 'cheer');
     } else {
       this.rival?.special();
       this.player.stumble();
@@ -1077,7 +1119,13 @@ export class PlayScene extends Phaser.Scene {
       this.updateBattle(time);
 
       const crew = this.crew;
-      if (crew && time > crew.end - ROUND_FADE) conductor.setVolume(getSettings().musicVolume * Phaser.Math.Clamp((crew.end + 0.4 - time) / ROUND_FADE, 0, 1));
+      const fade = crew && time > crew.end - ROUND_FADE ? Phaser.Math.Clamp((crew.end + 0.4 - time) / ROUND_FADE, 0, 1) : 1;
+      const hype = this.hypeAudio;
+      if (hype) hype.update(this.engine.stats.combo, this.engine.stats.health);
+      // The song dips a little under the biggest hype moments.
+      const duck = hype?.duck() ?? 1;
+      if (fade < 1 || duck < 1 || this.ducked) conductor.setVolume(getSettings().musicVolume * fade * duck);
+      this.ducked = duck < 1;
       if (this.engine.stats.failed) {
         this.finish(true);
       } else if (crew && time >= crew.end + 0.4) {
@@ -1126,6 +1174,8 @@ export class PlayScene extends Phaser.Scene {
     const labels = ['3', '2', '1', 'Go!'];
     while (this.countIndex < labels.length && rawTime >= this.origin - LEAD_IN + this.countIndex * COUNT_STEP) {
       const label = labels[this.countIndex++];
+      if (label === '3' && this.crew) this.cheer({ kind: 'roundIntro', round: this.crew.round, total: CREW_ROUNDS.length });
+      if (label === 'Go!' && !this.crew && (this.battle?.rounds.length ?? 0) < 2) this.cheer({ kind: 'letsDance' });
       this.countText.setText(label).setAlpha(1).setScale(1.4);
       this.tweens.add({ targets: this.countText, scale: 1, duration: 150, ease: 'Quad.easeOut' });
       playSfx(this.game, label === 'Go!' ? 'go' : 'count');

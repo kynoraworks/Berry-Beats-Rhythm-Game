@@ -16,6 +16,8 @@ export interface Settings {
   scrollSpeed: number;
   /** Play a tick when a note is hit. */
   hitSounds: boolean;
+  /** MC call-outs in battles ("Round one!", "Hype!", "Winner!"). */
+  announcer: boolean;
   /** Keep playing when the health bar is empty. */
   noFail: boolean;
   /** Turn off camera shakes, flashes and background pulsing. */
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS: Settings = {
   audioOffsetMs: 0,
   scrollSpeed: 1,
   hitSounds: false,
+  announcer: true,
   noFail: false,
   reduceMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   hypeCamera: true,
@@ -71,6 +74,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     audioOffsetMs: clamp(raw.audioOffsetMs, -500, 500, d.audioOffsetMs),
     scrollSpeed: clamp(raw.scrollSpeed, 0.5, 2.5, d.scrollSpeed),
     hitSounds: typeof raw.hitSounds === 'boolean' ? raw.hitSounds : d.hitSounds,
+    announcer: typeof raw.announcer === 'boolean' ? raw.announcer : d.announcer,
     noFail: typeof raw.noFail === 'boolean' ? raw.noFail : d.noFail,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
     hypeCamera: typeof raw.hypeCamera === 'boolean' ? raw.hypeCamera : d.hypeCamera,

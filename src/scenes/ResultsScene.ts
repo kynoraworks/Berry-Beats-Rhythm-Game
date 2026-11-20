@@ -6,6 +6,7 @@ import { levelForChart } from '../core/levels';
 import { music } from '../core/music';
 import { submitScore } from '../core/saves';
 import { getSettings, updateSettings } from '../core/settings';
+import { playHype } from '../core/announcer';
 import { playSfx } from '../core/sfx';
 import { FocusGroup, UiButton, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
 import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
@@ -163,10 +164,12 @@ export class ResultsScene extends Phaser.Scene {
     const timing = plan.timing && meanErrorMs !== undefined ? this.addTimingHint(plan.timing.ms, plan.timing.late, meanErrorMs) : null;
     if (notes.length) addBody(this, timing ? 270 : GAME_W / 2, NOTES_Y, notes.join('   '), 24, { color: CSS.grey });
 
-    const jingle = failed || battle?.won === false ? 'lose' : 'win';
+    const lost = failed || battle?.won === false;
+    // A battle ends on a recorded sting and the crowd; a plain song on the little jingle.
+    const jingle = () => (battle ? playHype(this.game, { kind: lost ? 'resultsLost' : 'resultsWon' }) : playSfx(this.game, lost ? 'lose' : 'win'));
     if (calm) {
       scoreText.setText(stats.score.toLocaleString('en-US'));
-      playSfx(this.game, jingle);
+      jingle();
     } else {
       this.animateIn({ banner, player, rival, stamp, scoreText, badges, score: stats.score, jingle });
     }
@@ -338,7 +341,7 @@ export class ResultsScene extends Phaser.Scene {
     scoreText: Phaser.GameObjects.Text;
     badges: Phaser.GameObjects.Container[];
     score: number;
-    jingle: 'win' | 'lose';
+    jingle: () => void;
   }): void {
     const { banner, player, rival, stamp, scoreText, badges, score, jingle } = parts;
     banner.setScale(1.6).setAlpha(0);
@@ -365,7 +368,7 @@ export class ResultsScene extends Phaser.Scene {
       onComplete: () => {
         this.cameras.main.shake(160, 0.008);
         playSfx(this.game, 'stamp');
-        this.time.delayedCall(120, () => playSfx(this.game, jingle));
+        this.time.delayedCall(120, jingle);
         this.tweens.add({ targets: stamp, scale: 1.08, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
       },
     });
