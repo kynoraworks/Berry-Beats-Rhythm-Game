@@ -24,10 +24,10 @@ describe('places', () => {
     }
   });
 
-  it('reuse the drawn stages as the streets of stops 3, 5, 7 and 8, and give the rest wide streets', () => {
+  it('reuse the drawn stages as the streets of stops 3, 5 and 7, and give the rest wide streets (the Rooftop is a food court)', () => {
     for (const stop of STOPS.slice(1, 11)) {
       const street = placeOf(stop.id, 'street')!;
-      if ([3, 5, 7, 8].includes(stop.number)) {
+      if ([3, 5, 7].includes(stop.number)) {
         expect(street.bg).toBe(stop.stage);
         expect(street.width).toBe(STATION_W);
       } else {

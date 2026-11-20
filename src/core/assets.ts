@@ -85,6 +85,7 @@ export const PRESENT_IMAGES: readonly string[] = [
   'street_the_tunnel',
   'street_orange_plaza',
   'street_pineapple_hall',
+  'street_rooftop',
 ];
 
 export function optionalSheets(): OptionalSheet[] {

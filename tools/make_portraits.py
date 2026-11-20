@@ -33,6 +33,10 @@ reference, converted at 10.4; the first versions are in
 archive/generated-sprites/v1/portraits_v1.png. Frames 26-27 (Blueberry) were
 replaced the same month for his redesign as Berry's mirror (cap backwards,
 open hoodie, hood down), from the design round that chose his look.
+Frames 18-19 (Watermelon) were replaced the same month when he became the
+rooftop food court's chef (toque, apron, spatula), generated as a pair from
+his old frames and 0-3 as references and converted at 18.3 so the face keeps
+its size with the hat; the old pair is in archive/generated-sprites/v1/portraits_v1.png.
 Frames 10-29 were generated three characters (or the extras) to a 3x2 sheet
 from a design lineup of the new fruits and frames 0-9 as a style reference,
 converted at an art pixel of 10.6 source pixels with one palette per character.

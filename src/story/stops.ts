@@ -136,7 +136,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Reward',
     arc: 'Berry speaks his first full line and admits what happened in July. The crew returns. Watermelon makes five.',
     song: 'tutorial',
-    stage: Tex.stageRooftop,
+    // A rooftop food court: its own street (street_rooftop), danced at its far end, Watermelon's grill (stage_rooftop).
   },
   {
     station: 'The Tunnel',

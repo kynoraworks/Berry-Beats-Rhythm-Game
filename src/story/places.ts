@@ -162,9 +162,13 @@ const STATION_SEEDS: Record<StopId, StationSeed> = {
     looks: [look('coats', 'Coat check', LEFT_BOX, [say('raspberry', 'neutral', 'Coat check. You could check the hood. No? Okay. No.')], 'stall')],
     exit: 'The Club',
   },
+  // The Rooftop is a food court: a menu board by the train and a stall under the awning.
   stop08: {
-    looks: [look('bench', 'Bench', RIGHT_BOX, [silence()], 'bench')],
-    exit: 'Roof stairs',
+    looks: [
+      look('menu', 'Menu board', [54, 96, 26, 34], [say('npc', 'neutral', "Tonight's special: watermelon noodles. The chef insists.", 'COOK')], 'board'),
+      look('stall', 'Food stall', [150, 88, 46, 40], [silence()], 'stall'),
+    ],
+    exit: 'Food court',
   },
   stop09: {
     looks: [look('closed', 'Closed sign', LEFT_BOX, [say('watermelon', 'bold', 'Tunnels are just big round hallways. I fit right in!')], 'sign')],
@@ -274,14 +278,14 @@ const STREET_SEEDS: Partial<Record<StopId, StreetSeed>> = {
     ],
     fruitX: 210,
   },
-  // The Rooftop reuses the rooftop stage. Berry is alone here: the crew walked out at The Club.
+  // The Rooftop food court: stalls and tables, and Watermelon at his grill at the far end. Berry is alone here: the crew walked out at The Club.
   stop08: {
     looks: [
-      look('lights', 'String lights', [60, 92, 136, 14], [silence()]),
-      look('boombox', 'Boombox', [156, 116, 20, 16], [say('npc', 'neutral', "Big guy's been hosting up here all night. Go say hi.", 'GUEST')]),
-      look('tower', 'Water tower', [120, 62, 22, 28], [silence()]),
+      look('noodles', 'Noodle stall', box(0), [say('npc', 'neutral', "Noodles? The big chef's been cooking up here since sunset.", 'COOK')], 'stall'),
+      look('tables', 'Tables', box(1), [say('npc', 'neutral', "Table for one? You look more like a table-for-five kind of kid.", 'DINER')], 'bench'),
+      look('dumplings', 'Dumpling stall', box(2), [say('npc', 'neutral', "Big guy's been hosting up here all night. Go say hi.", 'GUEST')], 'stall'),
     ],
-    fruitX: 214,
+    fruitX: 584,
   },
   stop09: {
     looks: [
