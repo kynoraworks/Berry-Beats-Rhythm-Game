@@ -17,10 +17,13 @@ The hand-editable sources are in archive/generated-sprites:
   pear_sit.png, lemon_sit.png: the same three cells and placement. Their eyes
   are hidden, so the middle cell is not a blink: the Pear dips his chin as if
   nodding to a beat, and the Lemon shuts his grin into a tight little smile.
-  The Pear sits slouched with his knees apart, the Lemon bolt upright with his
-  flask on his lap. In both, the second and third cells reuse the first cell's
+  The Pear sits slouched with his knees apart. The Lemon sits with one leg
+  crossed over the other, his coat tails spread on the seat and his flask in
+  his lap (a first version faced straight ahead and read as standing, so it
+  was redrawn). In both, the second and third cells reuse the first cell's
   body below the chest (row 42 for the Pear, row 36 for the Lemon) so that only
-  the head moves, and a few stray pixels in the Pear's beanie brim were fixed.
+  the head moves. A few stray pixels in the Pear's beanie brim were fixed, and
+  the Lemon's closed smile and tilted grin were redrawn by hand.
 
 This script adds a one-pixel "breathing" variant of the neutral and tilt frames
 and writes five-frame sheets to public/assets/img:
