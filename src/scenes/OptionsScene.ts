@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { CSS, LANE_NAMES, SceneKeys, Tex } from '../core/config';
+import { COLORS, CSS, LANE_COLORS, LANE_NAMES, SceneKeys, Tex } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings, keyLabel, resetSettings, updateSettings, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
+import { SCHEME_INFO, TOUCH_SCHEMES, zonesFor, type TouchScheme } from '../core/touchSchemes';
 import { UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addSlider, addText, addToggle, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { FocusFrame, addSectionTitle, addStepArrow, type Bounds } from '../menus/kit';
 import { OffsetTest } from '../menus/offsetTest';
@@ -137,7 +138,7 @@ export class OptionsScene extends Phaser.Scene {
     const controlsY = rightY(3) + 48;
     if (isTouch()) {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Touch controls');
-      this.addTouchGuide(controlsY + 40);
+      this.addTouchControls(controlsY);
     } else {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
       LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 52 + lane * KEY_DY));
@@ -229,7 +230,7 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, bounds, refresh, adjust });
   }
 
-  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion' | 'hypeCamera'): void {
+  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion' | 'hypeCamera' | 'touchGuides'): void {
     const index = this.rows.length;
     const bounds = this.rowBounds(panel, y);
     const at = controls(panel);
@@ -270,18 +271,77 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, button, refresh: () => undefined, confirm: run });
   }
 
-  /** Phones have no keys to rebind, so the controls section explains the touch columns instead. */
-  private addTouchGuide(top: number): void {
-    const cx = RIGHT.x + RIGHT.w / 2;
-    const columnW = 112;
-    LANE_NAMES.forEach((name, lane) => {
-      const x = cx + (lane - 1.5) * (columnW + 12);
-      addBox(this, x - columnW / 2, top, columnW, 128, 'track');
-      this.add.image(x, top + 50, Tex.notes, lane).setScale(4);
-      addText(this, x, top + 104, capital(name), 24, { stroke: false });
-    });
-    const lines = ['The screen is split into four columns.', 'Tap a column to hit its arrow, and keep', 'holding for long notes. Tap the pause', 'button in the corner to stop.'];
-    addBody(this, cx, top + 200, lines.join('\n'), 22, { color: CSS.lilac });
+  /** Phones have no keys to rebind: they choose how to play by touch instead, with a picture of each way. */
+  private addTouchControls(top: number): void {
+    const index = this.rows.length;
+    const y = top + 52;
+    const bounds = this.rowBounds(RIGHT, y);
+    const at = controls(RIGHT);
+    this.addHitZone(bounds, index);
+    addText(this, at.label, y, 'Controls', 32, { origin: [0, 0.5], stroke: false });
+    const value = addText(this, at.control, y, '', 24, { color: CSS.yellow, stroke: false });
+    const preview = this.add.graphics();
+    const previewBox: Bounds = { x: RIGHT.x + RIGHT.w / 2 - 150, y: top + 142, w: 300, h: 140 };
+    addBox(this, previewBox.x - 10, previewBox.y - 10, previewBox.w + 20, previewBox.h + 20, 'track');
+    preview.setDepth(1);
+    const row: Row = { hint: '', bounds, refresh: () => undefined };
+    const refresh = () => {
+      const scheme = getSettings().touchScheme;
+      value.setText(SCHEME_INFO[scheme].name);
+      row.hint = SCHEME_INFO[scheme].blurb;
+      if (this.focus === index) this.say(row.hint);
+      this.drawScheme(preview, scheme, previewBox);
+    };
+    const adjust = (dir: number) => {
+      const list = TOUCH_SCHEMES;
+      const next = list[(list.indexOf(getSettings().touchScheme) + dir + list.length) % list.length];
+      updateSettings({ touchScheme: next });
+      playSfx(this.game, 'move');
+      refresh();
+    };
+    const press = (dir: -1 | 1) => () => {
+      if (!this.idle()) return;
+      this.setFocus(index, false);
+      adjust(dir);
+    };
+    addStepArrow(this, at.arrowLeft, y, -1, press(-1), () => this.setFocus(index, false));
+    addStepArrow(this, at.arrowRight, y, 1, press(1), () => this.setFocus(index, false));
+    row.refresh = refresh;
+    row.adjust = adjust;
+    row.confirm = () => adjust(1);
+    this.rows.push(row);
+    this.addToggle(RIGHT, y + ROW_DY, 'Guides', 'Keep the touch areas on screen for the whole song. Off, they fade after a few seconds.', 'touchGuides');
+  }
+
+  /** A small picture of a touch scheme: a landscape phone with its touch areas in the lane colours. */
+  private drawScheme(g: Phaser.GameObjects.Graphics, scheme: TouchScheme, box: Bounds): void {
+    g.clear();
+    g.fillStyle(COLORS.night, 1).fillRoundedRect(box.x, box.y, box.w, box.h, 14);
+    // The note fields, faintly, so it is clear what the hands leave uncovered.
+    g.fillStyle(COLORS.purple, 0.25).fillRect(box.x + 20, box.y + 10, 90, box.h - 20).fillRect(box.x + box.w - 110, box.y + 10, 90, box.h - 20);
+    if (scheme === 'swipe') {
+      g.fillStyle(COLORS.lilac, 0.18).fillRect(box.x, box.y + box.h / 3, box.w, (box.h * 2) / 3);
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h * 0.66;
+      const arms: [number, number, number][] = [
+        [0, -1, 0],
+        [1, 0, -1],
+        [2, 0, 1],
+        [3, 1, 0],
+      ];
+      for (const [lane, dx, dy] of arms) {
+        g.lineStyle(6, LANE_COLORS[lane], 1).lineBetween(cx + dx * 10, cy + dy * 10, cx + dx * 34, cy + dy * 30);
+        g.fillStyle(LANE_COLORS[lane], 1).fillCircle(cx + dx * 34, cy + dy * 30, 6);
+      }
+    } else {
+      for (const zone of zonesFor(scheme, box.w, box.h)) {
+        const inset = scheme === 'columns' ? 1 : 5;
+        g.fillStyle(LANE_COLORS[zone.lane], scheme === 'columns' ? 0.35 : 0.6);
+        g.fillRoundedRect(box.x + zone.x + inset, box.y + zone.y + inset, zone.w - inset * 2, zone.h - inset * 2, scheme === 'columns' ? 2 : 10);
+      }
+    }
+    // The pause button stays in the top corner in every scheme.
+    g.fillStyle(COLORS.orange, 1).fillRoundedRect(box.x + 8, box.y + 6, 16, 16, 4);
   }
 
   private addKeyRow(lane: number, y: number): void {
