@@ -449,6 +449,20 @@ export class Dancer {
     this.showpiece(this.specialCount++ % (1 + (f.finishers?.length ?? 0)));
   }
 
+  /**
+   * A beat of the countdown: 'hood' tugs the hood straight (Berry's layout),
+   * 'boast' strikes a confident pose. Fruits in the lite layout show their
+   * signature pose for either. Ignored mid-move.
+   */
+  getReady(kind: 'hood' | 'boast', seconds = 0.5): void {
+    if (this.mode !== 'idle' && this.mode !== 'pose') return;
+    const frame = this.frames === BERRY ? (kind === 'hood' ? 37 : 41) : this.frames === LITE ? 16 : undefined;
+    if (frame === undefined) return;
+    this.pending = null;
+    this.start('pose', [frame], seconds, seconds);
+    if (!this.calm) this.squash(1.05, 0.95, 120);
+  }
+
   /** Final pose for the end of the song. */
   finish(won: boolean): void {
     const frames = won ? this.frames.victory : this.frames.defeat;

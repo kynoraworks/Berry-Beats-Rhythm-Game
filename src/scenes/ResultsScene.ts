@@ -16,6 +16,9 @@ import { isStopOpen } from '../story/progress';
 import { STOPS, stopById } from '../story/stops';
 import { planResults, roundScore, type BannerTone, type ButtonId } from './resultsPlan';
 
+/** Ticks heard as the score counts up. */
+const COUNT_TICKS = 16;
+
 const JUDGEMENTS: [Judgement, string, string][] = [
   ['perfect', 'Perfect', CSS.perfect],
   ['good', 'Good', CSS.good],
@@ -373,13 +376,23 @@ export class ResultsScene extends Phaser.Scene {
       },
     });
 
+    // The score ticks as it climbs, the ticks rising in pitch and thinning out as it eases in.
+    let ticked = 0;
     this.tweens.addCounter({
       from: 0,
       to: score,
       delay: 900,
       duration: 900,
       ease: 'Quad.easeOut',
-      onUpdate: (tween) => scoreText.setText(Math.round(tween.getValue() ?? 0).toLocaleString('en-US')),
+      onUpdate: (tween) => {
+        const value = tween.getValue() ?? 0;
+        scoreText.setText(Math.round(value).toLocaleString('en-US'));
+        const step = score > 0 ? Math.floor((value / score) * COUNT_TICKS) : COUNT_TICKS;
+        if (step > ticked) {
+          ticked = step;
+          playSfx(this.game, 'countTick', 1 + (step / COUNT_TICKS) * 0.5);
+        }
+      },
     });
 
     badges.forEach((badge, i) => {
@@ -390,7 +403,7 @@ export class ResultsScene extends Phaser.Scene {
         delay: 1850 + i * 160,
         duration: 260,
         ease: 'Back.easeOut',
-        onStart: () => playSfx(this.game, 'bonus'),
+        onStart: () => playSfx(this.game, 'badgePop', 1 + i * 0.12),
       });
     });
   }

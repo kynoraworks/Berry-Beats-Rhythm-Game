@@ -286,9 +286,13 @@ export class BeatMapsScene extends Phaser.Scene {
     switch (key) {
       case 'up':
         if (this.focus === 'list') {
-          if (this.listIndex > 0) this.listIndex--;
-          else this.focus = 'top';
-          playSfx(game, 'move');
+          if (this.listIndex > 0) {
+            this.listIndex--;
+            playSfx(game, 'listScroll');
+          } else {
+            this.focus = 'top';
+            playSfx(game, 'move');
+          }
         }
         break;
       case 'down':
@@ -297,7 +301,7 @@ export class BeatMapsScene extends Phaser.Scene {
           playSfx(game, 'move');
         } else if (this.focus === 'list' && this.listIndex < this.charts.length - 1) {
           this.listIndex++;
-          playSfx(game, 'move');
+          playSfx(game, 'listScroll');
         }
         break;
       case 'left':

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build the battle hype sounds in public/assets/audio/sfx.
 
-    python3 tools/build_sfx.py archive/generated-audio/mc
+    python3 tools/build_sfx.py archive/generated-audio/mc [--countdown]
 
 RAW_DIR holds the generated takes (ElevenLabs v4, preset voice "Barrett",
 [shouting] tag): mc_*.mp3 for the MC lines and src_ahh.mp3, a
@@ -222,6 +222,7 @@ MC_LINES = {
     'mc_round1': 'mc_round1', 'mc_round2': 'mc_round2', 'mc_round3': 'mc_round3', 'mc_round4': 'mc_round4',
     'mc_final': 'mc_final', 'mc_hype': 'mc_hype_b', 'mc_flawless': 'mc_flawless', 'mc_combo': 'mc_combo',
     'mc_crowdwild': 'mc_crowdwild', 'mc_winner': 'mc_winner', 'mc_ohno': 'mc_ohno', 'mc_letsdance': 'mc_letsdance',
+    'mc_three': 'mc_three', 'mc_two': 'mc_two', 'mc_one': 'mc_one',
 }
 
 
@@ -479,6 +480,30 @@ def sub_drop():
     save(fade(norm(y, -1), 0.0005, 0.3), 'sub_drop')
 
 
+def count_hits(raw):
+    """The 3-2-1 before a battle: a short heavy hit with one scratch chirp on each
+    number, a step higher each time, and a bigger hit with a baby scratch on GO."""
+    ahh = Record(load(os.path.join(raw, 'src_ahh.mp3')))
+    for name, (f0, rise) in {'count_3': (88, 0.0), 'count_2': (98, 0.12), 'count_1': (110, 0.25)}.items():
+        dur = 0.7
+        s = sub(f0 * 1.9, f0, 0.03, 0.16, dur)
+        h = Hand().stroke(0.11 + 0.02 * rise, 0.07, fader=gate(0.7), shape='push').stroke(-0.11, 0.06, fader=0.0).hold(0.4)
+        chirp = ahh.play(*h.take())
+        hit = mix(excite(s) * 0.9, knock(0.2) * 0.9, kick_click() * 0.5, body(0.18, 520, 0.035) * 0.7, crack(0.2) * 0.25)
+        hit = saturate(norm(hit, 0), 2.4)
+        y = mix(hit, at(norm(hp(chirp, 300), -6), 0.012, len(hit) / SR))
+        y = mix(y, hall(lp(y, 2500), 0.6, 0.5) * 0.1)[: int(dur * SR)]
+        save(fade(norm(y, -1), 0.0005, 0.2), name)
+    s = sub(105, 40, 0.05, 0.5, 1.4)
+    h = Hand().stroke(0.16, 0.09, shape='push').stroke(-0.16, 0.08).stroke(0.2, 0.08, shape='push').stroke(-0.2, 0.12, shape='pull').hold(0.8)
+    baby = ahh.play(*h.take())
+    hit = mix(excite(s), knock() * 1.0, kick_click() * 0.5, body(0.3, 440, 0.07) * 0.9, crack() * 0.5)
+    hit = saturate(norm(hit, 0), 2.7)
+    y = mix(hit, at(norm(hp(baby, 300), -7), 0.02, len(hit) / SR))
+    y = mix(y, hall(y, 1.3, 1.0) * 0.18)[: int(1.4 * SR)]
+    save(fade(norm(y, -1), 0.0005, 0.35), 'count_go')
+
+
 def crowd_roar():
     """The cheer, tripled: three slightly different-sized crowds swelling together."""
     cheer = load(os.path.join(OUT, 'crowd_cheer.mp3'))
@@ -493,9 +518,15 @@ def crowd_roar():
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
     raw = sys.argv[1]
+    if len(sys.argv) == 3 and sys.argv[2] == '--countdown':
+        # Only the countdown: the MC's numbers and the hits.
+        for dst in ('mc_three', 'mc_two', 'mc_one'):
+            save(mc_chain(load(os.path.join(raw, f'{MC_LINES[dst]}.mp3'))), dst)
+        count_hits(raw)
+        return
     for dst, src in MC_LINES.items():
         save(mc_chain(load(os.path.join(raw, f'{src}.mp3'))), dst)
     scratches(raw)
@@ -505,6 +536,7 @@ def main():
     boom()
     slam()
     sub_drop()
+    count_hits(raw)
     crowd_roar()
 
 

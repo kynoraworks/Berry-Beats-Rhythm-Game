@@ -253,9 +253,17 @@ export class UiButton {
     this.container = scene.add.container(x, y, parts);
     this.container.setSize(this.width, this.height);
     this.container.setInteractive({ useHandCursor: true });
-    this.container.on(Phaser.Input.Events.POINTER_OVER, () => this.enabled && this.onHover?.());
-    this.container.on(Phaser.Input.Events.POINTER_DOWN, () => {
+    this.container.on(Phaser.Input.Events.POINTER_OVER, (pointer: Phaser.Input.Pointer) => {
       if (!this.enabled) return;
+      // In a focus group the group ticks as focus moves; a lone button ticks on a mouse hover.
+      if (this.onHover) this.onHover();
+      else if (!pointer.wasTouch) playSfx(this.scene.game, 'move');
+    });
+    this.container.on(Phaser.Input.Events.POINTER_DOWN, () => {
+      if (!this.enabled) {
+        if (this.container.visible) playSfx(this.scene.game, 'locked');
+        return;
+      }
       this.pressed = true;
       this.refresh();
     });

@@ -100,6 +100,7 @@ export class Doors {
         return;
       }
       // A breath apart as the seal lets go, then the slide.
+      this.scene.time.delayedCall(90, () => playSfx(this.scene.game, 'doorSlide'));
       this.slide(0.985, 90, 'Sine.easeOut', () => this.slide(0, 560, 'Cubic.easeInOut', () => onDone?.()));
     });
   }
@@ -116,7 +117,8 @@ export class Doors {
       playSfx(this.scene.game, 'doorThunk');
       this.setLamp(RED);
       this.showLines(name, sub, true);
-      // The train moves off: the lights outside start to stream past.
+      // The train moves off: the lights outside start to stream past, the wheels clatter.
+      this.scene.time.delayedCall(quick ? 0 : 150, () => playSfx(this.scene.game, 'trainRoll'));
       this.scene.tweens.addCounter({ from: 0, to: quick ? 0 : 1, duration: 900, ease: 'Quad.easeIn', onUpdate: (tween) => void (this.rush = (tween.getValue() ?? 0) * 2200) });
       this.scene.time.delayedCall(quick ? 0 : 260, () => onDone?.());
     };
@@ -127,6 +129,7 @@ export class Doors {
     }
     this.scene.time.delayedCall(380, () => {
       playSfx(this.scene.game, 'doorHiss');
+      playSfx(this.scene.game, 'doorSlide');
       // They meet a touch too far and bounce back on the seal.
       this.slide(1.008, 440, 'Cubic.easeIn', () => this.slide(1, 110, 'Back.easeOut', finish));
     });

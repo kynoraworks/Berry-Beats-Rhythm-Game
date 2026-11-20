@@ -17,7 +17,7 @@ import {
 } from '../core/battle';
 import { COLORS, CSS, GAME_W, SceneKeys, Tex, type Lane } from '../core/config';
 import { secToBeat, toTimedNotes, type Chart } from '../core/chart';
-import { HypeAudio, type HypeEvent } from '../core/announcer';
+import { HypeAudio, type CountCall, type HypeEvent } from '../core/announcer';
 import { Conductor } from '../core/conductor';
 import { Engine, START_HEALTH, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
@@ -42,6 +42,8 @@ import { effectChips } from '../play/fighterCard';
 import { HypeMode } from '../play/HypeMode';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
+import { Countdown } from '../play/Countdown';
+import { planCountdown } from '../play/countdownPlan';
 import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable } from '../story/crew';
@@ -149,7 +151,9 @@ export class PlayScene extends Phaser.Scene {
   private speed = BASE_SCROLL_SPEED;
   private offsetSec = 0;
   private lastNoteEnd = 0;
-  private countIndex = 0;
+  private countdown: Countdown | null = null;
+  /** Plays the countdown's hits and MC: the battle's hype audio, or one of its own outside a battle. */
+  private countAudio: HypeAudio | null = null;
   private countText!: Phaser.GameObjects.Text;
   private pauseLayer!: Phaser.GameObjects.Container;
   private pauseFocus!: FocusGroup;
@@ -199,7 +203,8 @@ export class PlayScene extends Phaser.Scene {
     this.versus = null;
     this.errorSum = 0;
     this.errorCount = 0;
-    this.countIndex = 0;
+    this.countdown = null;
+    this.countAudio = null;
     this.dialogue = null;
     this.story = null;
     this.buffer = null;
@@ -451,8 +456,8 @@ export class PlayScene extends Phaser.Scene {
     // A crew round enters its song part-way through, after a silent count-in.
     if (this.crew) this.conductor.play(this.origin - LEAD_IN - this.introTime, this.origin);
     else this.conductor.play(startAt > 0 ? startAt - PRACTICE_LEAD_IN : -LEAD_IN - this.introTime);
-    this.countIndex = startAt > 0 ? 3 : 0;
-    this.countText.setText(startAt > 0 ? 'Ready' : '');
+    this.countText.setText('');
+    this.startCountdown(startAt > 0 ? startAt : this.origin, startAt > 0 ? PRACTICE_LEAD_IN : LEAD_IN);
     if (this.introTime > 0) {
       const texture = rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
       const gimmick = this.rules.gimmick;
@@ -476,13 +481,14 @@ export class PlayScene extends Phaser.Scene {
   }
 
   /**
-   * Title and artist, shown at the start of the count-in once the versus card has
+   * Title and artist, shown above the countdown once the versus card has
    * cleared. It is gone before the first turn label and round call-out need the space.
    */
   private showSongCredit(): void {
     const { title, artist } = this.chart;
-    const name = addText(this, GAME_W / 2, 276, title, 32, { color: CSS.lilac }).setDepth(Depth.overlay);
-    const by = addBody(this, GAME_W / 2, 314, artist, 24, { stroke: true }).setDepth(Depth.overlay);
+    // High up, clear of the countdown that runs at the same time.
+    const name = addText(this, GAME_W / 2, 196, title, 28, { color: CSS.lilac }).setDepth(Depth.overlay);
+    const by = addBody(this, GAME_W / 2, 228, artist, 20, { stroke: true }).setDepth(Depth.overlay);
     const lines = [name, by];
     if (this.introTime > 0) {
       lines.forEach((line) => line.setAlpha(0));
@@ -557,7 +563,7 @@ export class PlayScene extends Phaser.Scene {
     this.pauseFocus.focus(0, true);
     this.pauseLayer.setVisible(true);
     this.playPauseMusic();
-    playSfx(this.game, 'back');
+    playSfx(this.game, 'pauseOpen');
   }
 
   /** One stage dances to the pause screen's own track; pausing there plays another. */
@@ -582,13 +588,14 @@ export class PlayScene extends Phaser.Scene {
     this.dialogue?.setSuspended(true);
     this.pauseFocus.focus(0, true);
     this.pauseLayer.setVisible(true);
-    playSfx(this.game, 'back');
+    playSfx(this.game, 'pauseOpen');
   }
 
   private closeMenuOnly(): void {
     if (!this.menuOnly) return;
     this.menuOnly = false;
     this.pauseLayer.setVisible(false);
+    playSfx(this.game, 'pauseClose');
     this.dialogue?.setSuspended(false);
     const buffer = this.pendingBuffer;
     this.pendingBuffer = null;
@@ -608,6 +615,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.state !== 'paused' || isRotateNoticeShown()) return;
     this.state = 'resuming';
     this.pauseLayer.setVisible(false);
+    playSfx(this.game, 'pauseClose');
     this.tweens.resumeAll();
     music.stop(200);
     const steps = ['3', '2', '1'];
@@ -1170,18 +1178,30 @@ export class PlayScene extends Phaser.Scene {
 
   private updateCountdown(rawTime: number): void {
     if (this.versus && !this.versus.update(rawTime - this.origin + LEAD_IN + this.introTime)) this.versus = null;
-    const labels = ['3', '2', '1', 'Go!'];
-    while (this.countIndex < labels.length && rawTime >= this.origin - LEAD_IN + this.countIndex * COUNT_STEP) {
-      const label = labels[this.countIndex++];
-      if (label === '3' && this.crew) this.cheer({ kind: 'roundIntro', round: this.crew.round, total: CREW_ROUNDS.length });
-      if (label === 'Go!' && !this.crew && (this.battle?.rounds.length ?? 0) < 2) this.cheer({ kind: 'letsDance' });
-      this.countText.setText(label).setAlpha(1).setScale(1.4);
-      this.tweens.add({ targets: this.countText, scale: 1, duration: 150, ease: 'Quad.easeOut' });
-      playSfx(this.game, label === 'Go!' ? 'go' : 'count');
-    }
-    if (this.countIndex >= labels.length && this.countText.text !== '' && rawTime >= Math.max(this.playData.startAt ?? 0, this.origin) + 0.2 && this.countText.alpha === 1) {
-      this.tweens.add({ targets: this.countText, alpha: 0, duration: 250, onComplete: () => this.countText.setText('').setAlpha(1) });
-    }
+    this.countdown?.update(rawTime);
+  }
+
+  /**
+   * The 3-2-1 over the lead-in before `start`, on the song's beats. It ends by
+   * the first note and never holds the song up (see Countdown).
+   */
+  private startCountdown(start: number, leadIn: number): void {
+    const notes = [...this.engine.notes, ...(this.rivalEngine?.notes ?? [])].map((n) => n.t).filter((t) => t >= start - 1e-6);
+    const firstNote = notes.reduce((first, t) => Math.min(first, t), Infinity);
+    const plan = planCountdown(this.chart.bpm, this.chart.offset, start - leadIn, start, firstNote);
+    this.countAudio = this.hypeAudio ?? new HypeAudio(this.game);
+    // The MC calls the numbers unless he is calling a crew round; "Let's dance!" only when no rounds are called.
+    const say = !this.crew;
+    const letsDance = !this.crew && (this.battle?.rounds.length ?? 0) < 2;
+    this.countdown = new Countdown(this, plan, {
+      calm: getSettings().reduceMotion,
+      onCall: (index) => {
+        if (index === 0 && this.crew) this.cheer({ kind: 'roundIntro', round: this.crew.round, total: CREW_ROUNDS.length });
+        this.countAudio?.count(index as CountCall, say, letsDance);
+        if (index === 0) this.player.getReady('hood');
+        if (index === 1) this.rival?.getReady('boast');
+      },
+    });
   }
 
   /** Plays every note perfectly (and fires the Flair when full). Used for demos and automated tests. */
@@ -1219,8 +1239,9 @@ export class PlayScene extends Phaser.Scene {
     const panelW = canSwap ? 600 : 480;
     const panel = addBox(this, GAME_W / 2 - panelW / 2, top, panelW, 440 + extra, 'panel');
     const title = addText(this, GAME_W / 2, top + 68, 'Paused', 64, { color: CSS.lilac });
-    const entries: [string, () => void, 'select' | 'back'][] = [
-      ['Resume', () => this.resumeGame(), 'select'],
+    // Resume makes the tape-start sound itself.
+    const entries: [string, () => void, 'select' | 'back' | null][] = [
+      ['Resume', () => this.resumeGame(), null],
       [this.crew ? 'Restart round' : 'Restart', () => this.restart(), 'select'],
       [this.crew ? 'Exit to lineup' : 'Exit', () => this.quit(), 'back'],
     ];

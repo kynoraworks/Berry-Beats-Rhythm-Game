@@ -3,6 +3,7 @@ import { COLORS, CSS, FONT, GAME_H, GAME_W, Tex } from '../core/config';
 import { hint } from '../core/mobile';
 import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
+import { voiceRate } from '../core/pitches';
 import { UI_SCALE, UiButton, addBody, addBox, addIcon, addText, addUiButton } from '../core/ui';
 import { CAST, portraitFrame, speakerName } from '../story/cast';
 import type { Line } from '../story/types';
@@ -16,8 +17,8 @@ const BOX_W = GAME_W - MARGIN * 2 - PORTRAIT_BOX - GAP;
 const TEXT_SIZE = 32;
 /** Letters revealed per second while a line types out. */
 const TYPE_SPEED = 48;
-/** A blip is played once per this many letters. */
-const BLIP_EVERY = 6;
+/** A voice blip is played once per this many letters. */
+const BLIP_EVERY = 3;
 /**
  * The body font joins "fi", "fl" and "ff" into single glyphs that read badly at this
  * size ("first" looks like "Arst"). A zero-width non-joiner after the f keeps them apart.
@@ -82,6 +83,8 @@ export class Dialogue {
   private full = '';
   private shown = 0;
   private typed = 0;
+  /** The current speaker's blip pitch (see voiceRate). */
+  private voice = 1;
   private lineStart = 0;
   private open = true;
   private closing = false;
@@ -186,6 +189,7 @@ export class Dialogue {
     // Wrap the whole line up front, so words do not jump to the next row as they type out.
     this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
 
+    this.voice = voiceRate(line.who, speakerName(line));
     this.nameText.setText(speakerName(line)).setColor(character.darkTag ? CSS.ink : CSS.cream);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;
     const tagX = onLeft ? boxX + 24 : boxX + BOX_W - 24 - tagWidth;
@@ -246,7 +250,7 @@ export class Dialogue {
       this.next.setVisible(true);
       return;
     }
-    playSfx(this.scene.game, 'move');
+    playSfx(this.scene.game, 'dialogNext');
     this.showLine(this.index + 1);
   }
 
@@ -255,7 +259,7 @@ export class Dialogue {
     this.typed += (deltaMs / 1000) * TYPE_SPEED;
     const count = Math.min(this.full.length, Math.floor(this.typed));
     if (count === this.shown) return;
-    if (Math.floor(count / BLIP_EVERY) !== Math.floor(this.shown / BLIP_EVERY)) playSfx(this.scene.game, 'tick');
+    if (Math.floor(count / BLIP_EVERY) !== Math.floor(this.shown / BLIP_EVERY) && /\S/.test(this.full.charAt(count - 1))) playSfx(this.scene.game, 'talkBlip', this.voice);
     this.shown = count;
     this.body.setText(this.full.slice(0, count));
     if (count >= this.full.length) this.next.setVisible(true);

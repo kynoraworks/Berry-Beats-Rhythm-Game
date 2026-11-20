@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { playHype } from '../core/announcer';
 import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
+import { playSfx } from '../core/sfx';
 import { UiButton, addBackdrop, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addFace } from '../play/CrewScoreboard';
 import { CAST, HOOD_DOWN_FRAME } from '../story/cast';
@@ -110,7 +111,8 @@ export class CrewEndScene extends Phaser.Scene {
     const fades = [raspberry, berry, blueberry, title, line];
     fades.forEach((item, i) => {
       item.setAlpha(0);
-      this.tweens.add({ targets: item, alpha: 1, delay: 300 + i * 450, duration: 700 });
+      // The three faces pop in on rising notes; the words come in quietly.
+      this.tweens.add({ targets: item, alpha: 1, delay: 300 + i * 450, duration: 700, onStart: () => i < 3 && playSfx(this.game, 'badgePop', 1 + i * 0.12) });
     });
 
     // A short roll of credits rising under the card.

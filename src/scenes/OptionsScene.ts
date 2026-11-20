@@ -218,7 +218,9 @@ export class OptionsScene extends Phaser.Scene {
     const adjust = (dir: number) => {
       const before = show(getSettings());
       updateSettings(change(getSettings(), dir));
-      if (before !== show(getSettings())) playSfx(this.game, 'move');
+      // A notch at a pitch that follows the value; a dull bonk at either end.
+      if (before !== show(getSettings())) playSfx(this.game, 'sliderTick', 0.8 + amount(getSettings()) * 0.6);
+      else playSfx(this.game, 'locked');
       refresh();
     };
     const press = (dir: -1 | 1) => () => {
@@ -245,7 +247,7 @@ export class OptionsScene extends Phaser.Scene {
     };
     const toggle = () => {
       updateSettings({ [key]: !getSettings()[key] });
-      playSfx(this.game, 'move');
+      playSfx(this.game, getSettings()[key] ? 'toggleOn' : 'toggleOff');
       refresh();
     };
     this.addHitZone(bounds, index, toggle);
@@ -297,7 +299,7 @@ export class OptionsScene extends Phaser.Scene {
       const list = TOUCH_SCHEMES;
       const next = list[(list.indexOf(getSettings().touchScheme) + dir + list.length) % list.length];
       updateSettings({ touchScheme: next });
-      playSfx(this.game, 'move');
+      playSfx(this.game, 'pageTurn');
       refresh();
     };
     const press = (dir: -1 | 1) => () => {
@@ -438,26 +440,26 @@ export class OptionsScene extends Phaser.Scene {
   private resetStoryProgress(): void {
     if (!this.storyResetArmed) {
       this.storyResetArmed = true;
-      playSfx(this.game, 'move');
+      playSfx(this.game, 'warn');
       this.say('Press again to start the story over. Scores are kept.', CSS.miss);
       return;
     }
     this.storyResetArmed = false;
     resetStory();
-    playSfx(this.game, 'select');
+    playSfx(this.game, 'confirm');
     this.say('Story reset. The train is back at Berry Town.', CSS.perfect);
   }
 
   private reset(): void {
     if (!this.resetArmed) {
       this.resetArmed = true;
-      playSfx(this.game, 'move');
+      playSfx(this.game, 'warn');
       this.say('Press again to reset everything.', CSS.miss);
       return;
     }
     this.resetArmed = false;
     resetSettings();
-    playSfx(this.game, 'select');
+    playSfx(this.game, 'confirm');
     this.rows.forEach((row) => row.refresh());
     this.say('Options reset.', CSS.perfect);
   }
@@ -509,7 +511,7 @@ export class OptionsScene extends Phaser.Scene {
       return;
     }
     if (RESERVED.has(code) || code.startsWith('Meta') || code.startsWith('Control') || code.startsWith('Alt') || /^F\d+$/.test(code)) {
-      playSfx(this.game, 'miss');
+      playSfx(this.game, 'locked');
       this.say('That key is reserved. Press another, or Esc to cancel.', CSS.miss);
       return;
     }
@@ -526,7 +528,7 @@ export class OptionsScene extends Phaser.Scene {
       if (previous !== undefined) keys[otherLane][otherSlot] = previous;
       else if (keys[otherLane].length > 1) keys[otherLane].splice(otherSlot, 1);
       else {
-        playSfx(this.game, 'miss');
+        playSfx(this.game, 'locked');
         this.say(`That is the only key for ${LANE_NAMES[otherLane]}. Press another, or Esc to cancel.`, CSS.miss);
         return;
       }

@@ -44,6 +44,9 @@ export class Walker {
   private onArrive: (() => void) | null = null;
   private clock = 0;
   private moving = false;
+  private lastFoot = -1;
+  /** Called on each footfall while walking (Berry's footsteps). */
+  onStep: (() => void) | null = null;
   /** Art x this walker may not go past. */
   private min = 0;
   private max = Number.POSITIVE_INFINITY;
@@ -135,6 +138,16 @@ export class Walker {
         this.place(this.x + Math.sign(delta) * step);
         this.moving = true;
       }
+    }
+    if (this.moving) {
+      // Two footfalls per cycle: the drawn cycle's first and fourth frames, the sway's first and fifth.
+      const foot = this.walkTexture ? Math.floor((this.clock * CYCLE_FPS) / (CYCLE.length / 2)) : Math.floor((this.clock * WALK_FPS) / (WALK[this.layout].length / 2));
+      if (foot !== this.lastFoot) {
+        if (this.lastFoot >= 0) this.onStep?.();
+        this.lastFoot = foot;
+      }
+    } else {
+      this.lastFoot = -1;
     }
     if (this.moving && this.walkTexture) {
       const frame = CYCLE[Math.floor(this.clock * CYCLE_FPS) % CYCLE.length];

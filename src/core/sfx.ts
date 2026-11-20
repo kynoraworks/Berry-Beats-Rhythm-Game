@@ -46,6 +46,40 @@ export type SfxName =
   | 'doorHiss'
   | 'doorThunk'
   | 'stamp'
+  // Micro sounds: one family of short taps and clicks (see MICRO below).
+  | 'confirm'
+  | 'locked'
+  | 'toggleOn'
+  | 'toggleOff'
+  | 'sliderTick'
+  | 'pageTurn'
+  | 'listScroll'
+  | 'talkBlip'
+  | 'dialogNext'
+  | 'lookAt'
+  | 'npcHey'
+  | 'unlock'
+  | 'step'
+  | 'doorSlide'
+  | 'trainRoll'
+  | 'brakeSqueal'
+  | 'mapPin'
+  | 'backupCycle'
+  | 'cardPick'
+  | 'cardDrop'
+  | 'cardSwap'
+  | 'countTick'
+  | 'badgePop'
+  | 'pauseOpen'
+  | 'pauseClose'
+  // The 3-2-1 before a battle: a hit and a scratch per number, and the MC.
+  | 'count3'
+  | 'count2'
+  | 'count1'
+  | 'countGo'
+  | 'mcThree'
+  | 'mcTwo'
+  | 'mcOne'
   // Battle hype (see announcer.ts for when each plays).
   // Turntable: scratches, a crossfader cut, the record spun back or braked, the needle landing.
   | 'djBaby'
@@ -137,6 +171,103 @@ const CHEER_RECIPE: Layer[] = [
   { type: 'noise', from: 3200, dur: 0.7, gain: 0.04, delay: 0.1, attack: 0.3 },
 ];
 
+/** A heavy countdown hit, `semi` semitones up: a pitched thump with a short scratch on top. */
+const COUNT_HIT = (semi: number): Layer[] => [
+  { type: 'sine', from: 170 * 2 ** (semi / 12), to: 60, dur: 0.3, gain: 0.26 },
+  { type: 'noise', from: 300, dur: 0.12, gain: 0.12 },
+  { type: 'noise', from: 2600, dur: 0.02, gain: 0.08 },
+  ...stroke(900 * 2 ** (semi / 12), 3200, 0.07, 0.01, 0.12),
+];
+
+/**
+ * The micro sounds: menus, talking, walking, the train. One family so they sit
+ * together: a short bright tick (the snap of a tape-deck key), a soft low
+ * thump where something lands, and plucked tones in C major pentatonic.
+ * Everything is quiet and under a tenth of a second unless it is a moment
+ * (the train, an unlock). Sounds that repeat fast are rate-limited and
+ * slightly varied (see GAPS and JITTER).
+ */
+const snap = (from: number, gain: number, delay = 0, dur = 0.012): Layer => ({ type: 'noise', from, dur, gain, delay, q: 1.6 });
+const pluck = (semi: number, dur: number, gain: number, delay = 0, type: OscillatorType = 'triangle'): Layer => ({ type, from: note(semi), dur, gain, delay });
+const thump = (from: number, gain: number, delay = 0, dur = 0.05): Layer => ({ type: 'sine', from, to: from * 0.55, dur, gain, delay });
+/** One wheel over a rail joint: a dull clack with a knock under it. */
+const clack = (delay: number, gain = 1): Layer[] => [
+  { type: 'noise', from: 900, dur: 0.035, gain: 0.07 * gain, delay, q: 1.2 },
+  { type: 'sine', from: 120, to: 75, dur: 0.06, gain: 0.1 * gain, delay },
+];
+
+const MICRO = {
+  // Focus or hover: a tick you barely notice.
+  move: [snap(5200, 0.035, 0, 0.01), pluck(19, 0.028, 0.04)],
+  // A press: the key's snap and thump, then a rising two-note blip.
+  select: [snap(2600, 0.09, 0, 0.014), thump(190, 0.12), pluck(12, 0.05, 0.07, 0.012), pluck(19, 0.09, 0.06, 0.045)],
+  // Back or cancel: the same press, falling.
+  back: [snap(2200, 0.08, 0, 0.014), thump(170, 0.11), pluck(12, 0.05, 0.065, 0.012), pluck(7, 0.09, 0.055, 0.045)],
+  // A bigger yes (resetting, riding): the press with a low root under it.
+  confirm: [snap(2600, 0.09, 0, 0.014), thump(200, 0.14, 0, 0.07), pluck(12, 0.05, 0.07, 0.012), pluck(19, 0.12, 0.06, 0.045), pluck(-12, 0.22, 0.08, 0.045), pluck(24, 0.16, 0.025, 0.06, 'sine')],
+  // Locked or not allowed: a dull bonk, two flat notes rubbing.
+  locked: [
+    { type: 'triangle', from: 196, to: 180, dur: 0.11, gain: 0.1 },
+    { type: 'square', from: 98, to: 92, dur: 0.08, gain: 0.03 },
+    { type: 'noise', from: 500, dur: 0.03, gain: 0.06, q: 1 },
+  ],
+  toggleOn: [snap(3000, 0.07, 0, 0.01), pluck(7, 0.04, 0.07), pluck(14, 0.07, 0.07, 0.04)],
+  toggleOff: [snap(2400, 0.07, 0, 0.01), pluck(9, 0.04, 0.065), pluck(2, 0.07, 0.06, 0.04)],
+  // A notch on a slider; played at a pitch that follows the value.
+  sliderTick: [pluck(12, 0.022, 0.05), snap(6000, 0.025, 0, 0.008)],
+  // A page or tab: a card flicked over.
+  pageTurn: [{ type: 'noise', from: 1800, to: 5200, dur: 0.09, gain: 0.06, attack: 0.02 }, snap(4200, 0.03, 0.07, 0.02), pluck(7, 0.03, 0.03, 0.02)],
+  // A list scrolling by one row.
+  listScroll: [snap(4200, 0.045, 0, 0.01), pluck(24, 0.018, 0.04)],
+  // A letter of dialogue; played at each speaker's own pitch.
+  talkBlip: [pluck(7, 0.04, 0.026, 0, 'square'), pluck(7, 0.045, 0.045)],
+  dialogNext: [snap(3400, 0.05), pluck(12, 0.03, 0.05), pluck(16, 0.05, 0.045, 0.03)],
+  // Looking at something: a curious little lift.
+  lookAt: [{ type: 'triangle', from: note(12), to: note(19), dur: 0.1, gain: 0.05 }, pluck(24, 0.14, 0.035, 0.08, 'sine')],
+  // Walking up to someone to talk: "hey!"
+  npcHey: [pluck(4, 0.05, 0.03, 0, 'square'), pluck(4, 0.05, 0.05), pluck(11, 0.08, 0.05, 0.06), pluck(11, 0.07, 0.02, 0.06, 'square')],
+  // The way out opening: a latch, then a chime.
+  unlock: [snap(2400, 0.06, 0, 0.02), thump(300, 0.08), ...arpeggio([0, 7, 12, 19], 0.06, 0.25, 0.07, 'sine').map((l) => ({ ...l, delay: (l.delay ?? 0) + 0.05 })), { type: 'noise', from: 7000, dur: 0.3, gain: 0.02, delay: 0.2 }],
+  // A footstep, played a touch higher on wood and tiles than on the street.
+  step: [{ type: 'noise', from: 380, dur: 0.045, gain: 0.05, q: 1.4 }, thump(110, 0.06, 0, 0.05), snap(2400, 0.015, 0, 0.012)],
+  // The train doors running on their rollers.
+  doorSlide: [{ type: 'noise', from: 300, to: 240, dur: 0.6, gain: 0.05, attack: 0.08, q: 1.2 }, { type: 'sine', from: 55, dur: 0.55, gain: 0.04, attack: 0.1 }],
+  // Pulling away: wheels over the rail joints, faster and faster, over a low rumble.
+  trainRoll: [
+    ...clack(0, 0.7),
+    ...clack(0.11, 0.6),
+    ...clack(0.55, 0.85),
+    ...clack(0.64, 0.75),
+    ...clack(0.95),
+    ...clack(1.02, 0.9),
+    ...clack(1.27),
+    ...clack(1.33, 0.9),
+    { type: 'noise', from: 160, dur: 1.6, gain: 0.06, attack: 0.5, q: 0.8 },
+  ],
+  // Coming into a station: the brakes' squeal over the rumble dying away.
+  brakeSqueal: [
+    { type: 'sine', from: 2350, to: 2150, dur: 0.9, gain: 0.02, attack: 0.25 },
+    { type: 'sine', from: 3480, to: 3200, dur: 0.8, gain: 0.01, attack: 0.3 },
+    { type: 'noise', from: 3000, to: 2600, dur: 0.9, gain: 0.025, attack: 0.2, q: 12 },
+    { type: 'noise', from: 400, to: 180, dur: 1.0, gain: 0.05, attack: 0.05, q: 0.8 },
+  ],
+  // A stop picked on the route map; each stop sits on its own note.
+  mapPin: [snap(3200, 0.06), pluck(12, 0.04, 0.06), pluck(24, 0.08, 0.025, 0.02, 'sine')],
+  // The backup changing: a card shuffled to the front.
+  backupCycle: [{ type: 'noise', from: 2600, to: 5200, dur: 0.06, gain: 0.06, attack: 0.01 }, snap(3800, 0.05, 0.06, 0.015), pluck(9, 0.04, 0.045, 0.05)],
+  // Line-up cards: picked up, put down, swapped.
+  cardPick: [{ type: 'noise', from: 3000, to: 5600, dur: 0.05, gain: 0.05, attack: 0.01 }, { type: 'triangle', from: note(7), to: note(12), dur: 0.06, gain: 0.055 }],
+  cardDrop: [thump(210, 0.12, 0, 0.07), snap(1400, 0.08, 0, 0.025), pluck(0, 0.05, 0.04, 0.01)],
+  cardSwap: [{ type: 'noise', from: 2000, to: 5000, dur: 0.07, gain: 0.05, attack: 0.02 }, { type: 'noise', from: 5000, to: 2000, dur: 0.07, gain: 0.05, delay: 0.08, attack: 0.02 }, pluck(7, 0.04, 0.04, 0.07)],
+  // The results' numbers counting up, and a badge popping in.
+  countTick: [pluck(24, 0.018, 0.035), snap(7000, 0.02, 0, 0.006)],
+  tick: [pluck(24, 0.018, 0.035), snap(7000, 0.02, 0, 0.006)],
+  badgePop: [{ type: 'sine', from: 380, to: 1100, dur: 0.06, gain: 0.09 }, pluck(24, 0.1, 0.06, 0.04), { type: 'noise', from: 6000, dur: 0.05, gain: 0.025, delay: 0.04 }],
+  // Pause: the tape winding down and the key clunking. Unpause: the reverse.
+  pauseOpen: [{ type: 'sawtooth', from: 320, to: 70, dur: 0.22, gain: 0.05 }, { type: 'noise', from: 2400, to: 300, dur: 0.2, gain: 0.06 }, thump(140, 0.1, 0.2, 0.06), snap(800, 0.06, 0.2, 0.015)],
+  pauseClose: [thump(150, 0.1, 0, 0.05), snap(700, 0.07, 0, 0.03), { type: 'sawtooth', from: 80, to: 330, dur: 0.2, gain: 0.025, delay: 0.04, attack: 0.05 }],
+} satisfies Partial<Record<SfxName, Layer[]>>;
+
 const RECIPES: Record<SfxName, Layer[]> = {
   // The train: a two-tone chime before the doors move, the air hiss as they slide, the bump as they meet.
   doorChime: [
@@ -159,17 +290,7 @@ const RECIPES: Record<SfxName, Layer[]> = {
     { type: 'noise', from: 900, dur: 0.08, gain: 0.12 },
     { type: 'noise', from: 3200, dur: 0.05, gain: 0.05, delay: 0.01 },
   ],
-  move: [{ type: 'square', from: 520, to: 640, dur: 0.05, gain: 0.1 }],
-  select: [
-    { type: 'square', from: note(0), dur: 0.07, gain: 0.11 },
-    { type: 'square', from: note(7), dur: 0.12, gain: 0.11, delay: 0.06 },
-    { type: 'triangle', from: note(12), dur: 0.16, gain: 0.08, delay: 0.06 },
-  ],
-  back: [
-    { type: 'square', from: note(4), dur: 0.07, gain: 0.1 },
-    { type: 'square', from: note(-3), dur: 0.11, gain: 0.1, delay: 0.06 },
-  ],
-  tick: [{ type: 'triangle', from: 1400, to: 900, dur: 0.035, gain: 0.2 }],
+  ...MICRO,
   perfect: [
     { type: 'triangle', from: note(12), dur: 0.09, gain: 0.16 },
     { type: 'sine', from: note(19), dur: 0.14, gain: 0.1, delay: 0.02 },
@@ -199,6 +320,14 @@ const RECIPES: Record<SfxName, Layer[]> = {
     { type: 'sawtooth', from: 220, to: 90, dur: 0.5, gain: 0.14, delay: 0.25 },
   ],
   count: [{ type: 'square', from: 440, dur: 0.09, gain: 0.12 }],
+  // Stand-ins for the countdown's recorded hits while they load.
+  count3: COUNT_HIT(0),
+  count2: COUNT_HIT(2),
+  count1: COUNT_HIT(4),
+  countGo: DROP_RECIPE,
+  mcThree: [],
+  mcTwo: [],
+  mcOne: [],
   go: [
     { type: 'square', from: 880, dur: 0.2, gain: 0.12 },
     { type: 'triangle', from: 1320, dur: 0.24, gain: 0.08 },
@@ -389,6 +518,13 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
   mcWinner: { file: 'assets/audio/sfx/mc_winner.mp3', gain: 0.55 },
   mcOhNo: { file: 'assets/audio/sfx/mc_ohno.mp3', gain: 0.55 },
   mcLetsDance: { file: 'assets/audio/sfx/mc_letsdance.mp3', gain: 0.55 },
+  mcThree: { file: 'assets/audio/sfx/mc_three.mp3', gain: 0.55 },
+  mcTwo: { file: 'assets/audio/sfx/mc_two.mp3', gain: 0.55 },
+  mcOne: { file: 'assets/audio/sfx/mc_one.mp3', gain: 0.55 },
+  count3: { file: 'assets/audio/sfx/count_3.mp3', gain: 0.6 },
+  count2: { file: 'assets/audio/sfx/count_2.mp3', gain: 0.6 },
+  count1: { file: 'assets/audio/sfx/count_1.mp3', gain: 0.6 },
+  countGo: { file: 'assets/audio/sfx/count_go.mp3', gain: 0.7 },
 };
 
 /** A sound's recorded sample and its level, if it has one (for offline renders). */
@@ -526,16 +662,55 @@ function voiceOf(ctx: BaseAudioContext, out: GainNode, sources: AudioScheduledSo
 }
 
 /**
- * Start a sound `delay` seconds from now, scaled by `gain` and the Sound volume.
- * Returns null when nothing will play (muted, audio locked, or a sample-only
- * sound that has not loaded).
+ * Sounds that can fire many times a second (a held key, a fast typewriter, a
+ * dragged slider) play at most once per this many seconds, so they never buzz.
  */
-export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, bus: Bus = 'main'): Voice | null {
+export const GAPS: Partial<Record<SfxName, number>> = {
+  move: 0.035,
+  sliderTick: 0.035,
+  listScroll: 0.05,
+  talkBlip: 0.045,
+  countTick: 0.04,
+  tick: 0.04,
+  step: 0.09,
+};
+
+/** Sounds that repeat get up to this much random pitch spread (a ratio), so a run of them never sounds mechanical. */
+export const JITTER: Partial<Record<SfxName, number>> = {
+  step: 0.08,
+  talkBlip: 0.04,
+  move: 0.02,
+  countTick: 0.02,
+  listScroll: 0.03,
+};
+
+const lastPlayed = new Map<SfxName, number>();
+
+/** True if `name` may play at `now`: it was not heard within its gap. Records the play. */
+export function allowRepeat(name: SfxName, now: number, last: Map<SfxName, number> = lastPlayed): boolean {
+  const gap = GAPS[name];
+  if (gap === undefined) return true;
+  const before = last.get(name);
+  if (before !== undefined && now - before < gap && now >= before) return false;
+  last.set(name, now);
+  return true;
+}
+
+/**
+ * Start a sound `delay` seconds from now, scaled by `gain` and the Sound volume.
+ * `rate` shifts its pitch (2 is an octave up). Returns null when nothing will
+ * play (muted, audio locked, a sample-only sound that has not loaded, or a
+ * fast-repeating sound inside its gap).
+ */
+export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, bus: Bus = 'main', rate = 1): Voice | null {
   const volume = getSettings().sfxVolume * gain;
   if (volume <= 0) return null;
   const ctx = getAudioContext(game);
   if (ctx.state !== 'running') return null;
   const at = ctx.currentTime + delay;
+  if (!allowRepeat(name, at)) return null;
+  const spread = JITTER[name];
+  if (spread) rate *= 1 + (Math.random() * 2 - 1) * spread;
   const out = ctx.createGain();
   out.connect(busInput(ctx, bus));
   const sources: AudioScheduledSourceNode[] = [];
@@ -544,6 +719,7 @@ export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, 
   if (buffer && sample) {
     const source = ctx.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = rate;
     out.gain.value = sample.gain * volume;
     source.connect(out);
     source.start(at);
@@ -553,9 +729,9 @@ export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, 
       out.disconnect();
       return null;
     }
-    sources.push(...scheduleRecipe(ctx, name, at, volume, out));
+    sources.push(...scheduleRecipe(ctx, name, at, volume, out, rate));
   }
-  return voiceOf(ctx, out, sources, sfxDuration(name));
+  return voiceOf(ctx, out, sources, sfxDuration(name) / (buffer && sample ? rate : 1));
 }
 
 /** The turntable moves that can be made live from the battle song. */
@@ -658,14 +834,28 @@ export function startRecordMove(game: Phaser.Game, move: RecordMove, song: Audio
   return voiceOf(ctx, out, sources, recordMoveDuration(move));
 }
 
-export function playSfx(game: Phaser.Game, name: SfxName): void {
-  startSfx(game, name);
+/** Play a sound now. `rate` shifts its pitch (a speaker's voice, a slider's value, a footstep's floor). */
+export function playSfx(game: Phaser.Game, name: SfxName, rate = 1): void {
+  startSfx(game, name, 0, 1, 'main', rate);
 }
 
 /** Schedule a sound's synthesised layers into `out` (also used to render the sounds offline). */
-export function scheduleRecipe(ctx: BaseAudioContext, name: SfxName, at: number, volume: number, out: AudioNode): AudioScheduledSourceNode[] {
-  return RECIPES[name].map((layer) => playLayer(ctx, layer, at, volume, out));
+export function scheduleRecipe(ctx: BaseAudioContext, name: SfxName, at: number, volume: number, out: AudioNode, rate = 1): AudioScheduledSourceNode[] {
+  return RECIPES[name].map((layer) => playLayer(ctx, rate === 1 ? layer : { ...layer, from: layer.from * rate, to: layer.to === undefined ? undefined : layer.to * rate }, at, volume, out));
 }
+
+/** How long a sound's synthesised layers last, in seconds. */
+export function recipeLength(name: SfxName): number {
+  return RECIPES[name].reduce((end, layer) => Math.max(end, (layer.delay ?? 0) + layer.dur), 0);
+}
+
+/** The loudest single layer of a sound's recipe (for the tests: micro sounds stay quiet). */
+export function recipePeak(name: SfxName): number {
+  return RECIPES[name].reduce((peak, layer) => Math.max(peak, layer.gain), 0);
+}
+
+/** Every sound name. */
+export const SFX_NAMES = Object.keys(RECIPES) as SfxName[];
 
 function playLayer(ctx: BaseAudioContext, layer: Layer, at: number, volume: number, out: AudioNode): AudioScheduledSourceNode {
   const start = at + (layer.delay ?? 0);

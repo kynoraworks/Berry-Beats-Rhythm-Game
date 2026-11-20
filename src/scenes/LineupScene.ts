@@ -294,12 +294,12 @@ export class LineupScene extends Phaser.Scene {
 
   private pick(index: number): void {
     this.held = index;
-    playSfx(this.game, 'select');
+    playSfx(this.game, 'cardPick');
   }
 
   private drop(): void {
     this.held = null;
-    playSfx(this.game, 'place');
+    playSfx(this.game, 'cardDrop');
     this.refreshFocus();
   }
 
@@ -307,7 +307,7 @@ export class LineupScene extends Phaser.Scene {
     if (a === b) return;
     this.order = swapOrder(this.order, a, b);
     saveOrder(this.order);
-    playSfx(this.game, 'place');
+    playSfx(this.game, 'cardSwap');
     this.drawRows();
   }
 

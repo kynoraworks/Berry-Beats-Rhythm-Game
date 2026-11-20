@@ -131,6 +131,9 @@ export class ExploreScene extends Phaser.Scene {
     const floor = (artX: number) => floorAt(place.bg, artX);
     this.berry = new Walker(this, characterSheet(this, 'berry').texture, 'berry', place.startX, floor, BERRY_WALK).setBounds(10, max);
     this.world.add(this.berry.sprite.setDepth(DEPTH.people + 2));
+    // Footsteps: brighter on the room's boards and the station tiles than on the street.
+    const floorTone = place.kind === 'room' ? 1.2 : place.kind === 'street' ? 0.92 : 1.38;
+    this.berry.onStep = () => playSfx(this.game, 'step', floorTone);
 
     // The crew walks with him (in the depart beat, only Raspberry has joined).
     const crew = place.kind === 'room' ? [] : place.kind === 'depart' ? (['raspberry'] as const) : crewAt(this.stop);
@@ -351,6 +354,8 @@ export class ExploreScene extends Phaser.Scene {
       // The doors open on the platform and the crew steps off behind Berry.
       this.locked = true;
       this.doors.shut(this.stop.station, `Stop ${this.stop.number}`);
+      // The train pulls in: brakes, then the doors.
+      playSfx(this.game, 'brakeSqueal');
       this.time.delayedCall(350, () =>
         this.doors.open(() => {
           // Far enough onto the platform for the whole crew to step off behind him.
@@ -460,23 +465,28 @@ export class ExploreScene extends Phaser.Scene {
     this.berry.stop();
     switch (hotspot.kind) {
       case 'look':
+        playSfx(this.game, 'lookAt');
         this.talk(hotspot.lines, () => {
           markInspected(this.lookKey(hotspot));
           this.refreshMarkers();
         });
         break;
       case 'clue':
+        playSfx(this.game, 'npcHey');
         this.talk(hotspot.lines, () => {
           const first = !hasTalked(talkKey(this.stop.id));
           markTalked(talkKey(this.stop.id));
           this.refreshMarkers();
           if (this.place.kind === 'room') this.coachArrives();
-          else if (first) this.say(`The way to ${this.exitLabel()} is open.`, 2200, CSS.perfect);
+          else if (first) {
+            playSfx(this.game, 'unlock');
+            this.say(`The way to ${this.exitLabel()} is open.`, 2200, CSS.perfect);
+          }
         });
         break;
       case 'exit':
         if (!this.exitOpen()) {
-          playSfx(this.game, 'miss');
+          playSfx(this.game, 'locked');
           this.say(`Talk to the ${this.clueLabel().toLowerCase()} first.`, 2000, CSS.miss);
           return;
         }

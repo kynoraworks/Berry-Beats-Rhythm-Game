@@ -8,6 +8,7 @@ import { music } from '../core/music';
 import { getBest } from '../core/saves';
 import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
+import { stopPitch } from '../core/pitches';
 import { UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { formatScore } from '../menus/kit';
 import { Doors } from '../explore/doors';
@@ -378,13 +379,14 @@ export class LevelSelectScene extends Phaser.Scene {
     const allies = crewAt(stop);
     if (!isStopOpen(this.index) || listAvailable(allies).length < 2) return;
     cycleBackup(1, allies);
-    playSfx(this.game, 'move');
+    playSfx(this.game, 'backupCycle');
     this.refreshBackup(stop, true);
   }
 
   private select(index: number): void {
     if (this.busy || isLeaving(this) || index < 0 || index >= STOPS.length || index === this.index) return;
-    playSfx(this.game, 'move');
+    // Each stop rings its own note of the pentatonic, climbing along the line.
+    playSfx(this.game, 'mapPin', stopPitch(index));
     this.index = index;
     lastIndex = index;
     this.statusText.setText('');
@@ -399,13 +401,13 @@ export class LevelSelectScene extends Phaser.Scene {
   private ride(): void {
     if (this.busy || isLeaving(this)) return;
     if (!isStopOpen(this.index)) {
-      playSfx(this.game, 'miss');
+      playSfx(this.game, 'locked');
       this.statusText.setText(`Win at ${STOPS[this.index - 1].station} first`).setColor(CSS.miss);
       return;
     }
     this.busy = true;
     const stop = STOPS[this.index];
-    playSfx(this.game, 'select');
+    playSfx(this.game, 'confirm');
     music.stop(800);
     this.statusText.setText('');
     const quick = getSettings().reduceMotion;
@@ -426,3 +428,4 @@ export class LevelSelectScene extends Phaser.Scene {
     this.time.delayedCall(quick ? 50 : 1000, () => this.doors.close(stop.station, sub, () => this.time.delayedCall(300, arrive)));
   }
 }
+

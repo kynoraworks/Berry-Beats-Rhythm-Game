@@ -26,6 +26,8 @@ import { getAudioContext } from './songs';
  *   flawless        chirp, cheer, "FLAWLESS!"
  *   ability         whoosh, the ability's hit and a boom .12, cheer       .25
  *   lets dance      needle drop, "LET'S DANCE!"
+ *   countdown       a hit and a scratch on each of 3, 2, 1 with "THREE!" "TWO!" "ONE!",
+ *                   a bigger hit and scratch on go with "LET'S DANCE!" (see countCue)
  *   battle won      slam, horn, roar, "WINNER!"                           .6
  *   battle lost     falling sting, boom .17, "ohh", "OH NO!"              .3
  *   fail            the song braked to a stop, boom .9, "ohh", "OH NO!"
@@ -57,12 +59,16 @@ export type HypeEvent =
   | { kind: 'resultsLost' }
   | { kind: 'crewWon' };
 
+/** One call of the 3-2-1: 0 is "3" and 3 is go. */
+export type CountCall = 0 | 1 | 2 | 3;
+
 /**
  * stinger: the big one-offs, one at a time. mc: the announcer, one line at a
  * time, queued briefly. crowd: one reaction at a time. fx: small sounds that
- * always play.
+ * always play. call: an MC line that must land on the beat (the countdown):
+ * it cuts off whatever the MC was saying instead of waiting.
  */
-export type Channel = 'stinger' | 'mc' | 'crowd' | 'fx';
+export type Channel = 'stinger' | 'mc' | 'crowd' | 'fx' | 'call';
 
 export interface CuePart {
   sound: SfxName;
@@ -85,6 +91,20 @@ const fx = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'fx',
 const sting = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'stinger', delay });
 const mc = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'mc', delay });
 const crowd = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'crowd', delay });
+const call = (sound: SfxName): CuePart => ({ sound, channel: 'call' });
+
+const COUNT_HITS: readonly SfxName[] = ['count3', 'count2', 'count1', 'countGo'];
+const COUNT_LINES: readonly SfxName[] = ['mcThree', 'mcTwo', 'mcOne', 'mcLetsDance'];
+
+/**
+ * One call of the countdown. The hit always plays; the MC calls the number
+ * when `say` is set (not while he is calling a round), and on go only when
+ * `letsDance` is set too (a battle with rounds gets "Round one!" instead).
+ */
+export function countCue(index: CountCall, say: boolean, letsDance: boolean): Cue {
+  const line = say && (index < 3 || letsDance) ? [call(COUNT_LINES[index])] : [];
+  return { priority: 3, parts: [fx(COUNT_HITS[index]), ...line] };
+}
 
 const ABILITY_HITS: Record<AbilityId, SfxName> = {
   steady: 'abilitySteady',
@@ -190,6 +210,8 @@ export type PlayFn = (sound: SfxName, delay: number) => Voice | null;
 const MC_WAIT = 1.2;
 /** A short breath between two MC lines. */
 const MC_GAP = 0.12;
+/** A countdown line holds the MC this long: its echo may ring under what follows. */
+const CALL_HOLD = 0.7;
 const DUCK_ATTACK = 0.02;
 const DUCK_RELEASE = 0.45;
 
@@ -229,7 +251,7 @@ export class HypeMixer {
   cue(cue: Cue, now: number): void {
     const byChannel = new Map<Channel, CuePart[]>();
     for (const part of cue.parts) {
-      if (part.channel === 'mc' && !this.announcer()) continue;
+      if ((part.channel === 'mc' || part.channel === 'call') && !this.announcer()) continue;
       byChannel.set(part.channel, [...(byChannel.get(part.channel) ?? []), part]);
     }
     let loudest = 0;
@@ -240,6 +262,10 @@ export class HypeMixer {
       }
       if (channel === 'mc') {
         for (const part of parts) this.say(part.sound, cue.priority, now + (part.delay ?? 0), now);
+        continue;
+      }
+      if (channel === 'call') {
+        for (const part of parts) this.call(part.sound, now);
         continue;
       }
       const end = this.claim(channel, parts, cue.priority, now);
@@ -329,6 +355,18 @@ export class HypeMixer {
     this.waiting = { sound, priority, at, expires: at + MC_WAIT };
   }
 
+  /** A line on the beat: cut off the MC's current line and say it now, holding the MC only briefly. */
+  private call(sound: SfxName, now: number): void {
+    const busy = this.busy.get('mc');
+    if (busy && now < busy.until) for (const voice of busy.voices) voice.stop();
+    const voice = this.play(sound, 0);
+    if (!voice) {
+      this.busy.delete('mc');
+      return;
+    }
+    this.busy.set('mc', { until: now + Math.min(voice.duration, CALL_HOLD), priority: 0, voices: [voice] });
+  }
+
   private duckFor(depth: number, now: number, until: number): void {
     const current = 1 - this.duck(now);
     if (now >= this.duckUntil) this.duckFrom = now;
@@ -378,6 +416,11 @@ export class HypeAudio {
 
   event(event: HypeEvent): void {
     this.mixer.cue(cueFor(event), this.now);
+  }
+
+  /** One call of the countdown (see countCue). */
+  count(index: CountCall, say: boolean, letsDance: boolean): void {
+    this.mixer.cue(countCue(index, say, letsDance), this.now);
   }
 
   /** How loud the song should be right now, 0..1. */
