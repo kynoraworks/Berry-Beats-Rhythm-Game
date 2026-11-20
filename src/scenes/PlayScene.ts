@@ -1116,7 +1116,7 @@ export class PlayScene extends Phaser.Scene {
       scrambleBeats: scramble.beats,
       scrambleLeft: scramble.left,
       meltdown: effects?.meltdownNow(time) ?? false,
-      hype: this.hype?.active ? { left: this.hype.left(time), streak: this.engine.stats.combo } : null,
+      hype: this.hype?.active ? { ...this.hype.status(), streak: this.engine.stats.combo } : null,
       flash: effects?.flashStatus(time) ?? null,
       gimmick: this.rules.gimmick,
     });

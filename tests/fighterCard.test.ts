@@ -108,9 +108,15 @@ describe('effectCards', () => {
   });
 
   it('puts what the enemy is doing first, then your ability, then hype, then all-song effects', () => {
-    const cards = effectCards({ ...none, ability: ability('rind'), hype: { left: 0.5, streak: 31 }, flash: 'warn', gimmick: 'hardShell' });
+    const cards = effectCards({ ...none, ability: ability('rind'), hype: { left: 0.5, beats: 12, streak: 31, frozen: false }, flash: 'warn', gimmick: 'hardShell' });
     expect(cards.map((c) => c.kind)).toEqual(['flash', 'ability', 'hype', 'slowFlair']);
-    expect(cards[2].detail).toBe('streak 31');
+    expect(cards[2].detail).toBe('12 beats left, streak 31');
+    expect(cards[2].left).toBe(0.5);
+  });
+
+  it('says when hype is held through the rival's turn', () => {
+    const card = effectCards({ ...none, hype: { left: 0.7, beats: 1, streak: 40, frozen: true } })[0];
+    expect(card.detail).toBe('held, 1 beat left');
   });
 
   it('shows a meltdown in place of the scramble it causes', () => {

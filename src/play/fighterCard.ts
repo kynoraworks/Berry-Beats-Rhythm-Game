@@ -135,7 +135,8 @@ export interface EffectState {
   scrambleLeft: number;
   /** Dr. Lemon is melting down right now (his gimmick, which also scrambles you). */
   meltdown: boolean;
-  hype: { left: number; streak: number } | null;
+  /** Hype's time left (share and beats), the streak, and whether its clock is stopped for the rival's turn. */
+  hype: { left: number; beats: number; streak: number; frozen: boolean } | null;
   /** Dragon Fruit: 'warn' while the strip pulses, 'flash' while the glare is up. */
   flash: 'warn' | 'flash' | null;
   gimmick: GimmickId | null;
@@ -167,7 +168,10 @@ export function effectCards(state: EffectState): EffectCard[] {
   if (state.meltdown) cards.push({ kind: 'meltdown', title: 'Meltdown', detail: 'your notes shake', left: null, tone: 'rival' });
   else if (state.scrambleBeats > 0) cards.push({ kind: 'scramble', title: 'Scramble', detail: plural(state.scrambleBeats, 'beat', 'beats'), left: state.scrambleLeft, tone: 'rival' });
   if (state.ability) cards.push({ kind: 'ability', title: state.ability.name, detail: abilityDetail(state.ability), left: state.ability.left, tone: 'yours' });
-  if (state.hype) cards.push({ kind: 'hype', title: 'Hype x2', detail: `streak ${state.hype.streak}`, left: state.hype.left, tone: 'hype' });
+  if (state.hype) {
+    const detail = state.hype.frozen ? `held, ${plural(state.hype.beats, 'beat', 'beats')} left` : `${plural(state.hype.beats, 'beat', 'beats')} left, streak ${state.hype.streak}`;
+    cards.push({ kind: 'hype', title: 'Hype x2', detail, left: state.hype.left, tone: 'hype' });
+  }
   if (state.gimmick === 'hardShell') cards.push({ kind: 'slowFlair', title: 'Hard shell', detail: 'Flair charges slower', left: null, tone: 'rival' });
   return cards;
 }
