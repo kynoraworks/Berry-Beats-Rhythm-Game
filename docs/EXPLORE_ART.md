@@ -11,8 +11,27 @@ thing where its box is, or the boxes must be moved to match the art.
 
 All art is 1:1 pixel art at the stages' scale: art pixel = 5 screen pixels,
 characters about 48 to 56 px tall, a dark outline, no semi-transparent
-pixels. Everyone stands with their feet on **row 137** (the floor line), so
-the floor must read as floor from about row 128 down to 160.
+pixels.
+
+## Floors
+
+Each background has its own floor line: the art-pixel row a standing
+character's feet touch, which may change along x (a street eases onto its
+dance spot at the far end). The profiles are in `src/explore/floors.ts`
+(`floorAt(backgroundKey, artX)`), and every walker, NPC, fruit, battle
+dancer, spotlight pool and the hype floor uses them. A stage cut from the end
+of a street shares that street's floor.
+
+- Feet go on the walkable floor a few pixels in front of the wall base, never
+  on kerbs, ledges, wall decorations or blocks that read as raised.
+- When you add or redraw a background, run
+  `python3 tools/measure_floors.py propose` for a first guess, set the
+  profile in `floors.ts`, then check it by eye with
+  `python3 tools/measure_floors.py check <out dir>`, which draws the line and
+  a few characters standing on it. `tests/floors.test.ts` fails if a
+  background has no profile.
+- New art should still keep the floor readable from the wall base down to
+  row 160; the old fixed rule (feet on row 137) only applies as a fallback.
 
 ## Stations: 12 files, 256x160
 
@@ -38,7 +57,7 @@ Layout every station shares (art pixels, x from the left):
 
 - **Train, left:** the carriage side from x 0 to 44, its **open door** at x 8 to 36, y 66 to 137. Berry steps out here.
 - **Station name sign:** x 84 to 172, y 30 to 44 (the stand-in prints the name; drawn art should letter it).
-- **Clue NPC:** stands at x 128 (feet on row 137); keep x 112 to 144 clear of props in front of them.
+- **Clue NPC:** stands at x 128 (feet on the station's floor line); keep x 112 to 144 clear of props in front of them.
 - **Look hotspots:** a thing on the back wall at **x 56 to 90, y 72 to 112** (left) and/or **x 160 to 200, y 72 to 112** (right). Which ones a station uses, and what they are, is in `STATION_SEEDS` in `places.ts` (stop 2: a Blueberry poster left and a timetable right; stop 12: a sign-up board left and a mirror right; and so on).
 - **Exit, right:** stairs or a gate at **x 222 to 252, y 70 to 137**, with an exit sign above it (y 58 to 68).
 
