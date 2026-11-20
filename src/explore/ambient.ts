@@ -124,7 +124,9 @@ export function seeded(seed: number): () => number {
 
 /** Art x ranges where an extra must not stand: hotspots (and the people at them), with a margin. */
 export function blockedRanges(place: PlaceDef): [number, number][] {
-  const ranges: [number, number][] = place.hotspots.map((h) => [h.x - EXTRA_HALF - 4, h.x + h.w + EXTRA_HALF + 4]);
+  // Things on the wall may be brushed at their edges (people stand in front of a poster);
+  // the people Berry talks to and the fruit get a clear margin.
+  const ranges: [number, number][] = place.hotspots.map((h) => (h.kind === 'look' ? [h.x - EXTRA_HALF + 4, h.x + h.w + EXTRA_HALF - 4] : [h.x - EXTRA_HALF - 4, h.x + h.w + EXTRA_HALF + 4]));
   if (place.kind === 'station' || place.kind === 'depart') {
     ranges.push([0, 40]); // the train door
     ranges.push([216, place.width]); // the exit
@@ -149,6 +151,20 @@ export function placeExtras(width: number, blocked: [number, number][], count: n
     for (const x of candidates) {
       if (spots.some((s) => Math.abs(s.x - x) < gap)) continue;
       if (best === null || Math.abs(x - target) < Math.abs(best - target)) best = x;
+    }
+    if (best === null) break;
+    spots.push({ x: best, who: 0, flip: false });
+  }
+  // Fill any places still empty with the free spot farthest from everyone, if one is far enough.
+  while (spots.length < count) {
+    let best: number | null = null;
+    let bestDistance = gap - 1;
+    for (const x of candidates) {
+      const distance = Math.min(...spots.map((s) => Math.abs(s.x - x)), Number.POSITIVE_INFINITY);
+      if (distance > bestDistance) {
+        best = x;
+        bestDistance = distance;
+      }
     }
     if (best === null) break;
     spots.push({ x: best, who: 0, flip: false });
