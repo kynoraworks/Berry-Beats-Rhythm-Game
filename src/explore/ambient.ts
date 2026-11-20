@@ -126,7 +126,12 @@ export function seeded(seed: number): () => number {
 export function blockedRanges(place: PlaceDef): [number, number][] {
   // Things on the wall may be brushed at their edges (people stand in front of a poster);
   // the people Berry talks to and the fruit get a clear margin.
-  const ranges: [number, number][] = place.hotspots.map((h) => (h.kind === 'look' ? [h.x - EXTRA_HALF + 4, h.x + h.w + EXTRA_HALF - 4] : [h.x - EXTRA_HALF - 4, h.x + h.w + EXTRA_HALF + 4]));
+  const ranges: [number, number][] = place.hotspots.map((h) => {
+    if (h.kind === 'look') return [h.x - EXTRA_HALF + 4, h.x + h.w + EXTRA_HALF - 4];
+    // The fruit gets the most room: they are who Berry walks up to, and the battle starts there.
+    const margin = h.kind === 'fruit' ? 28 : 4;
+    return [h.x - EXTRA_HALF - margin, h.x + h.w + EXTRA_HALF + margin];
+  });
   if (place.kind === 'station' || place.kind === 'depart') {
     ranges.push([0, 40]); // the train door
     ranges.push([216, place.width]); // the exit
@@ -181,16 +186,19 @@ export function extraCount(kind: PlaceKind): number {
 
 /**
  * Battle extras stand at the back of the stage, between the two lane fields
- * (art x 79 to 177), so they never cover a note. Three spots: either side of
- * the dancers and between them.
+ * (art x 79 to 177), so they never cover a note. They are drawn smaller than
+ * the dancers (BATTLE_SCALE) so they read as a crowd further back.
  */
 export const BATTLE_SPOTS: readonly { x: number; who: number; flip: boolean }[] = [
-  { x: 90, who: 0, flip: false },
-  { x: 129, who: 1, flip: false },
-  { x: 166, who: 2, flip: true },
+  { x: 87, who: 0, flip: false },
+  { x: 118, who: 1, flip: false },
+  { x: 140, who: 2, flip: true },
+  { x: 169, who: 3, flip: true },
 ];
 /** The battle extras' feet row: further back than the dancers (row 138). */
-export const BATTLE_FEET = 122;
+export const BATTLE_FEET = 118;
+/** Canvas pixels per extras art pixel in battle (the dancers use 5). */
+export const BATTLE_SCALE = 3;
 
 /** A stop's number from its id, for seeding. */
 export function stopSeed(stop: Pick<StopDef, 'number'>, kind: PlaceKind): number {

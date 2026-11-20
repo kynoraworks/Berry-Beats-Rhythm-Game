@@ -54,7 +54,7 @@ describe('background life', () => {
   });
 
   it('keeps battle extras between the two lane fields, so they never cover a note', () => {
-    const halfBody = 12;
+    const halfBody = 8;
     for (const spot of BATTLE_SPOTS) {
       expect(spot.x * PX - halfBody * PX).toBeGreaterThanOrEqual(LANE_FIELD_WIDTH - PX);
       expect(spot.x * PX + halfBody * PX).toBeLessThanOrEqual(GAME_W - LANE_FIELD_WIDTH + PX);

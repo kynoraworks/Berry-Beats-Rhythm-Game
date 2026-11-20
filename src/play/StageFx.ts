@@ -5,7 +5,7 @@ import { Depth, FLOOR_Y, LANE_FIELD_WIDTH } from './layout';
 import { backdropTint, gradeStrength, leafCount, mixColor, multiplyColor } from '../core/atmosphere';
 import { LeafFall } from '../core/atmosphereFx';
 import { STOPS, stopForChart, TUTORIAL, type StopDef } from '../story/stops';
-import { BATTLE_FEET, BATTLE_SPOTS, battleLife, type SettingLife } from '../explore/ambient';
+import { BATTLE_FEET, BATTLE_SCALE, BATTLE_SPOTS, battleLife, type SettingLife } from '../explore/ambient';
 import { AmbientEffects, Extras } from '../explore/ambientFx';
 
 const SPOT_COLOR = 0xfff0c0;
@@ -178,6 +178,7 @@ export class StageFx {
         dancing: life.dancing,
         calm: this.calm,
         seed: stop.number,
+        scale: BATTLE_SCALE,
         addTo: (sprite) => {
           sprite.setTint(shade);
           this.backWall.add(sprite);
