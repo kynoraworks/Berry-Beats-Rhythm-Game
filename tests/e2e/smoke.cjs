@@ -93,6 +93,14 @@ async function main() {
     await page.goto(`${base}?scene=Explore&stop=stop02&place=street`);
     await waitForScene('Explore');
 
+    // The Grand Stage's crew battle: the lineup, then round 1 starts on the Grape's song.
+    await page.goto(`${base}?scene=Lineup`);
+    await waitForScene('Lineup');
+    await page.keyboard.press('Enter');
+    await waitForScene('Play');
+    const round = await page.evaluate(() => window.__game.scene.getScene('Play').crew?.round ?? null);
+    if (round !== 0) problems.push(`the crew battle did not start on round 1 (got ${round})`);
+
     // Let the tutorial play itself from near the end and check it reaches the results screen.
     await page.goto(`${base}?scene=Play&level=tutorial&autoplay=1&at=60`);
     await waitForScene('Play');
@@ -104,7 +112,7 @@ async function main() {
     server.close();
   }
   if (problems.length > 0) throw new Error(`Smoke test failed:\n  ${[...new Set(problems)].join('\n  ')}`);
-  console.log('Smoke test passed: title, menu, Berry\'s room, the train, a station, a street, the tutorial and results all loaded without errors.');
+  console.log('Smoke test passed: title, menu, Berry\'s room, the train, a station, a street, the crew battle lineup, the tutorial and results all loaded without errors.');
 }
 
 main().catch((error) => {
