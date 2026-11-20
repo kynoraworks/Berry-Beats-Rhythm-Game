@@ -1,5 +1,6 @@
 import { readdirSync, writeFileSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { configDefaults } from 'vitest/config';
 import { defineConfig, type Plugin } from 'vite';
 
 /** Files the service worker should not fetch ahead of time. */
@@ -47,4 +48,6 @@ export default defineConfig({
   },
   plugins: [precacheManifest()],
   server: { host: true },
+  // Agent worktrees under .claude/ hold copies of the suite; run only this checkout's tests.
+  test: { exclude: [...configDefaults.exclude, '.claude/**'] },
 });
