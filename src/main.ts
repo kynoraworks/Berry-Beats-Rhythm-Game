@@ -7,6 +7,8 @@ import { TitleScene } from './scenes/TitleScene';
 import { MenuScene } from './scenes/MenuScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { ExploreScene } from './scenes/ExploreScene';
+import { LineupScene } from './scenes/LineupScene';
+import { CrewEndScene } from './scenes/CrewEndScene';
 import { OptionsScene } from './scenes/OptionsScene';
 import { PlayScene } from './scenes/PlayScene';
 import { ResultsScene } from './scenes/ResultsScene';
@@ -30,7 +32,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   input: { activePointers: 4 },
-  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, ExploreScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene, UiKitScene],
+  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, ExploreScene, LineupScene, CrewEndScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene, UiKitScene],
 });
 
 music.init(game);

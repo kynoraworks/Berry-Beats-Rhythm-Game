@@ -14,6 +14,8 @@ export class Conductor {
   private rate = 1;
   private running = false;
   private finished = false;
+  /** Song position where the audio starts: before it there is silence (the lead-in). */
+  private floor = 0;
 
   constructor(ctx: AudioContext, buffer: AudioBuffer, volume = 1) {
     this.ctx = ctx;
@@ -59,8 +61,13 @@ export class Conductor {
     this.gain.gain.value = volume;
   }
 
-  /** Start (or restart) playback from `from` seconds. A negative `from` waits that long before the song begins. */
-  play(from = 0): void {
+  /**
+   * Start (or restart) playback from `from` seconds. A position before `audioFrom`
+   * (0 unless given) is silent: the sound starts when the clock reaches it, so a
+   * song can be entered part-way through after a quiet count-in.
+   */
+  play(from = 0, audioFrom?: number): void {
+    if (audioFrom !== undefined) this.floor = Math.max(0, audioFrom);
     this.stopSource();
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     this.finished = false;
@@ -76,8 +83,9 @@ export class Conductor {
     source.buffer = this.buffer;
     source.playbackRate.value = this.rate;
     source.connect(this.gain);
-    if (from >= 0) source.start(now, from);
-    else source.start(now + -from / this.rate, 0);
+    const floor = this.floor;
+    if (from >= floor) source.start(now, from);
+    else source.start(now + (floor - from) / this.rate, floor);
     source.onended = () => {
       if (this.source === source) {
         this.source = null;

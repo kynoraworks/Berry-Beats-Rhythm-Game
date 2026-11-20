@@ -18,7 +18,7 @@ import {
 import { COLORS, CSS, GAME_W, SceneKeys, Tex, type Lane } from '../core/config';
 import { secToBeat, toTimedNotes, type Chart } from '../core/chart';
 import { Conductor } from '../core/conductor';
-import { Engine, type JudgeEvent, type PlayNote } from '../core/engine';
+import { Engine, START_HEALTH, type JudgeEvent, type PlayNote } from '../core/engine';
 import type { BattleSummary, PlayData, ResultsData } from '../core/flow';
 import { LaneInput } from '../core/input';
 import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobile';
@@ -35,6 +35,7 @@ import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, 
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
+import { CrewScoreboard } from '../play/CrewScoreboard';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
 import { ABILITIES } from '../story/abilities';
@@ -43,10 +44,11 @@ import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
-import { stopForChart } from '../story/stops';
+import { stopById, stopForChart } from '../story/stops';
+import { crewLineup, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
-import { stageTexture } from '../story/placeholders';
-import { markCleared } from '../story/progress';
+import { characterSheet, stageTexture } from '../story/placeholders';
+import { markCleared, markSeen } from '../story/progress';
 import { nextRef, playSegment } from '../story/run';
 import type { Line } from '../story/types';
 
@@ -56,7 +58,7 @@ type State = 'loading' | 'playing' | 'paused' | 'resuming' | 'ended';
  * Play data with battle rules set by the caller (the crew battle sets each
  * round's gimmick and ability). Without them a story stop's own apply.
  */
-export type RuledPlayData = PlayData & { rules?: BattleRules };
+export type RuledPlayData = PlayData & { rules?: BattleRules; crew?: CrewRoundPlay };
 
 /** What the results screen gets on top of the usual: how often the Flair was fired. */
 export type FlairResults = ResultsData & { flairUsed?: number; abilityName?: string };
@@ -86,6 +88,9 @@ const TURN_COLORS: Record<Exclude<Turn, 'rest'>, string> = { player: CSS.blue, r
 const PAUSE_SONG = 'pause';
 const PAUSE_SONG_SPARE = 'menu';
 
+/** The crew battle's music fades out over this long as a round ends. */
+const ROUND_FADE = 1.6;
+
 /** Tint for the dancer who is not speaking during a conversation. */
 const LISTENER_TINT = 0x7a7896;
 /** Tempo of the standing idle while no music is playing. */
@@ -93,6 +98,11 @@ const IDLE_BPM = 77;
 
 export class PlayScene extends Phaser.Scene {
   private playData!: RuledPlayData;
+  /** A round of the crew battle, when this is one. */
+  private crew: CrewRoundPlay | null = null;
+  private crewBoard: CrewScoreboard | null = null;
+  /** Song time where play starts: 0, or a crew round's first bar. */
+  private origin = 0;
   private rules: BattleRules = NO_RULES;
   private effects: BattleEffects | null = null;
   private backupLabel: Phaser.GameObjects.Text | null = null;
@@ -149,6 +159,9 @@ export class PlayScene extends Phaser.Scene {
 
   init(data: RuledPlayData): void {
     this.playData = data;
+    this.crew = data.crew ?? null;
+    this.crewBoard = null;
+    this.origin = data.crew?.start ?? 0;
     this.rules = NO_RULES;
     this.effects = null;
     this.backupLabel = null;
@@ -206,10 +219,13 @@ export class PlayScene extends Phaser.Scene {
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
     const isBattle = hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && segment?.kind !== 'lesson';
+    const crew = this.crew;
     // A lesson cannot be failed: the Coach just keeps counting.
     const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson';
 
     this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail });
+    // The crew battle's bar carries over from the round before.
+    if (crew) this.engine.adjustHealth(crew.health - START_HEALTH);
     this.rules = isBattle ? this.resolveRules() : NO_RULES;
     let rivalPlan: ReturnType<typeof planRival> = [];
     if (hasRival) {
@@ -220,7 +236,8 @@ export class PlayScene extends Phaser.Scene {
       this.turns = buildTurns(chart, chart.notes, rivalChart);
     }
     if (isBattle) {
-      this.battle = new Battle(buildRounds(chart, chart.notes, rivalChart));
+      // A crew round is one round from its first bar to its last.
+      this.battle = new Battle(crew ? [{ startBar: crew.startBar, endBar: crew.endBar, start: crew.start, end: crew.end }] : buildRounds(chart, chart.notes, rivalChart));
       this.flawless = new FlawlessTracker(buildPhrases(chart, this.turns, chart.notes));
       if (!this.playData.practice) this.introTime = VersusCard.DURATION;
     }
@@ -233,11 +250,12 @@ export class PlayScene extends Phaser.Scene {
     this.lastNoteEnd = ends.reduce((latest, end) => Math.max(latest, end), 0);
 
     const playerX = hasRival ? PLAYER_X : GAME_W / 2;
-    let stageKey = segment?.stage ?? chart.stage ?? Tex.room;
-    if (story && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, story.stop.station, story.stop.time, CAST[story.stop.fruit].color);
+    const place = story?.stop ?? (crew ? stopById('stop12') : undefined);
+    let stageKey = segment?.stage ?? (crew ? place?.stage : undefined) ?? chart.stage ?? Tex.room;
+    if (place && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, place.station, place.time, CAST[place.fruit].color);
     this.stage = new StageFx(this, stageKey, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
-    this.player = createPlayer(this, playerX, FLOOR_Y);
+    this.player = createPlayer(this, playerX, FLOOR_Y, crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
     this.hud = new Hud(this, { rivalScore: isBattle, rounds, rival: rivalKind });
     if (this.rivalEngine) {
@@ -263,6 +281,8 @@ export class PlayScene extends Phaser.Scene {
         rivalCss: this.rivalLook.css,
         calm: settings.reduceMotion,
         touch: isTouch(),
+        // In the crew battle each ally fires their ability once in their round.
+        maxFires: crew ? 1 : undefined,
         hooks: {
           callout: (text, color) => hud.callout(text, color),
           sfx: (name) => playSfx(this.game, name),
@@ -287,6 +307,12 @@ export class PlayScene extends Phaser.Scene {
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
     if (tag) addBody(this, 104, 54, tag, 22, { origin: [0, 0], color: CSS.yellow, bold: true, stroke: true }).setDepth(Depth.hud);
 
+    if (crew) {
+      const session = getSession();
+      this.crewBoard = new CrewScoreboard(this, GAME_W / 2, 204, crewLineup(session?.order ?? []), 0.7, false).setDepth(Depth.hud);
+      this.crewBoard.update(session?.results ?? [], crew.round);
+    }
+
     this.buildPauseMenu();
     this.setupInput();
 
@@ -296,7 +322,7 @@ export class PlayScene extends Phaser.Scene {
 
     // Story stages open with a conversation, unless this is a retry of one just seen.
     const retry = consumeSkipIntro();
-    const intro = segment && !retry && startAt === 0 ? segment.before : [];
+    const intro = retry || startAt > 0 ? [] : (segment?.before ?? crew?.before ?? []);
     if (intro.length > 0) {
       this.introDone = false;
       this.touchLanes?.setGuideVisible(false);
@@ -380,7 +406,9 @@ export class PlayScene extends Phaser.Scene {
     this.touchLanes?.setGuideVisible(true);
     this.conductor = new Conductor(ctx, buffer, getSettings().musicVolume);
     const startAt = this.playData.startAt ?? 0;
-    this.conductor.play(startAt > 0 ? startAt - PRACTICE_LEAD_IN : -LEAD_IN - this.introTime);
+    // A crew round enters its song part-way through, after a silent count-in.
+    if (this.crew) this.conductor.play(this.origin - LEAD_IN - this.introTime, this.origin);
+    else this.conductor.play(startAt > 0 ? startAt - PRACTICE_LEAD_IN : -LEAD_IN - this.introTime);
     this.countIndex = startAt > 0 ? 3 : 0;
     this.countText.setText(startAt > 0 ? 'Ready' : '');
     if (this.introTime > 0) {
@@ -389,7 +417,11 @@ export class PlayScene extends Phaser.Scene {
       const look = gimmick ? { ...this.rivalLook, trait: GIMMICK_TRAITS[gimmick] } : this.rivalLook;
       const ability = this.rules.ability ? ABILITIES[this.rules.ability] : null;
       const backup = ability && this.rules.abilityOwner ? `${CAST[this.rules.abilityOwner].name}: ${ability.name}\n${isTouch() ? 'Tap the meter' : 'Space'} when Flair is full` : '';
-      this.versus = new VersusCard(this, this.rivalName, texture, look, backup);
+      const ally = this.crew && this.crew.ally !== 'berry' ? this.crew.ally : null;
+      const player = ally ? { name: CAST[ally].name, texture: characterSheet(this, ally).texture, color: CAST[ally].css } : undefined;
+      // In the crew battle the ally fires their own ability, so the line under them says how.
+      const label = ally && ability ? `${ability.name}, once this round\n${isTouch() ? 'Tap the meter' : 'Space'} when Flair is full` : backup;
+      this.versus = new VersusCard(this, this.rivalName, texture, look, label, player);
       playSfx(this.game, 'banner');
     }
     this.showSongCredit();
@@ -437,14 +469,15 @@ export class PlayScene extends Phaser.Scene {
 
   /** Run a conversation over the stage, lighting whoever is speaking. */
   private startDialogue(lines: readonly Line[], onDone: () => void, hoodDown = false): void {
-    const onStage = this.story?.stop.fruit;
+    const onStage = this.crew ? this.chart.rivalCharacter : this.story?.stop.fruit;
+    const playerWho = this.crew?.ally ?? 'berry';
     this.dialogue = new Dialogue(this, {
       lines,
       hoodDown,
       depth: Depth.overlay + 6,
       onLine: (line) => {
         // Berry and the stop's fruit are on stage. Anyone else speaks from the wings.
-        const side = line.who === 'berry' ? 'player' : this.rival && line.who === onStage ? 'rival' : null;
+        const side = line.who === playerWho ? 'player' : this.rival && line.who === onStage ? 'rival' : null;
         this.stage.setTurn(side ?? 'both');
         this.player.sprite.setTint(side === 'player' ? 0xffffff : LISTENER_TINT);
         this.rival?.sprite.setTint(side === 'rival' ? 0xffffff : LISTENER_TINT);
@@ -547,6 +580,8 @@ export class PlayScene extends Phaser.Scene {
 
   private quit(): void {
     music.stop(200);
+    // Leaving a crew round gives up the battle; the order is kept for the next try.
+    if (this.crew) endSession();
     goTo(this, this.playData.returnTo.scene, this.playData.returnTo.data);
   }
 
@@ -588,7 +623,10 @@ export class PlayScene extends Phaser.Scene {
     let after = toResults;
     let hoodDown = false;
     const segment = this.story?.segment;
-    if (this.story && segment?.kind === 'lesson') {
+    const crew = this.crew;
+    if (crew) {
+      ({ outro, after, hoodDown } = this.settleCrewRound(failed, playerOnTop));
+    } else if (this.story && segment?.kind === 'lesson') {
       // The lesson flows straight into the rest of the stop.
       outro = segment.after;
       after = () => this.continueStory();
@@ -622,12 +660,42 @@ export class PlayScene extends Phaser.Scene {
     } else {
       if (summary) {
         playSfx(this.game, summary.won ? 'cheer' : 'round');
-        this.hud.callout(summary.won ? 'You win!' : `${this.rivalName} wins!`, summary.won ? CSS.blue : this.rivalLook.css);
+        const yours = this.crew && this.crew.ally !== 'berry' ? `${CAST[this.crew.ally].name} takes it!` : 'You win!';
+        this.hud.callout(summary.won ? yours : `${this.rivalName} wins!`, summary.won ? CSS.blue : this.rivalLook.css);
         this.stage.flash(summary.won ? COLORS.blue : this.rivalLook.color, 0.3);
         if (summary.won) this.stage.cheer();
       }
       this.time.delayedCall(summary ? 1900 : 1400, wrapUp);
     }
+  }
+
+  /** Record a crew round, carry the bar forward, and say what comes next. */
+  private settleCrewRound(failed: boolean, won: boolean): { outro: readonly Line[]; after: () => void; hoodDown: boolean } {
+    const final = stopById('stop12');
+    const script = final?.script;
+    const battle = this.battle;
+    const result: RoundResult = {
+      playerAccuracy: battle?.accuracy('player') ?? 0,
+      rivalAccuracy: battle?.accuracy('rival') ?? 0,
+      playerScore: this.engine.stats.score,
+      won: won && !failed,
+    };
+    const toLineup = (data: object) => goTo(this, SceneKeys.Lineup, { ...data, autoplay: this.playData.autoplay }, 400);
+    const lose = { outro: script?.lose ?? [], after: () => { endSession(); toLineup({ lost: true }); }, hoodDown: false };
+    // An empty bar loses the whole battle, whatever the points say.
+    if (failed) return lose;
+    const state = recordRound(result, this.engine.stats.health);
+    const session = getSession();
+    this.crewBoard?.update(session?.results ?? [], null);
+    if (state === 'lost') return lose;
+    if (state === 'won') {
+      if (final) markCleared(final);
+      markSeen('ending');
+      const results = session?.results.slice() ?? [];
+      const order = session?.order.slice() ?? [];
+      return { outro: script?.win ?? [], after: () => { endSession(); goTo(this, SceneKeys.CrewEnd, { results, order }, 600); }, hoodDown: true };
+    }
+    return { outro: [], after: () => toLineup({ between: true }), hoodDown: false };
   }
 
   private cleanup(): void {
@@ -683,7 +751,7 @@ export class PlayScene extends Phaser.Scene {
   /** Song time as the player hears it, in seconds. */
   private heardTime(): number {
     const c = this.conductor;
-    return c ? c.time - c.outputLatency - this.offsetSec : -LEAD_IN;
+    return c ? c.time - c.outputLatency - this.offsetSec : this.origin - LEAD_IN;
   }
 
   /** Song time at which an input event happened, given its performance.now() timestamp. */
@@ -920,8 +988,12 @@ export class PlayScene extends Phaser.Scene {
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
       this.updateBattle(time);
 
+      const crew = this.crew;
+      if (crew && time > crew.end - ROUND_FADE) conductor.setVolume(getSettings().musicVolume * Phaser.Math.Clamp((crew.end + 0.4 - time) / ROUND_FADE, 0, 1));
       if (this.engine.stats.failed) {
         this.finish(true);
+      } else if (crew && time >= crew.end + 0.4) {
+        this.finish(false);
       } else if (conductor.ended) {
         this.finish(false);
       } else if (time > this.lastNoteEnd + 4 && conductor.duration - time > 6) {
@@ -945,20 +1017,21 @@ export class PlayScene extends Phaser.Scene {
       this.player.update(dt, beat);
       this.rival?.update(dt, beat);
       this.stage.update(beat, dt);
-      this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, time / conductor.duration, beat, dt);
+      const progress = this.crew ? (time - this.crew.start) / (this.crew.end - this.crew.start) : time / conductor.duration;
+      this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, Phaser.Math.Clamp(progress, 0, 1), beat, dt);
     }
   }
 
   private updateCountdown(rawTime: number): void {
-    if (this.versus && !this.versus.update(rawTime + LEAD_IN + this.introTime)) this.versus = null;
+    if (this.versus && !this.versus.update(rawTime - this.origin + LEAD_IN + this.introTime)) this.versus = null;
     const labels = ['3', '2', '1', 'Go!'];
-    while (this.countIndex < labels.length && rawTime >= -LEAD_IN + this.countIndex * COUNT_STEP) {
+    while (this.countIndex < labels.length && rawTime >= this.origin - LEAD_IN + this.countIndex * COUNT_STEP) {
       const label = labels[this.countIndex++];
       this.countText.setText(label).setAlpha(1).setScale(1.4);
       this.tweens.add({ targets: this.countText, scale: 1, duration: 150, ease: 'Quad.easeOut' });
       playSfx(this.game, label === 'Go!' ? 'go' : 'count');
     }
-    if (this.countIndex >= labels.length && this.countText.text !== '' && rawTime >= (this.playData.startAt ?? 0) + 0.2 && this.countText.alpha === 1) {
+    if (this.countIndex >= labels.length && this.countText.text !== '' && rawTime >= Math.max(this.playData.startAt ?? 0, this.origin) + 0.2 && this.countText.alpha === 1) {
       this.tweens.add({ targets: this.countText, alpha: 0, duration: 250, onComplete: () => this.countText.setText('').setAlpha(1) });
     }
   }
@@ -1000,8 +1073,8 @@ export class PlayScene extends Phaser.Scene {
     const title = addText(this, GAME_W / 2, top + 68, 'Paused', 64, { color: CSS.lilac });
     const entries: [string, () => void, 'select' | 'back'][] = [
       ['Resume', () => this.resumeGame(), 'select'],
-      ['Restart', () => this.restart(), 'select'],
-      ['Exit', () => this.quit(), 'back'],
+      [this.crew ? 'Restart round' : 'Restart', () => this.restart(), 'select'],
+      [this.crew ? 'Exit to lineup' : 'Exit', () => this.quit(), 'back'],
     ];
     if (canSwap) entries.splice(1, 0, [this.backupText(), () => this.swapBackup(1), 'select']);
     const buttons = entries.map(([label, action, sfx], i) => addUiButton(this, GAME_W / 2, top + 170 + i * 84, label, action, { width: 400, sfx }));

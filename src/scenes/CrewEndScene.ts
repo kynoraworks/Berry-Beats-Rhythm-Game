@@ -1,0 +1,125 @@
+import Phaser from 'phaser';
+import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
+import { music } from '../core/music';
+import { UiButton, addBackdrop, addBody, addBox, addHeader, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { addFace } from '../play/CrewScoreboard';
+import { CAST, HOOD_DOWN_FRAME } from '../story/cast';
+import { CREW_ROUNDS, ROUND_POINTS, crewLineup, tally, type RoundResult } from '../story/crewBattle';
+import type { FruitId } from '../story/types';
+
+export interface CrewEndData {
+  results: RoundResult[];
+  order: FruitId[];
+  /** Skip straight to the end card (for tests). */
+  card?: boolean;
+}
+
+/** The credits, as README.md lists them. */
+const CREDITS: [string, string[]][] = [
+  ['Music', ['Nicole Yazmin']],
+  ['Art', ['Maxim Volk', 'Salvatore', 'Sainttufa']],
+  ['Glacier35 font', ['Hugo4IT']],
+  ['Made by', ['The contributors to Berry Beats']],
+];
+
+/**
+ * After the crew battle is won: the crew's results round by round, then the
+ * end card and a short credits roll, then back to the train.
+ */
+export class CrewEndScene extends Phaser.Scene {
+  private opts: CrewEndData = { results: [], order: [] };
+  private page: 'results' | 'card' = 'results';
+  private button: UiButton | null = null;
+
+  constructor() {
+    super(SceneKeys.CrewEnd);
+  }
+
+  init(data: CrewEndData): void {
+    this.opts = { results: data?.results ?? [], order: data?.order ?? [], card: data?.card };
+    this.page = data?.card ? 'card' : 'results';
+    this.button = null;
+  }
+
+  create(): void {
+    fadeIn(this, 600);
+    music.play('title', 800);
+    if (this.page === 'results') this.showResults();
+    else this.showCard();
+    menuKeys(this, { confirm: () => this.button?.click(), back: () => this.button?.click() });
+  }
+
+  private showResults(): void {
+    addBackdrop(this);
+    addHeader(this, 'Crew Battle Won');
+    const { results, order } = this.opts;
+    const lineup = crewLineup(order);
+    const points = tally(results);
+    const panel = { x: 140, y: 128, w: GAME_W - 280, h: 512 };
+    addBox(this, panel.x, panel.y, panel.w, panel.h, 'panel');
+    addText(this, GAME_W / 2, panel.y + 42, `Points ${points.player} to ${points.rival}`, 40, { color: CSS.yellow });
+    CREW_ROUNDS.forEach((round, i) => {
+      const y = panel.y + 112 + i * 72;
+      const result = results[i];
+      const who = lineup[i] ?? 'berry';
+      addFace(this, panel.x + 64, y, who, 52);
+      addText(this, panel.x + 106, y, CAST[who].name, 26, { color: CAST[who].css, origin: [0, 0.5] });
+      addBody(this, panel.x + 360, y, 'vs', 22, { color: CSS.lilac });
+      addFace(this, panel.x + 420, y, round.enemy, 52);
+      addText(this, panel.x + 462, y, CAST[round.enemy].name, 26, { color: CAST[round.enemy].css, origin: [0, 0.5] });
+      if (result) {
+        addBody(this, panel.x + 760, y, `${Math.round(result.playerAccuracy)}% vs ${Math.round(result.rivalAccuracy)}%`, 22);
+        addText(this, panel.x + panel.w - 48, y, result.won ? `+${ROUND_POINTS[i]}` : '-', 28, { color: result.won ? CSS.blue : CAST[round.enemy].css, origin: [1, 0.5] });
+      }
+    });
+    const score = results.reduce((sum, result) => sum + result.playerScore, 0);
+    addBody(this, GAME_W / 2, panel.y + panel.h - 34, `Crew score ${score.toLocaleString('en-US')}`, 24, { color: CSS.cream });
+    this.button = addUiButton(this, GAME_W / 2, 700, 'Continue', () => this.next(), { width: 280 });
+    this.button.setFocused(true);
+  }
+
+  /** "The End": the trio together again, and the people who made the game. */
+  private showCard(): void {
+    this.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night).setOrigin(0);
+    const sheet = this.textures.exists(Tex.portraits) ? this.textures.get(Tex.portraits) : null;
+    const berry = sheet?.has(String(HOOD_DOWN_FRAME)) ? this.add.image(GAME_W / 2, 220, Tex.portraits, HOOD_DOWN_FRAME).setScale(2.5) : addFace(this, GAME_W / 2, 220, 'berry', 160, 'bold');
+    const raspberry = addFace(this, GAME_W / 2 - 190, 236, 'raspberry', 140, 'bold');
+    const blueberry = addFace(this, GAME_W / 2 + 190, 236, 'blueberry', 140, 'bold');
+    const title = addText(this, GAME_W / 2, 390, 'The End', 72, { color: CSS.lilac });
+    const line = addBody(this, GAME_W / 2, 452, 'Same garden, next summer.', 28, { color: CSS.cream });
+    const fades = [raspberry, berry, blueberry, title, line];
+    fades.forEach((item, i) => {
+      item.setAlpha(0);
+      this.tweens.add({ targets: item, alpha: 1, delay: 300 + i * 450, duration: 700 });
+    });
+
+    // A short roll of credits rising under the card.
+    const roll: Phaser.GameObjects.Text[] = [];
+    let y = 0;
+    for (const [role, names] of CREDITS) {
+      roll.push(addText(this, GAME_W / 2, y, role, 24, { color: CSS.yellow }));
+      y += 34;
+      for (const name of names) {
+        roll.push(addBody(this, GAME_W / 2, y, name, 22));
+        y += 30;
+      }
+      y += 18;
+    }
+    const credits = this.add.container(0, GAME_H, roll);
+    this.add.rectangle(0, 0, GAME_W, 500, COLORS.night).setOrigin(0).setDepth(1);
+    fades.forEach((item) => item.setDepth(2));
+    this.tweens.add({ targets: credits, y: 690 - y, delay: 2600, duration: 9000, ease: 'Sine.easeOut' });
+
+    this.button = addUiButton(this, GAME_W / 2, GAME_H - 56, 'Back to the train', () => this.next(), { width: 360 }).setDepth(3);
+    this.button.setFocused(true);
+  }
+
+  private next(): void {
+    if (isLeaving(this)) return;
+    if (this.page === 'results') goTo(this, SceneKeys.CrewEnd, { ...this.opts, card: true }, 600);
+    else {
+      music.stop(400);
+      goTo(this, SceneKeys.LevelSelect, { levelId: 'stop12' }, 600);
+    }
+  }
+}

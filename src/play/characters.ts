@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { seededRandom } from '../core/battle';
 import { PX, Tex, type Lane } from '../core/config';
-import type { RivalKind } from '../core/chart';
+import type { FruitId, RivalKind } from '../core/chart';
 import { LITE_SHEETS } from '../story/cast';
 import { characterSheet } from '../story/placeholders';
 import type { SheetLayout } from '../story/types';
@@ -574,8 +574,14 @@ export const BERRY_ORIGIN_Y = 63 / 64;
 /** Frames in the shared berry layout that other screens use directly. */
 export const BerryFrame = { victory: [29, 30], defeat: 31, fingerGuns: 42, dab: 41 } as const;
 
-export function createPlayer(scene: Phaser.Scene, x: number, y: number): Dancer {
-  return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
+/**
+ * The player's dancer: Berry, or (in the crew battle) the ally dancing a round
+ * for him, in their own sheet and style.
+ */
+export function createPlayer(scene: Phaser.Scene, x: number, y: number, who: FruitId | 'berry' = 'berry', options: DancerOptions = {}): Dancer {
+  if (who === 'berry') return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
+  const { texture, layout } = characterSheet(scene, who);
+  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[who], { ...options, seed: `${options.seed ?? ''}:${who}` });
 }
 
 const STYLES: Partial<Record<RivalKind, DanceStyle>> = { pear: PEAR_STYLE, lemon: LEMON_STYLE };

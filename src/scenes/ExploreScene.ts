@@ -4,6 +4,9 @@ import { isTouch } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
 import { playSfx } from '../core/sfx';
 import { UiButton, addBody, addText, addUiButton, isLeaving } from '../core/ui';
+import { breathStrength, gradeAt, gradeStrength, lampStrength, leafCount, type Setting } from '../core/atmosphere';
+import { BreathPuffs, LampPool, LeafFall, gradeBackdrop, gradePerson } from '../core/atmosphereFx';
+import { getSettings } from '../core/settings';
 import { FEET_ORIGIN_Y, npcSheet, placeBackground, placeProps } from '../explore/backgrounds';
 import { Doors } from '../explore/doors';
 import { Walker } from '../explore/Walker';
@@ -56,6 +59,9 @@ export class ExploreScene extends Phaser.Scene {
   private leaving = false;
   /** The depart beat: the crew walks into the train on their own. */
   private boarding = false;
+  private leaves: LeafFall | null = null;
+  private breath: BreathPuffs | null = null;
+  private lamp: LampPool | null = null;
 
   constructor() {
     super(SceneKeys.Explore);
@@ -75,6 +81,9 @@ export class ExploreScene extends Phaser.Scene {
     this.keyWalking = false;
     this.leaving = false;
     this.boarding = false;
+    this.leaves = null;
+    this.breath = null;
+    this.lamp = null;
   }
 
   create(): void {
@@ -138,7 +147,40 @@ export class ExploreScene extends Phaser.Scene {
       }
       this.spots.push({ hotspot, marker: this.addMarker(hotspot) });
     }
+    this.addAtmosphere();
     this.refreshMarkers();
+  }
+
+  /**
+   * November: the time of day's light over the place (softer indoors), a lamp
+   * pool around Berry after dark, leaves drifting down outdoors and breath in
+   * the cold. Leaves and breath stay still with Reduce motion.
+   */
+  private addAtmosphere(): void {
+    const place = this.place;
+    const stop = this.stop;
+    const setting: Setting = place.kind === 'room' ? 'room' : place.kind === 'street' ? 'street' : 'station';
+    const strength = gradeStrength(stop.number, setting);
+    const width = place.width * PX;
+    // The light is tinted into the art itself (free to draw): the backdrop and
+    // its props fully, the people standing in it more lightly.
+    for (const object of this.world.list) {
+      if (!(object instanceof Phaser.GameObjects.Image || object instanceof Phaser.GameObjects.Sprite) || !object.visible) continue;
+      const bounds = object.getBounds();
+      if (object.depth < DEPTH.people) {
+        if (object.displayWidth >= width - 1) gradeBackdrop(object, stop.time, strength, bounds.top / GAME_H, bounds.bottom / GAME_H);
+        else object.setTint(gradeAt(stop.time, strength, bounds.centerX / width, bounds.centerY / GAME_H));
+      } else if (object.depth < DEPTH.marker) {
+        gradePerson(object, stop.time, strength, bounds.bottom / GAME_H, bounds.centerX / width);
+      }
+    }
+    this.lamp = new LampPool(this, this.berry.sprite, lampStrength(stop.time, stop.number, setting), DEPTH.people - 0.5, this.world);
+    const calm = getSettings().reduceMotion;
+    const ground = (place.floor + 1) * PX;
+    this.leaves = new LeafFall(this, { count: calm ? 0 : leafCount(stop.time, stop.number, setting), depth: DEPTH.people + 3, region: 'view', ground, layer: this.world, seed: stop.number * 3 + (setting === 'street' ? 1 : 0) });
+    this.breath = new BreathPuffs(this, calm ? 0 : breathStrength(stop.time, stop.number, setting), DEPTH.people + 3, this.world);
+    this.breath.track(this.berry.sprite);
+    for (const walker of this.crew) this.breath.track(walker.sprite);
   }
 
   /** A bobbing tag over a hotspot: a speech mark for people, an eye for things, an arrow for exits. */
@@ -476,6 +518,9 @@ export class ExploreScene extends Phaser.Scene {
       walker.update(dt);
       leader = walker;
     }
+    this.lamp?.update();
+    this.leaves?.update(dt);
+    this.breath?.update(dt);
     this.updateNear();
   }
 

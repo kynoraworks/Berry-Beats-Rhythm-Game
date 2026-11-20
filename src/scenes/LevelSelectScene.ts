@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { TrainLight } from '../core/atmosphereFx';
 import type { Chart } from '../core/chart';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
 import { loadStoryChart } from '../core/levels';
@@ -113,6 +114,7 @@ export class LevelSelectScene extends Phaser.Scene {
   private card: Phaser.GameObjects.GameObject[] = [];
   private train!: Phaser.GameObjects.Sprite;
   private doors!: Doors;
+  private light!: TrainLight;
 
   constructor() {
     super(SceneKeys.LevelSelect);
@@ -144,6 +146,8 @@ export class LevelSelectScene extends Phaser.Scene {
     fadeIn(this);
     music.play('level_select');
     this.train = this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
+    // Made straight after the train so it lies under the map and card at the same depth.
+    this.light = new TrainLight(this, this.train, STOPS[this.index].time);
     this.seatCrew();
 
     const toMenu = () => {
@@ -184,7 +188,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   /** Berry in the middle of the bench and the crew around him. Between The Club and the Rooftop he rides alone. */
   private seatCrew(): void {
-    this.add.sprite(BERRY_SEAT * PX, SEAT_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit).setDepth(2);
+    this.light.light(this.add.sprite(BERRY_SEAT * PX, SEAT_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit).setDepth(2));
     crewOnBoard()
       .slice(0, SEAT_OFFSETS.length)
       .forEach((fruit, i) => {
@@ -192,10 +196,10 @@ export class LevelSelectScene extends Phaser.Scene {
         const art = CAST[fruit].seat;
         if (art && this.textures.exists(art.texture) && this.anims.exists(art.anim)) {
           // Each starts the breathing loop at a different point, so they do not bob in step.
-          this.add.sprite(x, SEAT_Y, art.texture).setScale(PX).play({ key: art.anim, startFrame: (i * 3) % 12 }).setDepth(1);
+          this.light.light(this.add.sprite(x, SEAT_Y, art.texture).setScale(PX).play({ key: art.anim, startFrame: (i * 3) % 12 }).setDepth(1));
         } else {
           // No seated art: they stand by the bench. Frames are 64x64 with the feet on row 62.
-          this.add.sprite(x, FLOOR_Y, characterSheet(this, fruit).texture, 0).setOrigin(0.5, 63 / 64).setScale(PX).setDepth(1);
+          this.light.light(this.add.sprite(x, FLOOR_Y, characterSheet(this, fruit).texture, 0).setOrigin(0.5, 63 / 64).setScale(PX).setDepth(1));
         }
       });
   }
@@ -298,6 +302,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private refresh(): void {
     const stop = STOPS[this.index];
+    this.light.setTime(stop.time, getSettings().reduceMotion);
     const open = isStopOpen(this.index);
     const next = nextStopIndex();
 

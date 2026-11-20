@@ -49,6 +49,8 @@ export interface EffectsSetup {
   calm: boolean;
   touch: boolean;
   hooks: EffectsHooks;
+  /** How many times the ability may be fired (the crew battle allows one per round). Unlimited if omitted. */
+  maxFires?: number;
 }
 
 /**
@@ -130,7 +132,12 @@ export class BattleEffects {
 
   /** The meter can be fired right now. */
   get ready(): boolean {
-    return !!this.meter?.full && !this.active(this.time);
+    return !!this.meter?.full && !this.active(this.time) && !this.spent;
+  }
+
+  /** True once the ability has been fired as often as this battle allows. */
+  private get spent(): boolean {
+    return this.setup.maxFires !== undefined && this.flairUsed >= this.setup.maxFires;
   }
 
   /** Whether firing now would pay off: Second Wind only scores in the back half of a round. For autoplay. */
@@ -146,7 +153,7 @@ export class BattleEffects {
   /** Feed a judgement of the player's. */
   record(event: JudgeEvent): void {
     const { judgement, part } = event;
-    if (this.meter && !this.active(this.time) && this.meter.add(judgement)) {
+    if (this.meter && !this.active(this.time) && !this.spent && this.meter.add(judgement)) {
       this.setup.hooks.sfx('flair');
       this.setup.hooks.callout(this.setup.touch ? 'Flair! Tap it!' : 'Flair! Press Space!', CSS.yellow);
     }

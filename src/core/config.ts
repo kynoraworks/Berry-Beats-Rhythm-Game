@@ -56,6 +56,8 @@ export const SceneKeys = {
   LevelSelect: 'LevelSelect',
   Options: 'Options',
   Explore: 'Explore',
+  Lineup: 'Lineup',
+  CrewEnd: 'CrewEnd',
   Play: 'Play',
   Results: 'Results',
   BeatMaps: 'BeatMaps',

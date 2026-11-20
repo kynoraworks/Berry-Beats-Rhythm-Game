@@ -23,8 +23,18 @@ export class VersusCard {
   private readonly versus: Phaser.GameObjects.Text;
   private done = false;
 
-  /** `backup` names the player's backup and how to fire their ability, shown under Berry. */
-  constructor(scene: Phaser.Scene, rivalName: string, rivalTexture: string, look: RivalProfile, backup = '') {
+  /**
+   * `backup` names the player's backup and how to fire their ability, shown under
+   * the player. `player` replaces Berry when a crew member dances for him.
+   */
+  constructor(
+    scene: Phaser.Scene,
+    rivalName: string,
+    rivalTexture: string,
+    look: RivalProfile,
+    backup = '',
+    player?: { name: string; texture: string; color: string },
+  ) {
     const dim = scene.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.86).setOrigin(0);
     const side = (texture: string, frame: number, name: string, color: string, flip: boolean, trait = '') => {
       const sprite = scene.add.sprite(0, 0, texture, frame).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(SCALE).setFlipX(flip);
@@ -33,7 +43,8 @@ export class VersusCard {
       if (trait) parts.push(addBody(scene, 0, 92, trait, 26, { color: CSS.cream, stroke: true }));
       return scene.add.container(0, 560, parts);
     };
-    this.left = side(Tex.blackberry, BerryFrame.fingerGuns, 'Berry', CSS.blue, false, backup);
+    const playerPose = player ? poseFrames(player.texture).victory[0] : BerryFrame.fingerGuns;
+    this.left = side(player?.texture ?? Tex.blackberry, playerPose, player?.name ?? 'Berry', player?.color ?? CSS.blue, false, backup);
     const pose = layoutOf(rivalTexture) === 'lite' ? poseFrames(rivalTexture).boast : look.versusFrame;
     this.right = side(rivalTexture, pose, rivalName, look.css, true, look.trait);
     this.versus = addText(scene, GAME_W / 2, 330, 'VS', 128, { color: CSS.yellow });

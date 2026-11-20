@@ -126,6 +126,11 @@ export function hasSeen(beat: string): boolean {
   return getProgress().seen.includes(beat);
 }
 
+/** True once the crew battle at the Grand Stage has been won. */
+export function isStoryComplete(): boolean {
+  return getProgress().cleared.includes('stop12');
+}
+
 export function crew(): FruitId[] {
   return getProgress().allies;
 }

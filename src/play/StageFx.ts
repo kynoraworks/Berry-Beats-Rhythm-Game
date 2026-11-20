@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W, PX, Tex } from '../core/config';
 import type { Turn } from '../core/battle';
-import { Depth, FLOOR_Y } from './layout';
+import { Depth, FLOOR_Y, LANE_FIELD_WIDTH } from './layout';
+import { backdropTint, gradeStrength, leafCount, mixColor, multiplyColor } from '../core/atmosphere';
+import { LeafFall } from '../core/atmosphereFx';
+import { STOPS, stopForChart, TUTORIAL, type StopDef } from '../story/stops';
 
 const SPOT_COLOR = 0xfff0c0;
 const PULSE_DARK = 0xd2cdea;
@@ -19,6 +22,9 @@ export class StageFx {
   private readonly spots: Record<'player' | 'rival', Phaser.GameObjects.Graphics>;
   private readonly spotTarget = { player: 0, rival: 0 };
   private readonly crowd: Phaser.GameObjects.Sprite | null;
+  private readonly leaves: LeafFall | null;
+  /** The time of day's tint at the stage's corners, or white for no story stop. */
+  private grade: [number, number, number, number] = [0xffffff, 0xffffff, 0xffffff, 0xffffff];
   private lastBeat = -Infinity;
   private pulse = 0;
   private flashLevel = 0;
@@ -38,6 +44,8 @@ export class StageFx {
       .setDepth(Depth.background + 0.5)
       .setBlendMode(Phaser.BlendModes.ADD)
       .setAlpha(0);
+    this.leaves = this.addAtmosphere(stage);
+    this.background.setTint(...this.grade);
     this.spots = {
       player: this.makeSpot(playerX),
       rival: this.makeSpot(rivalX ?? playerX),
@@ -76,6 +84,7 @@ export class StageFx {
   }
 
   update(beat: number, dt: number): void {
+    this.leaves?.update(dt);
     const whole = Math.floor(beat);
     const onBeat = whole !== this.lastBeat;
     if (onBeat) {
@@ -90,10 +99,9 @@ export class StageFx {
     if (this.calm) return;
 
     this.pulse = Math.max(0, this.pulse - dt * 3.2);
-    const light = Phaser.Display.Color.ValueToColor(0xffffff);
-    const dark = Phaser.Display.Color.ValueToColor(PULSE_DARK);
-    const mixed = Phaser.Display.Color.Interpolate.ColorWithColor(dark, light, 100, Math.round(this.pulse * 100));
-    this.background.setTint(Phaser.Display.Color.GetColor(mixed.r, mixed.g, mixed.b));
+    const beatLight = mixColor(PULSE_DARK, 0xffffff, Math.round(this.pulse * 100) / 100);
+    const [tl, tr, bl, br] = this.grade;
+    this.background.setTint(multiplyColor(tl, beatLight), multiplyColor(tr, beatLight), multiplyColor(bl, beatLight), multiplyColor(br, beatLight));
 
     this.flashLevel = Math.max(0, this.flashLevel - dt * 1.4);
     this.flashRect.setAlpha(this.flashLevel);
@@ -106,6 +114,38 @@ export class StageFx {
       const bounce = Math.abs(Math.sin(this.hop * Math.PI * 3)) * this.hop;
       this.crowd.setY(GAME_H - Math.round(bounce * 4) * PX);
     }
+  }
+
+  /**
+   * A story stop's time of day tinted into its stage, and a few leaves drifting down
+   * between the two lane fields when it is outdoors. Custom maps get neither.
+   */
+  private addAtmosphere(stage: string): LeafFall | null {
+    const stop = this.storyStop(stage);
+    if (!stop) return null;
+    this.grade = backdropTint(stop.time, gradeStrength(stop.number, 'battle'));
+    const count = this.calm ? 0 : leafCount(stop.time, stop.number, 'battle');
+    if (count === 0) return null;
+    const margin = 16;
+    return new LeafFall(this.scene, {
+      count,
+      depth: Depth.background + 0.45,
+      region: { x0: LANE_FIELD_WIDTH + margin, x1: GAME_W - LANE_FIELD_WIDTH - margin, y0: 60, y1: FLOOR_Y + 8 },
+      seed: stop.number,
+    });
+  }
+
+  /** The stop this battle belongs to: from the chart the scene was started with, else from the stage art. */
+  private storyStop(stage: string): StopDef | undefined {
+    const data: unknown = this.scene.sys.settings.data;
+    const chart = typeof data === 'object' && data !== null && 'chart' in data ? (data as { chart: unknown }).chart : null;
+    const id = typeof chart === 'object' && chart !== null && 'id' in chart ? (chart as { id: unknown }).id : null;
+    if (typeof id === 'string') {
+      const stop = id === TUTORIAL.id ? STOPS[0] : stopForChart(id);
+      if (stop) return stop;
+    }
+    // The room is also every custom map's default stage, so it names no stop by itself.
+    return stage === Tex.room ? undefined : STOPS.find((stop) => stop.stage === stage);
   }
 
   private makeSpot(x: number): Phaser.GameObjects.Graphics {
