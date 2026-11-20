@@ -33,6 +33,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   { key: Tex.watermelonSit, file: 'watermelon_sit.png', frameWidth: 75, frameHeight: 75 },
   // The generic station NPC: 2 idle frames in the dancers' 64x64 layout (a painted stand-in is used until then).
   { key: 'npc', file: 'npc.png', frameWidth: 64, frameHeight: 64 },
+  // Berry walking to the right: 6 frames in the dancers' 64x64 layout (feet on row 62), for the station and street walk.
+  { key: 'berry_walk', file: 'berry_walk.png', frameWidth: 64, frameHeight: 64 },
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -47,6 +49,8 @@ export const PRESENT_SHEETS: readonly string[] = [
   Tex.pineapple,
   Tex.blueberry,
   Tex.watermelonSit,
+  'npc',
+  'berry_walk',
 ];
 
 /**
@@ -54,7 +58,28 @@ export const PRESENT_SHEETS: readonly string[] = [
  * stop's stage, station or street (see src/story/stops.ts), e.g. 'stage_peel_street',
  * plus 'trio_photo' (the photo on Berry's wall). Sizes and layout: docs/EXPLORE_ART.md.
  */
-export const PRESENT_IMAGES: readonly string[] = [];
+export const PRESENT_IMAGES: readonly string[] = [
+  'stage_grand_stage',
+  'trio_photo',
+  'station_berry_town',
+  'station_peel_street',
+  'station_graffiti_corner',
+  'station_vine_crossing',
+  'station_citrus_labs',
+  'station_lantern_market',
+  'station_the_club',
+  'station_rooftop',
+  'station_the_tunnel',
+  'station_orange_plaza',
+  'station_pineapple_hall',
+  'station_grand_stage',
+  'street_peel_street',
+  'street_vine_crossing',
+  'street_lantern_market',
+  'street_the_tunnel',
+  'street_orange_plaza',
+  'street_pineapple_hall',
+];
 
 export function optionalSheets(): OptionalSheet[] {
   return KNOWN_SHEETS.filter((sheet) => PRESENT_SHEETS.includes(sheet.key));
