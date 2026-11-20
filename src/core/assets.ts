@@ -34,7 +34,18 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
-export const PRESENT_SHEETS: readonly string[] = [];
+export const PRESENT_SHEETS: readonly string[] = [
+  Tex.banana,
+  Tex.grape,
+  Tex.plum,
+  Tex.dragonfruit,
+  Tex.watermelon,
+  Tex.coconut,
+  Tex.orange,
+  Tex.pineapple,
+  Tex.blueberry,
+  Tex.watermelonSit,
+];
 
 /**
  * The optional backgrounds that are drawn and in public/assets/img: keys of a
