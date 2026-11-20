@@ -97,3 +97,12 @@ describe('the people baked into the scenery', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('background people lighting', () => {
+  it('lifts a tint toward full light by the given share', async () => {
+    const { liftColor } = await import('../src/explore/ambient');
+    expect(liftColor(0x000000, 0.5)).toBe(0x808080);
+    expect(liftColor(0x406080, 0)).toBe(0x406080);
+    expect(liftColor(0x406080, 1)).toBe(0xffffff);
+  });
+});

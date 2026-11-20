@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { PX } from '../core/config';
 import type { TimeOfDay } from '../story/types';
-import { pieceOf, seeded, type AmbientEffect, type PlacedPiece } from './ambient';
+import { liftColor, pieceOf, seeded, type AmbientEffect, type PlacedPiece } from './ambient';
 import { LIFE_SHEETS } from './lifePieces';
 
 /** Half a beat at the story's 77 BPM, for a crowd keeping time outside a battle. */
@@ -63,7 +63,17 @@ export interface LifeOptions {
   /** Screen pixels per art pixel (the background's own scale). */
   scale?: number;
   addTo?: (sprite: Phaser.GameObjects.Sprite) => void;
+  /**
+   * How far to lift whatever time-of-day tint the scene gives them toward full
+   * light once it has been applied (0 keeps it). The scene grades them like its
+   * props, which at dusk and night left people too dark to read.
+   */
+  lift?: number;
 }
+
+/** The share of the props' grade lifted off background people while exploring. */
+export const RESIDENT_LIFT = 0.4;
+
 
 /**
  * The people who live in a setting (src/explore/ambient.ts), drawn at the
@@ -97,6 +107,21 @@ export class Residents {
         .setDepth(options.depth);
       options.addTo?.(sprite);
       this.residents.push({ sprite, column, columns: sheet.pieces.length, beat: spot.beat ?? false, next: this.rest(spot.beat ?? false), frame: 0 });
+    }
+    const lift = options.lift ?? RESIDENT_LIFT;
+    if (lift > 0) {
+      // The scene grades its world after building it, so lift the result on the first frame.
+      scene.events.once(Phaser.Scenes.Events.UPDATE, () => {
+        for (const { sprite } of this.residents) {
+          if (!sprite.active) continue;
+          sprite.setTint(
+            liftColor(sprite.tintTopLeft, lift),
+            liftColor(sprite.tintTopRight, lift),
+            liftColor(sprite.tintBottomLeft, lift),
+            liftColor(sprite.tintBottomRight, lift),
+          );
+        }
+      });
     }
   }
 

@@ -247,3 +247,12 @@ export function seeded(seed: number): () => number {
 export function stopSeed(stop: Pick<StopDef, 'number'>, kind: PlaceKind): number {
   return stop.number * 7 + (kind === 'street' ? 3 : 1);
 }
+
+/** A tint lifted toward full light by a share (0 keeps it, 1 is white). */
+export function liftColor(color: number, t: number): number {
+  const channel = (shift: number) => {
+    const v = (color >> shift) & 0xff;
+    return Math.round(v + (255 - v) * t);
+  };
+  return (channel(16) << 16) | (channel(8) << 8) | channel(0);
+}

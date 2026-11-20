@@ -171,12 +171,13 @@ export class StageFx {
     if (!stop) return;
     const life = battleLife(stop.id);
     if (life.spots.length > 0) {
-      // The people take the stage's light, a shade darker so they stay behind the dancers.
-      const shade = multiplyColor(this.grade[2], 0xc8c0dc);
+      // The people take the stage's light, lifted a little so they read, and stay smaller and duller than the dancers.
+      const shade = mixColor(this.grade[2], 0xffffff, 0.35);
       this.extras = new Residents(this.scene, life.spots.map((spot) => placePiece(spot, key, 'battle')), {
         depth: 0,
         calm: this.calm,
         seed: stop.number,
+        lift: 0,
         addTo: (sprite) => {
           sprite.setTint(shade);
           this.backWall.add(sprite);
