@@ -172,6 +172,18 @@ def build_fonts() -> None:
     font["glyf"]["colon"] = pen.glyph()
     font["hmtx"]["colon"] = (256, 0)
 
+    # The original "!" is a wedge three pixels wide that reads as "?" at game
+    # sizes. Redraw it as a one-pixel bar over a dot, spaced like the colon.
+    pen = TTGlyphPen(None)
+    for bottom, top in ((256, 640), (0, 128)):
+        pen.moveTo((0, bottom))
+        pen.lineTo((0, top))
+        pen.lineTo((128, top))
+        pen.lineTo((128, bottom))
+        pen.closePath()
+    font["glyf"]["exclam"] = pen.glyph()
+    font["hmtx"]["exclam"] = (256, 0)
+
     for table in font["cmap"].tables:
         for code in range(ord("a"), ord("z") + 1):
             if code in table.cmap:

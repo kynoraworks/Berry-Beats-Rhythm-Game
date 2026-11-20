@@ -43,7 +43,8 @@ export type SfxName =
   | 'marker'
   | 'doorChime'
   | 'doorHiss'
-  | 'doorThunk';
+  | 'doorThunk'
+  | 'stamp';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -80,6 +81,12 @@ const RECIPES: Record<SfxName, Layer[]> = {
   doorThunk: [
     { type: 'sine', from: 140, to: 70, dur: 0.16, gain: 0.16 },
     { type: 'noise', from: 600, dur: 0.07, gain: 0.08 },
+  ],
+  // The rank landing on the results screen: a low thud with a paper slap.
+  stamp: [
+    { type: 'sine', from: 140, to: 55, dur: 0.22, gain: 0.22 },
+    { type: 'noise', from: 900, dur: 0.08, gain: 0.12 },
+    { type: 'noise', from: 3200, dur: 0.05, gain: 0.05, delay: 0.01 },
   ],
   move: [{ type: 'square', from: 520, to: 640, dur: 0.05, gain: 0.1 }],
   select: [
