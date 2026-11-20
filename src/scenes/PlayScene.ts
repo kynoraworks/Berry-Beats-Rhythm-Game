@@ -33,7 +33,7 @@ import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fa
 import { createPlayer, createRival, type Dancer } from '../play/characters';
 import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
-import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
+import { BASE_SCROLL_SPEED, Depth, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
@@ -51,6 +51,7 @@ import { rivalLevelFor, stopById, stopForChart } from '../story/stops';
 import { endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
+import { feetY } from '../explore/floors';
 import { markCleared, markSeen } from '../story/progress';
 import { nextRef, playSegment } from '../story/run';
 import type { Line } from '../story/types';
@@ -264,7 +265,9 @@ export class PlayScene extends Phaser.Scene {
     if (place && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, place.station, place.time, CAST[place.fruit].color);
     this.stage = new StageFx(this, stageKey, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
-    this.player = createPlayer(this, playerX, FLOOR_Y, crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
+    // Feet go on the stage art's own floor line under each dancer.
+    const stageFloor = this.stage.layers.background.texture.key;
+    this.player = createPlayer(this, playerX, feetY(stageFloor, playerX), crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
     this.player.setSchedule(this.engine.notes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
     const session = crew ? getSession() : null;
@@ -279,7 +282,7 @@ export class PlayScene extends Phaser.Scene {
     this.hud.setBattle(this.battle, 60 / chart.bpm);
     if (this.rivalEngine) {
       this.rivalField = new NoteField(this, RIVAL_LANES, this.rivalEngine.notes, true);
-      this.rival = createRival(this, rivalKind, RIVAL_X, FLOOR_Y, { seed: chart.id, calm: settings.reduceMotion });
+      this.rival = createRival(this, rivalKind, RIVAL_X, feetY(stageFloor, RIVAL_X), { seed: chart.id, calm: settings.reduceMotion });
       const rivalNotes = this.rivalEngine.notes;
       this.rival?.setSchedule(rivalNotes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     } else {

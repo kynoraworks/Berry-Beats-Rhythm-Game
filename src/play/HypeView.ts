@@ -3,13 +3,12 @@ import { beatToSec, secToBeat, type Chart } from '../core/chart';
 import { COLORS, GAME_H, GAME_W, PX, Tex } from '../core/config';
 import type { Dancer } from './characters';
 import { FLOOR_ROWS, FLOOR_TOP, FLOOR_W, floorColors, paintFloor } from './hypeFloor';
-import { Depth, FLOOR_Y, RECEPTOR_Y } from './layout';
+import { floorAt } from '../explore/floors';
+import { Depth, RECEPTOR_Y } from './layout';
 import type { NoteField } from './NoteField';
 import { FIELD_DEPTH, FieldProjection, depthScale, quad } from './Projection';
 import type { StageFx } from './StageFx';
 
-/** Row of the stage art that sits on the horizon in full hype: the foot of the back wall. */
-const WALL_FOOT = 132;
 /** Where the dancers' feet go in full hype, and their size in screen pixels per art pixel. */
 const PLAYER_SPOT = { x: 490, y: 615, px: 6 };
 const RIVAL_SPOT = { x: 800, y: 500, px: 4 };
@@ -64,11 +63,17 @@ export class HypeView {
   private readonly crowd: Phaser.GameObjects.Sprite[][] = [];
   private amount = 0;
   private lastBeat = -Infinity;
+  /**
+   * Row of the stage art that sits on the horizon in full hype: the stage's
+   * own floor line, so the painted 2.5D floor continues the real one.
+   */
+  private readonly wallFoot: number;
 
   constructor(scene: Phaser.Scene, setup: HypeViewSetup) {
     this.scene = scene;
     this.setup = setup;
     const { stage } = setup;
+    this.wallFoot = floorAt(stage.layers.background.texture.key, GAME_W / 2 / PX);
     this.floor = scene.add
       .image(0, GAME_H, this.floorTexture(stage.layers.background.texture.key))
       .setOrigin(0)
@@ -123,9 +128,9 @@ export class HypeView {
     const shown = amount > 0;
     const { background, crowd } = this.setup.stage.layers;
 
-    const wallY = Math.round(Phaser.Math.Linear(0, FLOOR_TOP - WALL_FOOT * PX, amount));
+    const wallY = Math.round(Phaser.Math.Linear(0, FLOOR_TOP - this.wallFoot * PX, amount));
     background.setY(wallY);
-    this.floor.setVisible(shown).setY(wallY + WALL_FOOT * PX).setAlpha(Math.min(1, amount * 2.5));
+    this.floor.setVisible(shown).setY(wallY + this.wallFoot * PX).setAlpha(Math.min(1, amount * 2.5));
     this.floor.setTint(background.tintBottomLeft, background.tintBottomRight, background.tintBottomLeft, background.tintBottomRight);
     crowd?.setAlpha(1 - amount);
 
@@ -161,7 +166,7 @@ export class HypeView {
       .ellipse(spot.x, spot.y, 30 * spot.px, 7 * spot.px, COLORS.night, 0.55)
       .setDepth(Depth.characters - 0.5)
       .setVisible(false);
-    return { dancer, box, shadow, spot: light, from: { x: flatX, y: FLOOR_Y }, to: { x: spot.x, y: spot.y, scale: spot.px / PX } };
+    return { dancer, box, shadow, spot: light, from: { x: flatX, y: dancer.sprite.y }, to: { x: spot.x, y: spot.y, scale: spot.px / PX } };
   }
 
   /** Move and scale a dancer (and their spotlight) so the feet travel from the flat stage to the hype spot. */
@@ -172,7 +177,7 @@ export class HypeView {
     p.box.setScale(scale).setPosition(Math.round(feetX - scale * p.from.x), Math.round(feetY - scale * p.from.y));
     p.shadow.setVisible(amount > 0).setAlpha(amount).setPosition(feetX, feetY + 2);
     // The cone keeps its top at the top of the screen and its pool under the feet.
-    const floorY = FLOOR_Y + 6;
+    const floorY = p.from.y + 6;
     const sy = (feetY + 6) / floorY;
     p.spot.setScale(scale, sy).setPosition(feetX - scale * p.from.x, 0);
   }

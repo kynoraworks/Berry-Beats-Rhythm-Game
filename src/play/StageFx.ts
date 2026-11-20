@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { GAME_H, GAME_W, PX, Tex } from '../core/config';
 import type { Turn } from '../core/battle';
+import { feetY } from '../explore/floors';
 import { Depth, FLOOR_Y, LANE_FIELD_WIDTH } from './layout';
 import { backdropTint, gradeStrength, leafCount, mixColor, multiplyColor } from '../core/atmosphere';
 import { LeafFall } from '../core/atmosphereFx';
@@ -63,8 +64,8 @@ export class StageFx {
     this.backWall = scene.add.container(0, 0).setDepth(Depth.background + 0.3);
     this.addLife(stage);
     this.spots = {
-      player: this.makeSpot(playerX),
-      rival: this.makeSpot(rivalX ?? playerX),
+      player: this.makeSpot(playerX, feetY(key, playerX)),
+      rival: this.makeSpot(rivalX ?? playerX, feetY(key, rivalX ?? playerX)),
     };
     this.crowd = scene.textures.exists(Tex.crowd)
       ? scene.add
@@ -216,7 +217,8 @@ export class StageFx {
     return stage === Tex.room ? undefined : STOPS.find((stop) => stop.stage === stage);
   }
 
-  private makeSpot(x: number): Phaser.GameObjects.Graphics {
+  /** A spotlight cone from the top of the screen to a pool under feet at `floorY`. */
+  private makeSpot(x: number, floorY: number): Phaser.GameObjects.Graphics {
     const g = this.scene.add
       .graphics()
       .setDepth(Depth.characters - 1)
@@ -224,9 +226,9 @@ export class StageFx {
       .setAlpha(0);
     g.fillStyle(SPOT_COLOR, 0.1);
     const corner = (dx: number, y: number) => new Phaser.Math.Vector2(x + dx, y);
-    g.fillPoints([corner(-26, 0), corner(26, 0), corner(150, FLOOR_Y + 8), corner(-150, FLOOR_Y + 8)], true);
+    g.fillPoints([corner(-26, 0), corner(26, 0), corner(150, floorY + 8), corner(-150, floorY + 8)], true);
     g.fillStyle(SPOT_COLOR, 0.14);
-    g.fillEllipse(x, FLOOR_Y + 6, 300, 44);
+    g.fillEllipse(x, floorY + 6, 300, 44);
     return g;
   }
 }

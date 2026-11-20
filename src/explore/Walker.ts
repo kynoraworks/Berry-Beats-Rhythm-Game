@@ -38,7 +38,8 @@ export class Walker {
   private readonly texture: string;
   /** A drawn walk cycle, if this walker has one. */
   private readonly walkTexture: string | null;
-  private readonly floorY: number;
+  /** The feet row under an art x (the background's floor profile, or a flat row). */
+  private readonly floorRow: (artX: number) => number;
   private target: number | null = null;
   private onArrive: (() => void) | null = null;
   private clock = 0;
@@ -47,12 +48,12 @@ export class Walker {
   private min = 0;
   private max = Number.POSITIVE_INFINITY;
 
-  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floorRow: number, walkTexture?: string) {
+  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floor: number | ((artX: number) => number), walkTexture?: string) {
     this.layout = layout;
     this.texture = texture;
     this.walkTexture = walkTexture && scene.textures.exists(walkTexture) ? walkTexture : null;
-    this.floorY = (floorRow + 1) * PX;
-    this.sprite = scene.add.sprite(artX * PX, this.floorY, texture, IDLE[layout][0]).setOrigin(0.5, 63 / 64).setScale(PX);
+    this.floorRow = typeof floor === 'number' ? () => floor : floor;
+    this.sprite = scene.add.sprite(artX * PX, this.groundY(artX), texture, IDLE[layout][0]).setOrigin(0.5, 63 / 64).setScale(PX);
   }
 
   /** Position in art pixels. */
@@ -76,8 +77,14 @@ export class Walker {
   }
 
   place(artX: number): this {
-    this.sprite.setX(Phaser.Math.Clamp(artX, this.min, this.max) * PX);
+    const x = Phaser.Math.Clamp(artX, this.min, this.max);
+    this.sprite.setPosition(x * PX, this.groundY(x));
     return this;
+  }
+
+  /** Screen y of the feet when standing at art x. */
+  private groundY(artX: number): number {
+    return (this.floorRow(artX) + 1) * PX;
   }
 
   /** Walk to an art x, then call `onArrive` (once). */
@@ -133,7 +140,7 @@ export class Walker {
       const frame = CYCLE[Math.floor(this.clock * CYCLE_FPS) % CYCLE.length];
       if (this.sprite.texture.key !== this.walkTexture) this.sprite.setTexture(this.walkTexture, frame);
       else this.sprite.setFrame(frame);
-      this.sprite.setY(this.floorY);
+      this.sprite.setY(this.groundY(this.x));
       return;
     }
     if (this.sprite.texture.key !== this.texture) this.sprite.setTexture(this.texture);
@@ -141,6 +148,6 @@ export class Walker {
     const fps = this.moving ? WALK_FPS : IDLE_FPS;
     const index = Math.floor(this.clock * fps) % frames.length;
     this.sprite.setFrame(frames[index]);
-    this.sprite.setY(this.floorY - (this.moving && index % 2 === 1 ? PX : 0));
+    this.sprite.setY(this.groundY(this.x) - (this.moving && index % 2 === 1 ? PX : 0));
   }
 }

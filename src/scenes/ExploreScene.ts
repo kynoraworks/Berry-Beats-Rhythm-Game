@@ -12,6 +12,7 @@ import { blockedRanges, extraCount, placeExtras, placeLife, stopSeed } from '../
 import { AmbientEffects, Extras } from '../explore/ambientFx';
 import { FEET_ORIGIN_Y, npcSheet, placeBackground, placeProps } from '../explore/backgrounds';
 import { Doors } from '../explore/doors';
+import { floorAt } from '../explore/floors';
 import { Walker } from '../explore/Walker';
 import { Dialogue } from '../play/Dialogue';
 import { CAST } from '../story/cast';
@@ -125,7 +126,9 @@ export class ExploreScene extends Phaser.Scene {
     for (const prop of placeProps(this, place)) this.world.add(this.add.image(prop.x * PX, prop.y * PX, prop.key).setOrigin(0).setScale(PX));
 
     const max = place.width - 10;
-    this.berry = new Walker(this, characterSheet(this, 'berry').texture, 'berry', place.startX, place.floor, BERRY_WALK).setBounds(10, max);
+    // Everyone stands on the background's own floor line, which can rise or fall along a street.
+    const floor = (artX: number) => floorAt(place.bg, artX);
+    this.berry = new Walker(this, characterSheet(this, 'berry').texture, 'berry', place.startX, floor, BERRY_WALK).setBounds(10, max);
     this.world.add(this.berry.sprite.setDepth(DEPTH.people + 2));
 
     // The crew walks with him (in the depart beat, only Raspberry has joined).
@@ -133,7 +136,7 @@ export class ExploreScene extends Phaser.Scene {
     crew.forEach((fruit, i) => {
       const sheet = characterSheet(this, fruit);
       const start = place.kind === 'depart' ? Math.min(max, place.startX + (i + 1) * FOLLOW_GAP) : place.startX - (i + 1) * FOLLOW_GAP;
-      const walker = new Walker(this, sheet.texture, sheet.layout, start, place.floor, `${fruit}_walk`).setBounds(4, max + 6);
+      const walker = new Walker(this, sheet.texture, sheet.layout, start, floor, `${fruit}_walk`).setBounds(4, max + 6);
       this.world.add(walker.sprite.setDepth(DEPTH.people + 1 - i * 0.01));
       this.crew.push(walker);
     });
@@ -141,14 +144,14 @@ export class ExploreScene extends Phaser.Scene {
     for (const hotspot of place.hotspots) {
       const cx = (hotspot.x + hotspot.w / 2) * PX;
       if (hotspot.kind === 'clue' && place.kind === 'station') {
-        const npc = this.add.sprite(cx, (place.floor + 1) * PX, npcSheet(this, CAST[this.stop.fruit].color), 0).setOrigin(0.5, FEET_ORIGIN_Y).setScale(PX);
+        const npc = this.add.sprite(cx, (floor(cx / PX) + 1) * PX, npcSheet(this, CAST[this.stop.fruit].color), 0).setOrigin(0.5, FEET_ORIGIN_Y).setScale(PX);
         npc.setFlipX(true);
         this.world.add(npc.setDepth(DEPTH.people));
         this.tweens.addCounter({ from: 0, to: 1, duration: 900, repeat: -1, onRepeat: () => npc.setFrame(npc.frame.name === '0' ? 1 : 0) });
       }
       if (hotspot.kind === 'fruit') {
         const sheet = characterSheet(this, this.stop.fruit);
-        const fruit = this.add.sprite(cx, (place.floor + 1) * PX, sheet.texture, 0).setOrigin(0.5, FEET_ORIGIN_Y).setScale(PX);
+        const fruit = this.add.sprite(cx, (floor(cx / PX) + 1) * PX, sheet.texture, 0).setOrigin(0.5, FEET_ORIGIN_Y).setScale(PX);
         this.world.add(fruit.setDepth(DEPTH.people));
         const idle = [0, 1, 0, 2];
         let step = 0;
@@ -187,7 +190,7 @@ export class ExploreScene extends Phaser.Scene {
     }
     this.lamp = new LampPool(this, this.berry.sprite, lampStrength(stop.time, stop.number, setting), DEPTH.people - 0.5, this.world);
     const calm = getSettings().reduceMotion;
-    const ground = (place.floor + 1) * PX;
+    const ground = (floorAt(place.bg, place.width / 2) + 1) * PX;
     this.leaves = new LeafFall(this, { count: calm ? 0 : leafCount(stop.time, stop.number, setting), depth: DEPTH.people + 3, region: 'view', ground, layer: this.world, seed: stop.number * 3 + (setting === 'street' ? 1 : 0) });
     this.breath = new BreathPuffs(this, calm ? 0 : breathStrength(stop.time, stop.number, setting), DEPTH.people + 3, this.world);
     this.breath.track(this.berry.sprite);

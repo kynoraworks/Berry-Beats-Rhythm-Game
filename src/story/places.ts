@@ -1,3 +1,4 @@
+import { floorAt } from '../explore/floors';
 import { STOPS, type StopDef, type StopId } from './stops';
 import type { FruitId, Line } from './types';
 
@@ -76,7 +77,7 @@ export interface PlaceDef {
   bg: string;
   /** Width of the background in art pixels. */
   width: number;
-  /** Art row Berry's feet stand on. */
+  /** Art row Berry's feet stand on where he starts. The floor can vary along the place: use floorAt(bg, x). */
   floor: number;
   /** Where Berry starts, in art pixels. */
   startX: number;
@@ -86,6 +87,7 @@ export interface PlaceDef {
 /** Station and street widths, and the row everyone stands on. */
 export const STATION_W = 256;
 export const STREET_W = 640;
+/** The old flat feet row; each background now has its own floor (src/explore/floors.ts). */
 export const FLOOR = 137;
 
 /** Where things stand in every generated station (the real art keeps the same layout). */
@@ -199,13 +201,13 @@ function station(stop: StopDef): PlaceDef {
     kind: 'clue',
     label: stop.script.station[0]?.role ? titleCase(stop.script.station[0].role) : 'Local',
     x: npcX - 12,
-    y: FLOOR - 50,
+    y: floorAt(stop.stationBg, npcX) - 50,
     w: 24,
     h: 50,
     lines: stop.script.station,
   };
   const out: Hotspot = { id: 'exit', kind: 'exit', label: seed.exit, x: exit.x, y: exit.y, w: exit.w, h: exit.h, lines: [] };
-  return { stop: stop.id, kind: 'station', bg: stop.stationBg, width: STATION_W, floor: FLOOR, startX: 22, hotspots: [...seed.looks, npc, out] };
+  return { stop: stop.id, kind: 'station', bg: stop.stationBg, width: STATION_W, floor: floorAt(stop.stationBg, 22), startX: 22, hotspots: [...seed.looks, npc, out] };
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +324,7 @@ function street(stop: StopDef): PlaceDef | null {
     kind: 'fruit',
     label: stop.fruit,
     x: seed.fruitX - 14,
-    y: FLOOR - 52,
+    y: floorAt(stop.streetBg, seed.fruitX) - 52,
     w: 28,
     h: 52,
     lines: [],
@@ -332,7 +334,7 @@ function street(stop: StopDef): PlaceDef | null {
     kind: 'street',
     bg: stop.streetBg,
     width: reused ? STATION_W : STREET_W,
-    floor: FLOOR,
+    floor: floorAt(stop.streetBg, 22),
     startX: 22,
     hotspots: [...seed.looks, fruit],
   };
@@ -352,7 +354,7 @@ function room(stop: StopDef): PlaceDef {
     kind: 'room',
     bg: 'room',
     width: STATION_W,
-    floor: FLOOR,
+    floor: floorAt('room', 118),
     startX: 118,
     hotspots: [
       look('photo', 'Old photo', [TRIO_PHOTO.x, TRIO_PHOTO.y, TRIO_PHOTO.w, TRIO_PHOTO.h], [silence()], 'photo'),
@@ -363,7 +365,7 @@ function room(stop: StopDef): PlaceDef {
 }
 
 function depart(stop: StopDef): PlaceDef {
-  return { stop: stop.id, kind: 'depart', bg: stop.stationBg, width: STATION_W, floor: FLOOR, startX: 236, hotspots: [] };
+  return { stop: stop.id, kind: 'depart', bg: stop.stationBg, width: STATION_W, floor: floorAt(stop.stationBg, 236), startX: 236, hotspots: [] };
 }
 
 /** Every place of a stop, in the order they are walked through. */

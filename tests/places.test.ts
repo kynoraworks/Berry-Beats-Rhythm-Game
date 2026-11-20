@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { CAST } from '../src/story/cast';
-import { arrivalPlace, crewAt, lookHotspots, placeOf, placesFor, FLOOR, STATION_W, STREET_W } from '../src/story/places';
+import { floorAt } from '../src/explore/floors';
+import { arrivalPlace, crewAt, lookHotspots, placeOf, placesFor, STATION_W, STREET_W } from '../src/story/places';
 import { crewOnBoard, markCleared, markInspected, hasInspected, markSeen, hasSeen, useStoryStorage } from '../src/story/progress';
 import { STOPS } from '../src/story/stops';
 import { MAX_LINE_LENGTH } from '../src/story/types';
@@ -45,7 +46,7 @@ describe('places', () => {
         for (const h of place.hotspots) {
           expect(h.x, `${stop.id} ${place.kind} ${h.id}`).toBeGreaterThanOrEqual(0);
           expect(h.x + h.w, `${stop.id} ${place.kind} ${h.id}`).toBeLessThanOrEqual(place.width);
-          expect(h.y + h.h, `${stop.id} ${place.kind} ${h.id}`).toBeLessThanOrEqual(FLOOR + 1);
+          expect(h.y + h.h, `${stop.id} ${place.kind} ${h.id}`).toBeLessThanOrEqual(floorAt(place.bg, h.x + h.w / 2) + 1);
         }
         expect(place.startX).toBeGreaterThan(0);
         expect(place.startX).toBeLessThan(place.width);
