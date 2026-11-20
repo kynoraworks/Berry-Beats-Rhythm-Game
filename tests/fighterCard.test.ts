@@ -1,22 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { battleStars, crewStars, effectCards, readDuel, roundClock, starPoints, type EffectState } from '../src/play/fighterCard';
+import { GAME_W } from '../src/core/config';
+import { HUD, PLAYER_BAR_X, RIVAL_BAR_RIGHT, battleStars, chipX, crewStars, effectChips, readDuel, roundClock, starPoints, type EffectState } from '../src/play/fighterCard';
+import { LANE_FIELD_WIDTH } from '../src/play/layout';
 import { ROUND_POINTS, outcome, tally } from '../src/story/crewBattle';
 
 describe('readDuel', () => {
-  it('shows dashes until a side has played a note this round', () => {
+  it('has no reading and no leader until a side has played a note this round', () => {
     const duel = readDuel(0, 0, 0, 0);
-    expect(duel.player.label).toBe('--');
-    expect(duel.rival.label).toBe('--');
+    expect(duel.player).toBeNull();
+    expect(duel.rival).toBeNull();
     expect(duel.lead).toBeNull();
   });
 
   it('names whoever is ahead on the rounded percentages', () => {
     expect(readDuel(92.4, 10, 84, 9).lead).toBe('player');
     expect(readDuel(70, 10, 84, 9).lead).toBe('rival');
-    expect(readDuel(92.4, 10, 84, 9).player.label).toBe('92%');
+    expect(readDuel(92.4, 10, 84, 9).player).toBeCloseTo(92.4);
   });
 
-  it('calls it level when the shown numbers match', () => {
+  it('calls it level when the rounded numbers match', () => {
     expect(readDuel(91.6, 10, 92.4, 10).lead).toBe('tie');
   });
 
@@ -26,8 +28,8 @@ describe('readDuel', () => {
   });
 
   it('clamps out-of-range values', () => {
-    expect(readDuel(130, 1, -5, 1).player.label).toBe('100%');
-    expect(readDuel(130, 1, -5, 1).rival.label).toBe('0%');
+    expect(readDuel(130, 1, -5, 1).player).toBe(100);
+    expect(readDuel(130, 1, -5, 1).rival).toBe(0);
   });
 });
 
@@ -81,11 +83,11 @@ describe('stars', () => {
   });
 });
 
-describe('effectCards', () => {
-  const none: EffectState = { ability: null, scrambleBeats: 0, scrambleLeft: 0, meltdown: false, hype: null, flash: null, gimmick: null };
-  const ability = (id: 'steady' | 'secondWind' | 'eureka' | 'rind', extra: Partial<EffectState['ability'] & object> = {}): EffectState['ability'] => ({
+describe('effectChips', () => {
+  const none: EffectState = { ability: null, hype: null };
+  const ability = (id: 'steady' | 'secondWind' | 'eureka' | 'rind', extra: Partial<NonNullable<EffectState['ability']>> = {}): EffectState['ability'] => ({
     id,
-    name: id,
+    owner: 'raspberry',
     beats: 3,
     left: 0.4,
     eurekaLeft: 5,
@@ -95,32 +97,47 @@ describe('effectCards', () => {
   });
 
   it('is empty with nothing going on', () => {
-    expect(effectCards(none)).toEqual([]);
+    expect(effectChips(none)).toEqual([]);
   });
 
-  it('describes each ability with what is left of it', () => {
-    expect(effectCards({ ...none, ability: ability('steady') })[0].detail).toBe('wider timing, 3 beats');
-    expect(effectCards({ ...none, ability: ability('steady', { beats: 1 }) })[0].detail).toBe('wider timing, 1 beat');
-    expect(effectCards({ ...none, ability: ability('eureka') })[0].detail).toBe('x3, 5 notes left');
-    expect(effectCards({ ...none, ability: ability('rind') })[0].detail).toBe('2 shields left');
-    expect(effectCards({ ...none, ability: ability('secondWind') })[0].detail).toBe('x2 in the back half');
-    expect(effectCards({ ...none, ability: ability('secondWind', { backHalf: true }) })[0].detail).toBe('x2 now, back half');
+  it('shows the ability first, then hype, each with its time left for the ring', () => {
+    const chips = effectChips({ ...none, ability: ability('steady'), hype: { left: 0.5, beats: 12, frozen: false } });
+    expect(chips.map((c) => c.icon)).toEqual(['steady', 'hype']);
+    expect(chips.map((c) => c.left)).toEqual([0.4, 0.5]);
+    expect(chips[0].owner).toBe('raspberry');
   });
 
-  it('puts what the enemy is doing first, then your ability, then hype, then all-song effects', () => {
-    const cards = effectCards({ ...none, ability: ability('rind'), hype: { left: 0.5, beats: 12, streak: 31, frozen: false }, flash: 'warn', gimmick: 'hardShell' });
-    expect(cards.map((c) => c.kind)).toEqual(['flash', 'ability', 'hype', 'slowFlair']);
-    expect(cards[2].detail).toBe('12 beats left, streak 31');
-    expect(cards[2].left).toBe(0.5);
+  it('carries only the counts that matter: Rind as shield pips, Eureka as notes left', () => {
+    expect(effectChips({ ...none, ability: ability('rind') })[0]).toMatchObject({ count: 2, countStyle: 'pips' });
+    expect(effectChips({ ...none, ability: ability('eureka') })[0]).toMatchObject({ count: 5, countStyle: 'number' });
+    expect(effectChips({ ...none, ability: ability('steady') })[0]).toMatchObject({ count: null, countStyle: null });
   });
 
-  it("says when hype is held through the rival's turn", () => {
-    const card = effectCards({ ...none, hype: { left: 0.7, beats: 1, streak: 40, frozen: true } })[0];
-    expect(card.detail).toBe('held, 1 beat left');
+  it('dims Second Wind before the back half and hype held through the rival turn', () => {
+    expect(effectChips({ ...none, ability: ability('secondWind') })[0].dim).toBe(true);
+    expect(effectChips({ ...none, ability: ability('secondWind', { backHalf: true }) })[0].dim).toBe(false);
+    expect(effectChips({ ...none, hype: { left: 0.7, beats: 1, frozen: true } })[0].dim).toBe(true);
+  });
+});
+
+describe('layout', () => {
+  it('keeps the whole card in the gap between the two lane fields', () => {
+    expect(HUD.left).toBeGreaterThanOrEqual(LANE_FIELD_WIDTH - 2);
+    expect(HUD.right).toBeLessThanOrEqual(GAME_W - LANE_FIELD_WIDTH + 2);
+    expect(PLAYER_BAR_X + HUD.barW).toBeLessThan(HUD.ringX - HUD.ringR - HUD.ringW);
+    expect(RIVAL_BAR_RIGHT - HUD.barW).toBeGreaterThan(HUD.ringX + HUD.ringR + HUD.ringW);
   });
 
-  it('shows a meltdown in place of the scramble it causes', () => {
-    expect(effectCards({ ...none, meltdown: true, scrambleBeats: 2, scrambleLeft: 1 }).map((c) => c.kind)).toEqual(['meltdown']);
-    expect(effectCards({ ...none, scrambleBeats: 2, scrambleLeft: 0.5 }).map((c) => c.kind)).toEqual(['scramble']);
+  it('fits the Flair meter and both chips in the row, with big enough tap targets', () => {
+    const lastRight = chipX(1, true) + HUD.chip / 2;
+    expect(lastRight).toBeLessThanOrEqual(HUD.right);
+    expect(chipX(0, true) - HUD.chip / 2).toBeGreaterThan(HUD.left + HUD.flairW);
+    expect(HUD.flairH).toBeGreaterThanOrEqual(56);
+    expect(HUD.flairW).toBeGreaterThanOrEqual(56);
+  });
+
+  it('keeps the header compact', () => {
+    expect(HUD.faceY + HUD.face).toBeLessThanOrEqual(100);
+    expect(HUD.ringY + HUD.ringR + HUD.ringW).toBeLessThanOrEqual(100);
   });
 });

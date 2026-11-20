@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
-import { UiButton, addBackdrop, addBody, addBox, addHeader, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { UiButton, addBackdrop, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { addFace } from '../play/CrewScoreboard';
 import { CAST, HOOD_DOWN_FRAME } from '../story/cast';
 import { CREW_ROUNDS, ROUND_POINTS, crewLineup, tally, type RoundResult } from '../story/crewBattle';
@@ -51,30 +51,46 @@ export class CrewEndScene extends Phaser.Scene {
 
   private showResults(): void {
     addBackdrop(this);
-    addHeader(this, 'Crew Battle Won');
     const { results, order } = this.opts;
     const lineup = crewLineup(order);
     const points = tally(results);
-    const panel = { x: 140, y: 128, w: GAME_W - 280, h: 512 };
+    addText(this, GAME_W / 2, 74, 'Crew battle won!', 72, { color: CSS.yellow });
+    addBody(this, GAME_W / 2, 128, `Points ${points.player} to ${points.rival}`, 26, { color: CSS.lilac });
+
+    // One row per round, the two dancers facing each other like the battle HUD:
+    // each side's accuracy fills towards the middle, where the round's points sit.
+    const panel = { x: 90, y: 160, w: GAME_W - 180, h: 476 };
     addBox(this, panel.x, panel.y, panel.w, panel.h, 'panel');
-    addText(this, GAME_W / 2, panel.y + 42, `Points ${points.player} to ${points.rival}`, 40, { color: CSS.yellow });
+    const centre = GAME_W / 2;
+    const barW = 200;
     CREW_ROUNDS.forEach((round, i) => {
-      const y = panel.y + 112 + i * 72;
+      const y = panel.y + 58 + i * 88;
       const result = results[i];
       const who = lineup[i] ?? 'berry';
-      addFace(this, panel.x + 64, y, who, 52);
-      addText(this, panel.x + 106, y, CAST[who].name, 26, { color: CAST[who].css, origin: [0, 0.5] });
-      addBody(this, panel.x + 360, y, 'vs', 22, { color: CSS.lilac });
-      addFace(this, panel.x + 420, y, round.enemy, 52);
-      addText(this, panel.x + 462, y, CAST[round.enemy].name, 26, { color: CAST[round.enemy].css, origin: [0, 0.5] });
+      const enemy = round.enemy;
+      const playerWon = result?.won === true;
+      addFace(this, panel.x + 56, y, who, 64, playerWon ? 'bold' : 'neutral');
+      addText(this, panel.x + 100, y, CAST[who].name, 26, { color: CAST[who].css, origin: [0, 0.5] });
+      addFace(this, panel.x + panel.w - 56, y, enemy, 64, result && !playerWon ? 'bold' : 'neutral');
+      addText(this, panel.x + panel.w - 100, y, CAST[enemy].name, 26, { color: CAST[enemy].css, origin: [1, 0.5] });
+      const bar = (x: number, value: number, color: number, toLeft: boolean) => {
+        this.add.rectangle(x, y, barW, 20, COLORS.ink).setOrigin(toLeft ? 1 : 0, 0.5);
+        this.add.rectangle(toLeft ? x - 3 : x + 3, y, (Math.max(0, Math.min(100, value)) / 100) * (barW - 6), 14, color).setOrigin(toLeft ? 1 : 0, 0.5);
+      };
       if (result) {
-        addBody(this, panel.x + 760, y, `${Math.round(result.playerAccuracy)}% vs ${Math.round(result.rivalAccuracy)}%`, 22);
-        addText(this, panel.x + panel.w - 48, y, result.won ? `+${ROUND_POINTS[i]}` : '-', 28, { color: result.won ? CSS.blue : CAST[round.enemy].css, origin: [1, 0.5] });
+        bar(centre - 44, result.playerAccuracy, playerWon ? 0x9fb4ff : COLORS.blue, true);
+        bar(centre + 44, result.rivalAccuracy, CAST[enemy].color, false);
+      }
+      // The round's points: a pip per point, filled in the winner's colour.
+      const worth = ROUND_POINTS[i];
+      for (let p = 0; p < worth; p++) {
+        const icon = addIcon(this, centre + (p - (worth - 1) / 2) * 30, y, result ? 'icon_star' : 'icon_star_empty', 4);
+        if (result) icon.setTint(playerWon ? 0x9fb4ff : CAST[enemy].color);
       }
     });
     const score = results.reduce((sum, result) => sum + result.playerScore, 0);
-    addBody(this, GAME_W / 2, panel.y + panel.h - 34, `Crew score ${score.toLocaleString('en-US')}`, 24, { color: CSS.cream });
-    this.button = addUiButton(this, GAME_W / 2, 700, 'Continue', () => this.next(), { width: 280 });
+    addBody(this, GAME_W / 2, panel.y + panel.h + 28, `Crew score ${score.toLocaleString('en-US')}`, 26, { color: CSS.cream });
+    this.button = addUiButton(this, GAME_W / 2, 726, 'Continue', () => this.next(), { width: 300, icon: 'icon_next' });
     this.button.setFocused(true);
   }
 

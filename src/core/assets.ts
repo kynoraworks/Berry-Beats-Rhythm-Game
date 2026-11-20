@@ -22,6 +22,10 @@ export interface OptionalImage {
   file: string;
 }
 
+/** Settings with a sheet of background extras (public/assets/img/ambient_<group>.png). */
+export const AMBIENT_GROUPS = ['club', 'street', 'market', 'lab', 'food', 'commuters', 'tunnel', 'fans', 'posh', 'backstage', 'town'] as const;
+export type AmbientGroup = (typeof AMBIENT_GROUPS)[number];
+
 /** Characters with a walk cycle sheet besides Berry. */
 export const WALKERS = ['raspberry', 'pear', 'lemon', 'watermelon', 'instructor', 'banana', 'grape', 'plum', 'dragonfruit', 'coconut', 'orange', 'pineapple', 'blueberry', 'npc'] as const;
 
@@ -40,6 +44,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   { key: 'berry_walk', file: 'berry_walk.png', frameWidth: 64, frameHeight: 64 },
   // Everyone else's walk: 6 frames walking right in the same layout, keyed '<id>_walk' (the Coach is 'instructor_walk'). See tools/build_walks.py.
   ...WALKERS.map((id) => ({ key: `${id}_walk`, file: `${id}_walk.png`, frameWidth: 64, frameHeight: 64 })),
+  // Background extras for each setting: 4 people by 2 loop frames in 48x48 cells, feet on row 46. See tools/build_ambient.py.
+  ...AMBIENT_GROUPS.map((group) => ({ key: `ambient_${group}`, file: `ambient_${group}.png`, frameWidth: 48, frameHeight: 48 })),
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -57,6 +63,7 @@ export const PRESENT_SHEETS: readonly string[] = [
   'npc',
   'berry_walk',
   ...WALKERS.map((id) => `${id}_walk`),
+  ...AMBIENT_GROUPS.map((group) => `ambient_${group}`),
 ];
 
 /**

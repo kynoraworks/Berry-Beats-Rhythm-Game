@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
+import { COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/config';
 import { accuracy, rankFor, type Judgement } from '../core/engine';
 import type { FlairResults } from './PlayScene';
 import { levelForChart } from '../core/levels';
@@ -7,14 +7,15 @@ import { music } from '../core/music';
 import { submitScore } from '../core/saves';
 import { getSettings, updateSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { FocusGroup, UiButton, addBody, addBox, addDim, addIcon, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
+import { FocusGroup, UiButton, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
 import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
 import { isStopOpen } from '../story/progress';
 import { STOPS, stopById } from '../story/stops';
+import { planResults, roundScore, type BannerTone, type ButtonId } from './resultsPlan';
 
-const ROWS: [Judgement, string, string][] = [
+const JUDGEMENTS: [Judgement, string, string][] = [
   ['perfect', 'Perfect', CSS.perfect],
   ['good', 'Good', CSS.good],
   ['hit', 'Hit', CSS.hit],
@@ -30,20 +31,38 @@ const RANK_COLOR: Record<string, string> = {
   F: CSS.miss,
 };
 
-/** Timing errors smaller than this are not worth correcting. */
-const TIMING_NOTICE_MS = 15;
+const TONE_COLOR: Record<BannerTone, string> = {
+  win: CSS.yellow,
+  clear: CSS.yellow,
+  lose: CSS.lilac,
+  fail: CSS.miss,
+};
+
 /**
  * Input is ignored for this long after the screen opens, so a press meant for the
  * closing dialogue cannot carry the player straight past their results.
  */
 const INPUT_GUARD_MS = 500;
 
-const LEFT = 230;
-const RIGHT = 610;
-const RANK_X = 870;
-const BUTTON_Y = 686;
-const TIMING_Y = 610;
+/** Layout, in canvas pixels. */
+const BANNER_Y = 84;
+const DANCER_X = 236;
+const FEET_Y = 500;
+const RANK_Y = 290;
+const SCORE_Y = 430;
+const BARS_Y = 560;
+const COUNTS_Y = 616;
+const NOTES_Y = 668;
+const BUTTON_Y = 736;
+const BAR_W = 250;
+const BAR_H = 22;
+const BAR_GAP = 24;
 
+/**
+ * After a song: the outcome first (a banner and the two dancers facing each
+ * other, the winner in the light), then the rank landing like a stamp and the
+ * score counting up, with the details kept small underneath.
+ */
 export class ResultsScene extends Phaser.Scene {
   private results!: FlairResults;
   private choices: UiButton[] = [];
@@ -84,126 +103,96 @@ export class ResultsScene extends Phaser.Scene {
       });
     }
 
-    const stage = play.chart.stage ?? levelForChart(play.chart.id)?.stage ?? Tex.room;
-    this.add.image(0, 0, this.textures.exists(stage) ? stage : Tex.room).setOrigin(0).setDisplaySize(GAME_W, GAME_H);
-    addDim(this, 0.55);
-    addBox(this, 140, 60, 1000, 680, 'panel');
-
-    // Header: the two dancers flank the title, the winner celebrating.
-    const playerOnTop = !failed && (battle?.won ?? true);
-    this.addDancer(250, Tex.blackberry, playerOnTop, false);
-    if (battle && this.textures.exists(battle.rivalTexture)) this.addDancer(GAME_W - 250, battle.rivalTexture, !playerOnTop, true);
-
-    addText(this, GAME_W / 2, 104, failed ? 'Failed' : 'Results', 64, { color: failed ? CSS.miss : CSS.lilac });
-    addBody(this, GAME_W / 2, 152, play.chart.title, 24, { color: CSS.lilac });
-    const rivalCss = rivalProfile(play.chart.rivalCharacter).css;
-    // A failed run shows the rival celebrating but no round count: the battle was cut short.
-    const scored = battle && !failed ? battle : undefined;
-    if (scored) {
-      const battle = scored;
-      const score = `${Math.max(battle.playerRounds, battle.rivalRounds)} to ${Math.min(battle.playerRounds, battle.rivalRounds)}`;
-      const rounds = battle.playerRounds + battle.rivalRounds > 1 ? ` ${score}` : '';
-      const outcome = battle.won ? `You win${rounds}!` : `${battle.rivalName} wins${rounds}`;
-      const outcomeText = addText(this, GAME_W / 2, 192, outcome, 32, { color: battle.won ? CSS.blue : rivalCss });
-      // The rounds each side took, as stars either side of the line, like the battle's fighter card.
-      if (battle.playerRounds + battle.rivalRounds > 1) {
-        const edge = outcomeText.width / 2 + 34;
-        for (let i = 0; i < battle.playerRounds; i++) addIcon(this, GAME_W / 2 - edge - i * 32, 192, 'icon_star', 3).setTint(0x9fb4ff);
-        const rivalTint = rivalProfile(play.chart.rivalCharacter).color;
-        for (let i = 0; i < battle.rivalRounds; i++) addIcon(this, GAME_W / 2 + edge + i * 32, 192, 'icon_star', 3).setTint(rivalTint);
-      }
-    }
-
-    // Left column: hit counts and accuracy.
-    ROWS.forEach(([key, label, color], i) => {
-      const y = 250 + i * 50;
-      addText(this, LEFT, y, label, 40, { origin: [0, 0.5], color });
-      addText(this, RIGHT, y, String(stats.counts[key]), 40, { origin: [1, 0.5] });
-    });
-    const line = (y: number, label: string, value: string, color: string) => {
-      addText(this, LEFT, y, label, 32, { origin: [0, 0.5], color });
-      addText(this, RIGHT, y, value, 32, { origin: [1, 0.5] });
-    };
-    line(454, 'Max combo', String(stats.maxCombo), CSS.lilac);
-    line(496, scored ? 'You' : 'Accuracy', `${percent.toFixed(1)}%`, scored ? CSS.blue : CSS.lilac);
-    if (scored) line(538, scored.rivalName, `${scored.rivalAccuracy.toFixed(1)}%`, rivalCss);
-    if (flairUsed !== undefined && abilityName) {
-      addBody(this, LEFT, 576, `Flair: ${abilityName} fired ${flairUsed === 1 ? 'once' : `${flairUsed} times`}`, 22, { origin: [0, 0.5], color: CSS.yellow });
-    }
-
-    // Right column: the rank lands like a stamp, then the score counts up.
-    addText(this, RANK_X, 244, 'Rank', 32, { color: CSS.lilac });
-    const rankText = addText(this, RANK_X, 326, rank, rank.length > 1 ? 80 : 128, { color: RANK_COLOR[rank] ?? CSS.cream });
-    const jingle = failed || battle?.won === false ? 'lose' : 'win';
-    if (calm) {
-      playSfx(this.game, jingle);
-    } else {
-      rankText.setScale(4).setAlpha(0).setAngle(-14);
-      this.tweens.add({
-        targets: rankText,
-        scale: 1,
-        alpha: 1,
-        angle: 0,
-        delay: 450,
-        duration: 220,
-        ease: 'Cubic.easeIn',
-        onComplete: () => {
-          this.cameras.main.shake(140, 0.006);
-          playSfx(this.game, jingle);
-          this.tweens.add({ targets: rankText, scale: 1.12, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
-        },
-      });
-    }
-    addText(this, RANK_X, 424, 'Score', 32, { color: CSS.lilac });
-    const scoreText = addText(this, RANK_X, 474, '0', 56);
-    this.tweens.addCounter({
-      from: 0,
-      to: stats.score,
-      duration: 900,
-      ease: 'Quad.easeOut',
-      onUpdate: (tween) => scoreText.setText(Math.round(tween.getValue() ?? 0).toLocaleString('en-US')),
-    });
-
-    const badges: [string, string][] = [];
-    if (fullCombo) badges.push(['Full combo!', CSS.yellow]);
-    if (newBest) badges.push(['New best!', CSS.pink]);
-    badges.forEach(([label, color], i) => {
-      const badge = addText(this, RANK_X, 532 + i * 34, label, 24, { color });
-      if (!calm) this.tweens.add({ targets: badge, scale: 1.12, duration: 380, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    });
-    const unsaved = play.practice ? 'Test play: the score is not saved' : play.autoplay ? 'Autoplay: the score is not saved' : '';
-    if (unsaved) addBody(this, RANK_X, 532 + badges.length * 34, unsaved, 20, { color: CSS.grey });
-
     // Winning a story battle offers the next stop, once it is open.
     const stop = stopById(play.story?.stop);
     const nextIndex = stop && !failed && battle?.won !== false ? STOPS.indexOf(stop) + 1 : -1;
     const next = nextIndex > 0 && nextIndex < STOPS.length && isStopOpen(nextIndex) ? STOPS[nextIndex] : undefined;
+    const plan = planResults({
+      failed,
+      battle,
+      practice: play.practice === true,
+      autoplay: play.autoplay === true,
+      returnScene: play.returnTo.scene,
+      hasNext: next !== undefined,
+      meanErrorMs,
+      flairUsed,
+      abilityName,
+    });
 
+    const stage = play.chart.stage ?? levelForChart(play.chart.id)?.stage ?? Tex.room;
+    this.add.image(0, 0, this.textures.exists(stage) ? stage : Tex.room).setOrigin(0).setDisplaySize(GAME_W, GAME_H);
+    // Dark at the top and bottom where the text sits, lighter where the dancers stand.
+    this.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.5).setOrigin(0);
+    this.add.rectangle(0, 0, GAME_W, 160, COLORS.night, 0.45).setOrigin(0);
+    this.add.rectangle(0, BARS_Y - 40, GAME_W, GAME_H - BARS_Y + 40, COLORS.night, 0.55).setOrigin(0);
+
+    // The outcome.
+    const banner = addText(this, GAME_W / 2, BANNER_Y, plan.banner.text, 88, { color: TONE_COLOR[plan.banner.tone] });
+    if (banner.width > 700) banner.setFontSize(64);
+    const rounds = battle && !failed ? roundScore(battle.playerRounds, battle.rivalRounds) : '';
+    addBody(this, GAME_W / 2, BANNER_Y + 62, rounds ? `${play.chart.title}, rounds ${rounds}` : play.chart.title, 26, { color: CSS.lilac });
+
+    // The dancers face each other; the winner stands larger, in the light.
+    const playerWon = !failed && (battle?.won ?? true);
+    const rivalTexture = battle && this.textures.exists(battle.rivalTexture) ? battle.rivalTexture : null;
+    const rivalColor = rivalProfile(play.chart.rivalCharacter).color;
+    const rivalCss = rivalProfile(play.chart.rivalCharacter).css;
+    const player = this.addDancer(DANCER_X, Tex.blackberry, playerWon, false, rivalTexture !== null);
+    const rival = rivalTexture ? this.addDancer(GAME_W - DANCER_X, rivalTexture, !playerWon, true, true) : null;
+    // Each name with the rounds that side took, as stars, under the dancer.
+    const showStars = battle !== undefined && !failed;
+    this.addNameplate(DANCER_X, 'Berry', CSS.blue, showStars ? battle.playerRounds : 0, 0x9fb4ff);
+    if (rival && battle) this.addNameplate(GAME_W - DANCER_X, battle.rivalName, rivalCss, showStars ? battle.rivalRounds : 0, rivalColor);
+
+    // The rank lands like a stamp; the score counts up under it.
+    const rankColor = RANK_COLOR[rank] ?? CSS.cream;
+    const ring = this.add.graphics();
+    ring.fillStyle(COLORS.ink, 0.7).fillCircle(0, 0, 112);
+    ring.lineStyle(10, Phaser.Display.Color.HexStringToColor(rankColor).color, 1).strokeCircle(0, 0, 104);
+    ring.lineStyle(4, Phaser.Display.Color.HexStringToColor(rankColor).color, 0.6).strokeCircle(0, 0, 88);
+    const rankText = addText(this, 0, 4, rank, rank.length > 1 ? 72 : 150, { color: rankColor });
+    const stamp = this.add.container(GAME_W / 2, RANK_Y, [ring, rankText]).setAngle(-8);
+
+    const scoreText = addText(this, GAME_W / 2, SCORE_Y, '0', 64);
+    const badges = this.addBadges(fullCombo, newBest);
+
+    // Details, small and secondary.
+    this.addAccuracyBars(percent, battle && !failed ? battle.rivalAccuracy : undefined, rivalColor, rivalCss);
+    this.addCounts(stats.counts, stats.maxCombo);
+    const notes = [plan.flairNote, plan.unsavedNote].filter((note): note is string => note !== undefined);
+    const timing = plan.timing && meanErrorMs !== undefined ? this.addTimingHint(plan.timing.ms, plan.timing.late, meanErrorMs) : null;
+    if (notes.length) addBody(this, timing ? 270 : GAME_W / 2, NOTES_Y, notes.join('   '), 24, { color: CSS.grey });
+
+    const jingle = failed || battle?.won === false ? 'lose' : 'win';
+    if (calm) {
+      scoreText.setText(stats.score.toLocaleString('en-US'));
+      playSfx(this.game, jingle);
+    } else {
+      this.animateIn({ banner, player, rival, stamp, scoreText, badges, score: stats.score, jingle });
+    }
+
+    // Buttons.
     const openedAt = performance.now();
     const guarded = (action: () => void) => () => {
       if (performance.now() - openedAt >= INPUT_GUARD_MS) action();
     };
-    const back = guarded(() => this.leave(play.returnTo.scene, play.returnTo.data));
-    const entries: [string, () => void, string | undefined][] = [
-      [
-        'Retry',
-        guarded(() => {
-          // The stage's opening was seen moments ago: go straight back into the song.
-          skipNextIntro();
-          this.leave(SceneKeys.Play, play);
-        }),
-        undefined,
-      ],
-      [play.practice ? 'Back to editor' : 'Continue', back, undefined],
-    ];
-    if (next) entries.push(['Next stop', guarded(() => this.leave(SceneKeys.LevelSelect, { levelId: next.id })), 'icon_next']);
-    const width = entries.length > 2 ? 272 : 288;
-    const step = width + 24;
-    this.choices = entries.map(([label, action, icon], i) => addUiButton(this, GAME_W / 2 + (i - (entries.length - 1) / 2) * step, BUTTON_Y, label, action, { width, icon }));
-    // After a fail the natural next step is to retry; after a clear it is to move on.
-    const start = failed ? 0 : entries.length - 1;
-    const fix = meanErrorMs !== undefined && Math.abs(meanErrorMs) >= TIMING_NOTICE_MS ? this.addTimingFix(meanErrorMs) : null;
-    this.focus = new FocusGroup(this, fix ? [...this.choices, fix] : this.choices, { start });
+    const actions: Record<ButtonId, () => void> = {
+      retry: () => {
+        // The stage's opening was seen moments ago: go straight back into the song.
+        skipNextIntro();
+        this.leave(SceneKeys.Play, play);
+      },
+      back: () => this.leave(play.returnTo.scene, play.returnTo.data),
+      next: () => {
+        if (next) this.leave(SceneKeys.LevelSelect, { levelId: next.id });
+      },
+    };
+    const width = plan.buttons.length > 2 ? 280 : 300;
+    const step = width + 28;
+    this.choices = plan.buttons.map((button, i) =>
+      addUiButton(this, GAME_W / 2 + (i - (plan.buttons.length - 1) / 2) * step, BUTTON_Y, button.label, guarded(actions[button.id]), { width, icon: button.icon }),
+    );
+    this.focus = new FocusGroup(this, timing ? [...this.choices, timing] : this.choices, { start: plan.primary });
 
     menuKeys(this, {
       left: () => this.focus.move(-1),
@@ -211,44 +200,196 @@ export class ResultsScene extends Phaser.Scene {
       up: () => this.focus.move(-1),
       down: () => this.focus.move(1),
       confirm: () => this.focus.activate(),
-      back,
+      back: guarded(actions.back),
     });
   }
 
-  /** A dancer beside the title, celebrating or slumped. */
-  private addDancer(x: number, texture: string, celebrating: boolean, flip: boolean): void {
+  /** A dancer, large and celebrating, or smaller and slumped in the shade. */
+  private addDancer(x: number, texture: string, winner: boolean, flip: boolean, lit: boolean): Phaser.GameObjects.Sprite {
     const poses = poseFrames(texture);
-    const frames = celebrating ? poses.victory : [poses.defeat];
-    const sprite = this.add.sprite(x, 204, texture, frames[0]).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(3).setFlipX(flip);
+    const frames = winner ? poses.victory : [poses.defeat];
+    if (lit && winner) {
+      // A spotlight cone and a pool of light under the winner.
+      const light = this.add.graphics();
+      light.fillStyle(0xfff3c4, 0.1).fillTriangle(x - 40, 0, x + 40, 0, x + 170, FEET_Y);
+      light.fillTriangle(x - 40, 0, x - 170, FEET_Y, x + 170, FEET_Y);
+      light.fillStyle(0xfff3c4, 0.22).fillEllipse(x, FEET_Y, 300, 46);
+    } else {
+      this.add.ellipse(x, FEET_Y, 220, 32, COLORS.night, 0.5);
+    }
+    const sprite = this.add
+      .sprite(x, FEET_Y, texture, frames[0])
+      .setOrigin(0.5, BERRY_ORIGIN_Y)
+      .setScale(winner ? 6 : 5)
+      .setFlipX(flip);
+    if (!winner) sprite.setTint(0x9a90b8);
     if (frames.length > 1) {
       let step = 0;
       this.time.addEvent({ delay: 320, loop: true, callback: () => sprite.setFrame(frames[++step % frames.length]) });
     }
+    return sprite;
+  }
+
+  /** A dancer's name with the rounds they took as stars after it, centred under them. */
+  private addNameplate(x: number, name: string, css: string, rounds: number, tint: number): void {
+    const gap = 34;
+    const label = addText(this, 0, FEET_Y + 28, name, 28, { color: css, origin: [0, 0.5] });
+    const width = label.width + (rounds > 0 ? 14 + rounds * gap : 0);
+    const left = x - width / 2;
+    label.setX(left);
+    for (let i = 0; i < rounds; i++) addIcon(this, left + label.width + 14 + gap / 2 + i * gap, FEET_Y + 28, 'icon_star', 4).setTint(tint);
+  }
+
+  /** Full combo and new best as small pill badges under the score. */
+  private addBadges(fullCombo: boolean, newBest: boolean): Phaser.GameObjects.Container[] {
+    const labels: [string, string][] = [];
+    if (newBest) labels.push(['New best!', CSS.pink]);
+    if (fullCombo) labels.push(['Full combo!', CSS.yellow]);
+    const width = 200;
+    return labels.map(([label, color], i) => {
+      const x = GAME_W / 2 + (i - (labels.length - 1) / 2) * (width + 16);
+      const box = addBox(this, -width / 2, -22, width, 44, 'tag');
+      const text = addText(this, 0, 0, label, 24, { color });
+      return this.add.container(x, SCORE_Y + 62, [box, text]);
+    });
+  }
+
+  /** This song's accuracy for both sides, as two bars meeting in the middle like the battle HUD. */
+  private addAccuracyBars(player: number, rival: number | undefined, rivalColor: number, rivalCss: string): void {
+    const centre = GAME_W / 2;
+    const bar = (x: number, value: number, color: number, toLeft: boolean, label: string, css: string) => {
+      this.add.rectangle(x, BARS_Y, BAR_W, BAR_H, COLORS.ink).setOrigin(toLeft ? 1 : 0, 0.5);
+      const fill = Math.max(0, Math.min(1, value / 100)) * (BAR_W - 6);
+      this.add.rectangle(toLeft ? x - 3 : x + 3, BARS_Y, fill, BAR_H - 6, color).setOrigin(toLeft ? 1 : 0, 0.5);
+      addText(this, toLeft ? x - BAR_W - 14 : x + BAR_W + 14, BARS_Y, label, 26, { color: css, origin: [toLeft ? 1 : 0, 0.5] });
+    };
+    if (rival === undefined) {
+      bar(centre - BAR_W / 2, player, COLORS.blue, false, `${player.toFixed(1)}%`, CSS.blue);
+      addBody(this, centre - BAR_W / 2 - 14, BARS_Y, 'Accuracy', 22, { color: CSS.lilac, origin: [1, 0.5] });
+      return;
+    }
+    // The bars fill towards the middle, the leader's a little brighter.
+    bar(centre - BAR_GAP / 2, player, player >= rival ? 0x9fb4ff : COLORS.blue, true, `${player.toFixed(1)}%`, CSS.blue);
+    bar(centre + BAR_GAP / 2, rival, rivalColor, false, `${rival.toFixed(1)}%`, rivalCss);
+  }
+
+  /** Judgement counts and the best combo in one compact row. */
+  private addCounts(counts: Record<Judgement, number>, maxCombo: number): void {
+    const items: [string, string, string][] = JUDGEMENTS.map(([key, label, color]) => [label, String(counts[key]), color]);
+    items.push(['Max combo', String(maxCombo), CSS.lilac]);
+    const width = 196;
+    items.forEach(([label, value, color], i) => {
+      const x = GAME_W / 2 + (i - (items.length - 1) / 2) * width;
+      const name = addText(this, x, COUNTS_Y, label, 22, { color, origin: [1, 0.5] });
+      const number = addText(this, x + 8, COUNTS_Y, value, 28, { origin: [0, 0.5] });
+      // Keep each pair centred on its slot.
+      const shift = (name.width - number.width - 8) / 2;
+      name.x += shift;
+      number.x += shift;
+    });
   }
 
   /**
-   * Offer to shift the audio offset by the player's average error, so hits
-   * that were consistently early or late line up next time.
+   * A small hint, shown only when hits were clearly early or late on average,
+   * offering to shift the audio offset to match. Dismissed by using it or by
+   * the close button beside it.
    */
-  private addTimingFix(meanErrorMs: number): UiButton {
-    const amount = Math.round(Math.abs(meanErrorMs));
-    const late = meanErrorMs > 0;
-    const note = addBody(this, LEFT, TIMING_Y, `Your hits were about ${amount} ms ${late ? 'late' : 'early'} on average.`, 22, { origin: [0, 0.5], color: CSS.lilac });
+  private addTimingHint(ms: number, late: boolean, meanErrorMs: number): UiButton {
+    const right = GAME_W - 70;
+    const note = addBody(this, right - 330, NOTES_Y, `Hits ran about ${ms} ms ${late ? 'late' : 'early'}`, 24, { color: CSS.lilac, origin: [1, 0.5] });
+    let close: UiButton | null = null;
+    const dismiss = () => {
+      button.destroy();
+      close?.destroy();
+      const index = Math.min(this.focus.index, this.choices.length - 1);
+      this.focus = new FocusGroup(this, this.choices, { start: index });
+    };
     const button = addUiButton(
       this,
-      RANK_X,
-      TIMING_Y,
-      'Fix my timing',
+      right - 200,
+      NOTES_Y,
+      'Fix timing',
       () => {
         updateSettings({ audioOffsetMs: getSettings().audioOffsetMs + Math.round(meanErrorMs) });
-        note.setText(`Timing adjusted. The audio offset is now ${getSettings().audioOffsetMs} ms.`);
-        const index = Math.min(this.focus.index, this.choices.length - 1);
-        button.destroy();
-        this.focus = new FocusGroup(this, this.choices, { start: index });
+        note.setText(`Audio offset is now ${getSettings().audioOffsetMs} ms`);
+        dismiss();
       },
-      { width: 288, height: 56, size: 24 },
+      { width: 220, height: 56, size: 24 },
+    );
+    close = addUiButton(
+      this,
+      right - 28,
+      NOTES_Y,
+      '',
+      () => {
+        note.destroy();
+        dismiss();
+      },
+      { width: 56, height: 56, icon: 'icon_close', sfx: 'back' },
     );
     return button;
+  }
+
+  private animateIn(parts: {
+    banner: Phaser.GameObjects.Text;
+    player: Phaser.GameObjects.Sprite;
+    rival: Phaser.GameObjects.Sprite | null;
+    stamp: Phaser.GameObjects.Container;
+    scoreText: Phaser.GameObjects.Text;
+    badges: Phaser.GameObjects.Container[];
+    score: number;
+    jingle: 'win' | 'lose';
+  }): void {
+    const { banner, player, rival, stamp, scoreText, badges, score, jingle } = parts;
+    banner.setScale(1.6).setAlpha(0);
+    this.tweens.add({ targets: banner, scale: 1, alpha: 1, duration: 260, ease: 'Back.easeOut' });
+    for (const [sprite, from] of [
+      [player, -200],
+      [rival, GAME_W + 200],
+    ] as const) {
+      if (!sprite) continue;
+      const x = sprite.x;
+      sprite.setX(from);
+      this.tweens.add({ targets: sprite, x, duration: 380, delay: 120, ease: 'Cubic.easeOut' });
+    }
+
+    stamp.setScale(3).setAlpha(0).setAngle(-24);
+    this.tweens.add({
+      targets: stamp,
+      scale: 1,
+      alpha: 1,
+      angle: -8,
+      delay: 650,
+      duration: 200,
+      ease: 'Cubic.easeIn',
+      onComplete: () => {
+        this.cameras.main.shake(160, 0.008);
+        playSfx(this.game, 'stamp');
+        this.time.delayedCall(120, () => playSfx(this.game, jingle));
+        this.tweens.add({ targets: stamp, scale: 1.08, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+      },
+    });
+
+    this.tweens.addCounter({
+      from: 0,
+      to: score,
+      delay: 900,
+      duration: 900,
+      ease: 'Quad.easeOut',
+      onUpdate: (tween) => scoreText.setText(Math.round(tween.getValue() ?? 0).toLocaleString('en-US')),
+    });
+
+    badges.forEach((badge, i) => {
+      badge.setScale(0);
+      this.tweens.add({
+        targets: badge,
+        scale: 1,
+        delay: 1850 + i * 160,
+        duration: 260,
+        ease: 'Back.easeOut',
+        onStart: () => playSfx(this.game, 'bonus'),
+      });
+    });
   }
 
   private leave(scene: string, data?: object): void {
@@ -256,3 +397,4 @@ export class ResultsScene extends Phaser.Scene {
     goTo(this, scene, data);
   }
 }
+

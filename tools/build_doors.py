@@ -15,7 +15,7 @@ view outside through them. Output: public/assets/img/doors_<name>.png at
 The game splits the picture down its centre seam (x 128): the left half slides
 left and the right half slides right. The blank display above the doors and
 the two status lamps are measured by eye and kept in DOOR_STYLES in
-src/explore/doors.ts; check them there if a source is regenerated.
+src/explore/doorStyles.ts; check them there if a source is regenerated.
 """
 from pathlib import Path
 

@@ -244,23 +244,30 @@ export class Doors {
   private tick(_time: number, delta: number): void {
     const [left] = this.halves;
     const visible = left.container.x > -GAME_W / 2;
-    for (const half of this.halves) {
+    // Each door only draws the view behind its own half, so nothing shows past its edge as it slides.
+    const span = (i: number): [number, number] => (i === 0 ? [0, GAME_W / 2] : [GAME_W / 2, GAME_W]);
+    this.halves.forEach((half, i) => {
       half.view.clear();
-      if (!visible || this.rush <= 0) continue;
+      if (!visible || this.rush <= 0) return;
       const [top, bottom] = tunnelColors(this.time);
       const [glassTop, glassBottom] = this.style.glass;
+      const [from, to] = span(i);
       half.view.fillGradientStyle(top, top, bottom, bottom, 1);
-      half.view.fillRect(0, glassTop * PX, GAME_W, (glassBottom - glassTop + 1) * PX);
-    }
+      half.view.fillRect(from, glassTop * PX, to - from, (glassBottom - glassTop + 1) * PX);
+    });
     if (!visible || this.rush <= 0) return;
     const lamp = this.time === 'afternoon' ? 0xfff2c8 : 0xffd08a;
     for (const streak of this.streaks) {
       streak.x -= (this.rush * delta) / 1000;
       if (streak.x + streak.w < 0) Object.assign(streak, this.newStreak(GAME_W + Math.random() * 200));
-      for (const half of this.halves) {
+      this.halves.forEach((half, i) => {
+        const [from, to] = span(i);
+        const x0 = Math.max(from, streak.x);
+        const x1 = Math.min(to, streak.x + streak.w);
+        if (x1 <= x0) return;
         half.view.fillStyle(streak.tone > 0.7 ? this.accent : lamp, 0.55 + streak.tone * 0.4);
-        half.view.fillRect(streak.x, streak.y, streak.w, PX);
-      }
+        half.view.fillRect(x0, streak.y, x1 - x0, PX);
+      });
     }
   }
 }
