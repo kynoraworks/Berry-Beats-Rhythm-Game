@@ -202,22 +202,27 @@ export class Dialogue {
     const left = centerX - size / 2;
     const top = centerY - size / 2;
     const bold = line.mood === 'bold';
-    // A bust in the speaker's colour: shoulders, a head and their initial, drawn in blocks.
+    // A bust in the speaker's colour: a head with their initial on shoulders, drawn in blocks.
+    const head = 96;
+    const headX = centerX - head / 2;
+    const headY = top + 22;
     this.stand
       .clear()
       .fillStyle(COLORS.ink, 1)
       .fillRect(left, top, size, size)
-      .fillStyle(character.color, bold ? 1 : 0.8)
-      .fillRect(left + 24, top + 138, size - 48, size - 138)
-      .fillRect(left + 48, top + 30, size - 96, 108)
-      .fillStyle(0xffffff, 0.18)
-      .fillRect(left + 48, top + 30, size - 96, 12)
+      .fillStyle(character.color, bold ? 1 : 0.75)
+      .fillRect(left + 28, top + 132, size - 56, size - 132)
+      .fillRect(headX, headY, head, head)
+      .fillStyle(0xffffff, 0.2)
+      .fillRect(headX, headY, head, 8)
+      .fillRect(left + 28, top + 132, size - 56, 8)
       .setVisible(true);
     const initial = (line.who === 'npc' ? speakerName(line) : character.name).replace(/^Dr\.\s*/, '').charAt(0).toUpperCase();
     this.standLetter
-      .setText(bold ? `${initial}!` : initial)
+      .setText(initial)
       .setFontFamily(FONT)
-      .setPosition(centerX, top + 86)
+      .setFontSize(bold ? 72 : 64)
+      .setPosition(centerX, headY + head / 2 + 4)
       .setColor(character.darkTag ? CSS.ink : CSS.cream)
       .setVisible(true);
   }

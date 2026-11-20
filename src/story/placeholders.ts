@@ -116,18 +116,22 @@ export function stageTexture(scene: Phaser.Scene, key: string, label: string, ti
   ctx.fillRect(0, 137, 256, 3);
   ctx.fillStyle = mix(accentCss, '#14182e', 0.7);
   for (let x = 0; x < 256; x += 16) ctx.fillRect(x, 142, 8, 18);
-  // A sign with the stop's name, so a stand-in stage is clearly one.
+  // A sign with the stop's name, so a stand-in stage is clearly one. It hangs at the
+  // top left, below the health bar and clear of the turn labels in the middle.
   ctx.font = `10px ${FONT}`;
-  const width = Math.min(220, Math.ceil(ctx.measureText(label).width) + 16);
-  const sx = Math.round((256 - width) / 2);
+  const width = Math.min(120, Math.ceil(ctx.measureText(label).width) + 12);
+  const sx = 8;
+  const sy = 36;
   ctx.fillStyle = '#14182e';
-  ctx.fillRect(sx - 1, 13, width + 2, 18);
+  ctx.fillRect(sx + 6, sy - 6, 2, 6);
+  ctx.fillRect(sx + width - 8, sy - 6, 2, 6);
+  ctx.fillRect(sx - 1, sy - 1, width + 2, 16);
   ctx.fillStyle = accentCss;
-  ctx.fillRect(sx, 14, width, 16);
+  ctx.fillRect(sx, sy, width, 14);
   ctx.fillStyle = '#14182e';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'center';
-  ctx.fillText(label, 128, 22);
+  ctx.fillText(label, sx + width / 2, sy + 7, width - 6);
   const texture = scene.textures.addCanvas(key, canvas);
   texture?.setFilter(Phaser.Textures.FilterMode.NEAREST);
   return texture ? key : Tex.room;
