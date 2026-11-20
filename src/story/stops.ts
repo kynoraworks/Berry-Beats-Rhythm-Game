@@ -24,8 +24,14 @@ export interface StopDef {
   chartUrl: string;
   /** Background the battle is danced on. Keys that are not loaded get a generated placeholder. */
   stage: string;
+  /** The station the train pulls into (256x160). Stop 1's is Berry Town, where he boards for the first time. */
   stationBg: string;
-  streetBg: string;
+  /**
+   * The street the stop's fruit waits at the end of: its own wide art (640x160), or an
+   * existing 256x160 stage where the bible reuses one. Null where there is no street
+   * (stop 1 starts in Berry's room; stop 12's station leads straight to the stage).
+   */
+  streetBg: string | null;
   time: TimeOfDay;
   gimmick: GimmickId;
   /** The fruit who joins Berry's crew after this stop's win, if any. */
@@ -43,6 +49,8 @@ interface StopSeed {
   song: string;
   /** An existing stage to dance on, or omitted for this stop's own (placeholder until drawn). */
   stage?: string;
+  /** False for stops without a street. An existing stage is the street when the stop has one. */
+  street?: boolean;
 }
 
 const SEEDS: StopSeed[] = [
@@ -55,6 +63,7 @@ const SEEDS: StopSeed[] = [
     arc: 'The Coach teaches the beat, Raspberry confronts Berry for hiding since summer, they battle, then the Coach hands over a ticket. Raspberry joins.',
     song: 'level1',
     stage: Tex.room,
+    street: false,
   },
   {
     station: 'Peel Street',
@@ -158,6 +167,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Return with the Elixir',
     arc: 'Five against five. Berry vs Blueberry. Berry finally says yes, the hood comes down, the trio reunites.',
     song: 'menu',
+    street: false,
   },
 ];
 
@@ -186,7 +196,7 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
     chartUrl: `charts/${id}.json`,
     stage: seed.stage ?? `stage_${seed.slug}`,
     stationBg: `station_${seed.slug}`,
-    streetBg: `street_${seed.slug}`,
+    streetBg: seed.street === false ? null : (seed.stage ?? `street_${seed.slug}`),
     time: timeOfDay(number),
     gimmick: CAST[seed.fruit].gimmick ?? 'even',
     joins: ALLIES[seed.fruit] ? seed.fruit : undefined,

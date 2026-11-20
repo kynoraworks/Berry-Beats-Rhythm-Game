@@ -178,14 +178,13 @@ describe('stops', () => {
 });
 
 describe('story flow', () => {
-  it('opens stop 1 with the station line and the lesson, then Raspberry in the same room', () => {
+  it('opens stop 1 with the lesson, then Raspberry in the same room', () => {
     const [lesson, battle, extra] = segmentsFor(STOPS[0]);
     expect(extra).toBeUndefined();
     expect(lesson.kind).toBe('lesson');
     expect(lesson.chartId).toBe('tutorial');
     expect(lesson.stage).toBe('room');
-    expect(lesson.before[0].role).toBe('NEIGHBOR');
-    expect(lesson.before.slice(1)).toEqual(STOPS[0].script.tutorial);
+    expect(lesson.before).toEqual(STOPS[0].script.tutorial);
     expect(battle.kind).toBe('battle');
     expect(battle.chartId).toBe('stop01');
     expect(battle.stage).toBe('room');
@@ -193,13 +192,13 @@ describe('story flow', () => {
     if (battle.kind === 'battle') expect(battle.win).toEqual(STOPS[0].script.win);
   });
 
-  it('plays every other stop as one battle that opens with its station line', () => {
+  it('plays every other stop as one battle that opens with its intro (the station line is said at the station)', () => {
     for (const stop of STOPS.slice(1)) {
       const segments = segmentsFor(stop);
       expect(segments).toHaveLength(1);
       const [battle] = segments;
       expect(battle.kind).toBe('battle');
-      expect(battle.before).toEqual([...stop.script.station, ...stop.script.intro]);
+      expect(battle.before).toEqual(stop.script.intro);
       if (battle.kind === 'battle') {
         expect(battle.lose).toEqual(stop.script.lose);
         expect(battle.hoodDown).toBe(stop.number === 12);
@@ -256,15 +255,15 @@ describe('story progress', () => {
     markTalked('stop02:npc');
     expect(getProgress().talked).toEqual(['stop02:npc']);
     resetStory();
-    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [] });
+    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [], inspected: [], seen: [] });
     expect(isStopOpen(1)).toBe(false);
   });
 
   it('survives storage that is broken or holds junk', () => {
     data['berrybeats.story.v1'] = '{not json';
-    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [] });
+    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [], inspected: [], seen: [] });
     data['berrybeats.story.v1'] = JSON.stringify({ cleared: ['stop01', 4], allies: 'pear' });
-    expect(getProgress()).toEqual({ cleared: ['stop01'], allies: [], talked: [] });
+    expect(getProgress()).toEqual({ cleared: ['stop01'], allies: [], talked: [], inspected: [], seen: [] });
     useStoryStorage({
       getItem: () => {
         throw new Error('blocked');

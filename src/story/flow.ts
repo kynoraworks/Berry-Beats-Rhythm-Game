@@ -2,10 +2,10 @@ import { stopById, TUTORIAL, type StopDef, type StopId } from './stops';
 import type { Line } from './types';
 
 /**
- * A stop is played as an ordered list of segments. Phase 1 has the two that
- * happen on a stage: a lesson (the Coach demonstrates, nothing is scored) and
- * a battle. Later phases add the station, the street and the crew battle as
- * more kinds, without changing how a stop is run.
+ * The part of a stop that happens on a stage, as an ordered list of segments:
+ * a lesson (the Coach demonstrates, nothing is scored) and a battle. The walk
+ * there (Berry's room, the station, the street) is the explore scene's, and
+ * the station NPC's line is said there, not here.
  */
 export type Segment = LessonSegment | BattleSegment;
 
@@ -53,20 +53,19 @@ export function segmentsFor(stop: StopDef): Segment[] {
     hoodDown: stop.role === 'final',
   };
   if (script.tutorial) {
-    // Stop 1: the station line opens the whole stop, then the Coach's lesson in Berry's
-    // room, then Raspberry finds him there.
+    // Stop 1: the Coach's lesson in Berry's room, then Raspberry finds him there.
+    // (The neighbour's line is said at Berry's door, before the Coach arrives.)
     const lesson: LessonSegment = {
       kind: 'lesson',
       chartId: TUTORIAL.id,
       chartUrl: TUTORIAL.chartUrl,
       stage: TUTORIAL.stage,
-      before: [...script.station, ...script.tutorial],
+      before: script.tutorial,
       after: [],
     };
     return [lesson, { ...battle, before: script.intro }];
   }
-  // Phase 3 moves the station line into the station scene. Until then it opens the intro.
-  return [{ ...battle, before: [...script.station, ...script.intro] }];
+  return [{ ...battle, before: script.intro }];
 }
 
 export function segmentAt(ref: StoryRef | undefined): { stop: StopDef; segment: Segment; last: boolean } | null {

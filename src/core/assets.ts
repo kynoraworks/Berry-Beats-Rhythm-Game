@@ -31,6 +31,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
     frameHeight: 64,
   })),
   { key: Tex.watermelonSit, file: 'watermelon_sit.png', frameWidth: 75, frameHeight: 75 },
+  // The generic station NPC: 2 idle frames in the dancers' 64x64 layout (a painted stand-in is used until then).
+  { key: 'npc', file: 'npc.png', frameWidth: 64, frameHeight: 64 },
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -49,7 +51,8 @@ export const PRESENT_SHEETS: readonly string[] = [
 
 /**
  * The optional backgrounds that are drawn and in public/assets/img: keys of a
- * stop's stage, station or street (see src/story/stops.ts), e.g. 'stage_peel_street'.
+ * stop's stage, station or street (see src/story/stops.ts), e.g. 'stage_peel_street',
+ * plus 'trio_photo' (the photo on Berry's wall). Sizes and layout: docs/EXPLORE_ART.md.
  */
 export const PRESENT_IMAGES: readonly string[] = [];
 

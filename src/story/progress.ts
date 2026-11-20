@@ -7,8 +7,12 @@ export interface StoryProgress {
   cleared: string[];
   /** Crew members who have joined, in the order they joined. */
   allies: FruitId[];
-  /** Station NPCs already talked to (Phase 3), keyed "stopId:npc". */
+  /** Station NPCs already talked to, keyed "stopId:npc". */
   talked: string[];
+  /** Things looked at in stations and streets, keyed "stopId:hotspotId". */
+  inspected: string[];
+  /** One-time story beats already shown (e.g. "boarded": Berry's first ride). */
+  seen: string[];
 }
 
 const KEY = 'berrybeats.story.v1';
@@ -33,7 +37,7 @@ export function useStoryStorage(next: Store | null): void {
 }
 
 function empty(): StoryProgress {
-  return { cleared: [], allies: [], talked: [] };
+  return { cleared: [], allies: [], talked: [], inspected: [], seen: [] };
 }
 
 function strings(value: unknown): string[] {
@@ -51,6 +55,8 @@ export function getProgress(): StoryProgress {
       cleared: strings(record.cleared),
       allies: strings(record.allies) as FruitId[],
       talked: strings(record.talked),
+      inspected: strings(record.inspected),
+      seen: strings(record.seen),
     };
   } catch {
     return empty();
@@ -94,8 +100,43 @@ export function markTalked(key: string): void {
   save(progress);
 }
 
+export function hasTalked(key: string): boolean {
+  return getProgress().talked.includes(key);
+}
+
+export function markInspected(key: string): void {
+  const progress = getProgress();
+  if (progress.inspected.includes(key)) return;
+  progress.inspected.push(key);
+  save(progress);
+}
+
+export function hasInspected(key: string): boolean {
+  return getProgress().inspected.includes(key);
+}
+
+export function markSeen(beat: string): void {
+  const progress = getProgress();
+  if (progress.seen.includes(beat)) return;
+  progress.seen.push(beat);
+  save(progress);
+}
+
+export function hasSeen(beat: string): boolean {
+  return getProgress().seen.includes(beat);
+}
+
 export function crew(): FruitId[] {
   return getProgress().allies;
+}
+
+/**
+ * Who rides with Berry right now. After The Club (stop 7) the crew walks out,
+ * and they only come back on the Rooftop (stop 8): until then he rides alone.
+ */
+export function crewOnBoard(): FruitId[] {
+  const { allies, cleared } = getProgress();
+  return cleared.includes('stop07') && !cleared.includes('stop08') ? [] : allies;
 }
 
 /** Index of the first stop not yet cleared (12 once the story is done). */

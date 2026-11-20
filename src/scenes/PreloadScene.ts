@@ -3,7 +3,8 @@ import { Anim, COLORS, CSS, GAME_H, GAME_W, SceneKeys, Tex } from '../core/confi
 import { parseChart } from '../core/chart';
 import { optionalImages, optionalSheets } from '../core/assets';
 import { LEVELS, loadLevelChart } from '../core/levels';
-import { stopForChart } from '../story/stops';
+import { stopById, stopForChart } from '../story/stops';
+import type { ExploreData } from '../story/places';
 import { addText } from '../core/ui';
 import type { PlayData } from '../core/flow';
 
@@ -117,6 +118,7 @@ export class PreloadScene extends Phaser.Scene {
    * (`&chart=charts/some.json` plays any chart file, `&at=30` starts 30 seconds in).
    * `level` takes a stop's chart id too (`level=stop05`); add `&story=1` to play it as the
    * story does, with its dialogue, its win lines and the rematch after a loss.
+   * `?scene=Explore&stop=stop03&place=street` opens a station, street or Berry's room.
    */
   private async startFirstScene(): Promise<void> {
     const params = new URLSearchParams(window.location.search);
@@ -140,6 +142,15 @@ export class PreloadScene extends Phaser.Scene {
       } catch (error) {
         console.error(error);
       }
+    } else if (requested === SceneKeys.Explore) {
+      // `?scene=Explore&stop=stop02&place=station` (room, station, street or depart).
+      const place = params.get('place');
+      const data: ExploreData = {
+        stop: (stopById(params.get('stop') ?? '')?.id ?? 'stop02'),
+        place: place === 'room' || place === 'street' || place === 'depart' ? place : 'station',
+      };
+      this.scene.start(SceneKeys.Explore, data);
+      return;
     } else if (requested && known.includes(requested) && requested !== SceneKeys.Results) {
       this.scene.start(requested);
       return;

@@ -78,8 +78,20 @@ async function main() {
     await waitForScene('Title');
     await page.keyboard.press('Enter');
     await waitForScene('Menu');
+    // A new game starts in Berry's room.
     await page.keyboard.press('Enter');
+    await waitForScene('Explore');
+
+    // With stop 1 won, the story opens on the train; a station and a street load their stand-in art.
+    await page.evaluate(() =>
+      localStorage.setItem('berrybeats.story.v1', JSON.stringify({ cleared: ['stop01'], allies: ['raspberry'], talked: [], inspected: [], seen: ['boarded'] })),
+    );
+    await page.goto(`${base}?scene=LevelSelect`);
     await waitForScene('LevelSelect');
+    await page.goto(`${base}?scene=Explore&stop=stop02&place=station`);
+    await waitForScene('Explore');
+    await page.goto(`${base}?scene=Explore&stop=stop02&place=street`);
+    await waitForScene('Explore');
 
     // Let the tutorial play itself from near the end and check it reaches the results screen.
     await page.goto(`${base}?scene=Play&level=tutorial&autoplay=1&at=60`);
@@ -92,7 +104,7 @@ async function main() {
     server.close();
   }
   if (problems.length > 0) throw new Error(`Smoke test failed:\n  ${[...new Set(problems)].join('\n  ')}`);
-  console.log('Smoke test passed: title, menu, level select, tutorial and results all loaded without errors.');
+  console.log('Smoke test passed: title, menu, Berry\'s room, the train, a station, a street, the tutorial and results all loaded without errors.');
 }
 
 main().catch((error) => {

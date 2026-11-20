@@ -40,6 +40,8 @@ import { VersusCard } from '../play/VersusCard';
 import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable } from '../story/crew';
+import { crewAt } from '../story/places';
+import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
 import { stopForChart } from '../story/stops';
 import { segmentAt } from '../story/flow';
@@ -317,6 +319,12 @@ export class PlayScene extends Phaser.Scene {
     );
   }
 
+  /** Who is with Berry at this stop as the story has it, so a replay never borrows a later ally. */
+  private storyCrew(): FruitId[] {
+    const stop = this.story?.stop ?? stopForChart(this.chart.id);
+    return stop ? crewAt(stop) : [];
+  }
+
   /**
    * The battle's rules: given by the caller (the crew battle), or a story
    * stop's own gimmick with the chosen backup's ability. Custom maps and test
@@ -327,7 +335,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.playData.practice) return NO_RULES;
     const stop = this.story?.stop ?? stopForChart(this.chart.id);
     if (!stop) return NO_RULES;
-    return battleRules(stop.gimmick, getBackup());
+    return battleRules(stop.gimmick, getBackup(crewAt(stop)));
   }
 
   // ---------------------------------------------------------------------
@@ -984,7 +992,7 @@ export class PlayScene extends Phaser.Scene {
     // Block clicks from reaching the lanes while paused.
     dim.setInteractive();
     // A story battle's backup can be swapped here, when there is more than one to choose from.
-    const canSwap = !this.playData.rules && this.rules.ability !== null && listAvailable().length > 1;
+    const canSwap = !this.playData.rules && this.rules.ability !== null && listAvailable(this.storyCrew()).length > 1;
     const extra = canSwap ? 170 : 0;
     const top = 180 - extra / 2;
     const panelW = canSwap ? 600 : 480;
@@ -1024,7 +1032,7 @@ export class PlayScene extends Phaser.Scene {
 
   /** Change the backup from the pause menu. The choice is remembered for later stops. */
   private swapBackup(step: 1 | -1): void {
-    const next = cycleBackup(step);
+    const next = cycleBackup(step, this.storyCrew());
     if (!next) return;
     const rules = battleRules(this.rules.gimmick, next);
     this.rules = rules;

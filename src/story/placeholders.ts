@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 import { FONT, Tex } from '../core/config';
 import { seededRandom } from '../core/battle';
+import { placeBackground } from '../explore/backgrounds';
 import { CAST } from './cast';
+import { placeOf } from './places';
+import { STOPS } from './stops';
 import type { CharacterId, SheetLayout, TimeOfDay } from './types';
 
 /**
@@ -83,6 +86,9 @@ const SKIES: Record<TimeOfDay, [string, string]> = {
  */
 export function stageTexture(scene: Phaser.Scene, key: string, label: string, time: TimeOfDay, accent: number): string {
   if (scene.textures.exists(key)) return key;
+  // A stop whose battle is danced at the end of its street uses the street's last screen.
+  const street = streetEnd(scene, key);
+  if (street) return street;
   const canvas = document.createElement('canvas');
   canvas.width = 256;
   canvas.height = 160;
@@ -135,6 +141,28 @@ export function stageTexture(scene: Phaser.Scene, key: string, label: string, ti
   const texture = scene.textures.addCanvas(key, canvas);
   texture?.setFilter(Phaser.Textures.FilterMode.NEAREST);
   return texture ? key : Tex.room;
+}
+
+/**
+ * The battle stage of a stop without its own stage art: the right-hand 256x160
+ * of its street (drawn or stand-in), where the fruit waits. Null for stops
+ * without a street of their own.
+ */
+function streetEnd(scene: Phaser.Scene, key: string): string | null {
+  const stop = STOPS.find((s) => s.stage === key);
+  const place = stop ? placeOf(stop.id, 'street') : null;
+  if (!place || !stop?.streetBg?.startsWith('street_')) return null;
+  const source = scene.textures.get(placeBackground(scene, place)).getSourceImage() as CanvasImageSource & { width: number; height: number };
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d');
+  if (!ctx || source.width < 256) return null;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(source, source.width - 256, 0, 256, 160, 0, 0, 256, 160);
+  const texture = scene.textures.addCanvas(key, canvas);
+  texture?.setFilter(Phaser.Textures.FilterMode.NEAREST);
+  return texture ? key : null;
 }
 
 function mix(a: string, b: string, t: number): string {

@@ -9,7 +9,7 @@ const IMG = 'public/assets/img/';
 const BUILT_IN = new Set(['room', 'stage_raspberry', 'stage_street', 'stage_lab', 'stage_club', 'stage_rooftop']);
 
 /** Every optional background a stop can use. */
-const KNOWN_IMAGES = [...new Set(STOPS.flatMap((stop) => [stop.stage, stop.stationBg, stop.streetBg]))].filter((key) => !BUILT_IN.has(key));
+const KNOWN_IMAGES = [...new Set([...STOPS.flatMap((stop) => [stop.stage, stop.stationBg, stop.streetBg ?? '']), 'trio_photo'])].filter((key) => key !== '' && !BUILT_IN.has(key));
 
 describe('optional art', () => {
   it('lists only files that are in public/assets/img', () => {
@@ -19,7 +19,7 @@ describe('optional art', () => {
       expect(existsSync(IMG + sheet!.file), `${sheet!.file} is listed in src/core/assets.ts but missing`).toBe(true);
     }
     for (const key of PRESENT_IMAGES) {
-      expect(KNOWN_IMAGES, `${key} is not a stop's stage, station or street`).toContain(key);
+      expect(KNOWN_IMAGES, `${key} is not a stop's stage, station or street, or the trio photo`).toContain(key);
       expect(existsSync(`${IMG}${key}.png`), `${key}.png is listed in src/core/assets.ts but missing`).toBe(true);
     }
   });

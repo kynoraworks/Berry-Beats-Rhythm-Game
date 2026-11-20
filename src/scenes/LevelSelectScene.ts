@@ -3,48 +3,60 @@ import type { Chart } from '../core/chart';
 import { Anim, COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../core/config';
 import { loadStoryChart } from '../core/levels';
 import { onSwipe } from '../core/mobile';
-import { music, type MusicKey } from '../core/music';
+import { music } from '../core/music';
 import { getBest } from '../core/saves';
+import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { UiButton, addBody, addBox, addHeader, addHints, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { addMenuArrow, type MenuArrow } from '../menus/arrows';
+import { UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { formatScore } from '../menus/kit';
-import { CAST } from '../story/cast';
-import { firstSegment } from '../story/flow';
+import { Doors } from '../explore/doors';
+import { CAST, portraitFrame } from '../story/cast';
+import { cycleBackup, getBackup, listAvailable } from '../story/crew';
+import { arrivalPlace, crewAt, lookHotspots, type ExploreData } from '../story/places';
 import { characterSheet } from '../story/placeholders';
-import { isCleared, isStopOpen, nextStopIndex } from '../story/progress';
-import { playSegment } from '../story/run';
-import { ROLE_LABELS, STOPS, stopTeaser } from '../story/stops';
+import { crewOnBoard, hasInspected, hasSeen, isCleared, isStopOpen, nextStopIndex } from '../story/progress';
+import { ROLE_LABELS, STOPS, stopTeaser, type StopDef } from '../story/stops';
+import type { FruitId, TimeOfDay } from '../story/types';
 
 interface LevelSelectData {
   levelId?: string;
 }
 
-// Berry's frame sits at (109, 74) in the 256x160 train art; the frame is 75px square
-// and his body is centred in it with his feet on row 66.
-const BERRY_X = (109 + 37.5) * PX;
-const BERRY_Y = (74 + 37.5) * PX;
-/** The opponent sits this many art pixels to Berry's right, which leaves a gap between them. */
-const SEAT_GAP = 36;
-const RIVAL_X = BERRY_X + SEAT_GAP * PX;
-/** Where a standing sprite's feet go when the seated art is not available. */
+/**
+ * The train: Berry on the bench with whoever rides with him, the Line's
+ * twelve stops as a route map along the top, and a card for the chosen stop.
+ * Riding to a stop shuts the doors and opens them on its station.
+ *
+ * It is also where the story starts: a new game goes to Berry's room first,
+ * and after the first win Berry walks to the station and boards before the
+ * train is ever shown.
+ */
+
+// The bench in the train art runs from x 38 to 216 (art pixels). Five seats 35 apart with
+// Berry in the middle. Seated frames are 75 wide with the body centred on x 38.
+const SEAT_Y = (74 + 37.5) * PX;
+const SEAT_GAP = 35;
+const BERRY_SEAT = 129;
+/** Seats by joining order: Raspberry on his right, Pear on his left, then Lemon and Watermelon. */
+const SEAT_OFFSETS = [1, -1, 2, -2];
+/** Where a standing sprite's feet go when there is no seated art. */
 const FLOOR_Y = (74 + 67) * PX;
 
-const PANEL = { x: 96, y: 152, w: 504, h: 472 };
-const PANEL_CX = PANEL.x + PANEL.w / 2;
-const POLE_W = 560;
-const WIPE_MS = 300;
+const MAP = { x: 24, y: 104, w: GAME_W - 48, h: 128 } as const;
+const NODE = 64;
+const NODE_Y = MAP.y + 54;
+const CARD = { x: 24, y: 244, w: GAME_W - 48, h: 148 } as const;
 const MAX_DIFFICULTY = 5;
 
-/** Widest a stop's name may be on the panel. */
-const NAME_W = PANEL.w - 56;
+/** The line on the map changes colour with the time of day the stops are reached at. */
+const TIME_COLORS: Record<TimeOfDay, number> = { afternoon: 0xffc21a, dusk: 0xff7a5a, night: 0x6a8aff };
 
 const OPENED_KEY = 'berrybeats.opened.v3';
 
 /** Remembered between visits; the first visit starts at the next stop to play. */
 let lastIndex: number | null = null;
 
-/** Ids of the levels the player has already been shown as open, or null on a first visit. */
+/** Ids of the stops the player has already been shown as open, or null on a first visit. */
 function readOpened(): Set<string> | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(OPENED_KEY) ?? 'null');
@@ -62,36 +74,45 @@ function writeOpened(ids: string[]): void {
   }
 }
 
+function nodeX(index: number): number {
+  return MAP.x + 56 + index * ((MAP.w - 112) / (STOPS.length - 1));
+}
+
+interface MapNode {
+  frame: Phaser.GameObjects.Rectangle;
+  face: Phaser.GameObjects.Image;
+  number: Phaser.GameObjects.Text;
+  badge: Phaser.GameObjects.Image;
+}
+
 export class LevelSelectScene extends Phaser.Scene {
   private index = 0;
   private busy = false;
   /** Changes every time the scene starts, so late promises from an earlier visit are ignored. */
   private run = 0;
-  /** Loaded chart per level, or null if loading failed, or undefined while loading. */
+  /** Loaded chart per stop, or null if loading failed, or undefined while loading. */
   private charts: (Chart | null | undefined)[] = [];
-  private preview?: Phaser.Time.TimerEvent;
-  /** Levels that opened since the player last looked. */
-  private fresh = new Set<number>();
+  private nodes: MapNode[] = [];
+  private cursor!: Phaser.GameObjects.Text;
+  private current!: Phaser.GameObjects.Rectangle;
 
-  private rival!: Phaser.GameObjects.Sprite;
+  private countText!: Phaser.GameObjects.Text;
   private nameText!: Phaser.GameObjects.Text;
   private blurbText!: Phaser.GameObjects.Text;
-  private countText!: Phaser.GameObjects.Text;
   private rivalTag!: Phaser.GameObjects.NineSlice;
   private rivalText!: Phaser.GameObjects.Text;
-  private difficultyLabel!: Phaser.GameObjects.Text;
   private pips: Phaser.GameObjects.Image[] = [];
   private infoText!: Phaser.GameObjects.Text;
   private bestText!: Phaser.GameObjects.Text;
-  private lockText!: Phaser.GameObjects.Text;
-  private statusText!: Phaser.GameObjects.Text;
-  private newTag!: Phaser.GameObjects.Container;
-  private playButton!: UiButton;
+  private exploredText!: Phaser.GameObjects.Text;
+  private backupButton!: UiButton;
+  private rideButton!: UiButton;
   private lockedButton!: UiButton;
   private lockedZone!: Phaser.GameObjects.Zone;
-  private left!: MenuArrow;
-  private right!: MenuArrow;
-  private pole!: Phaser.GameObjects.Container;
+  private statusText!: Phaser.GameObjects.Text;
+  private card: Phaser.GameObjects.GameObject[] = [];
+  private train!: Phaser.GameObjects.Sprite;
+  private doors!: Doors;
 
   constructor() {
     super(SceneKeys.LevelSelect);
@@ -104,94 +125,145 @@ export class LevelSelectScene extends Phaser.Scene {
     this.busy = false;
     this.run++;
     this.charts = [];
-    this.preview = undefined;
-    this.fresh = new Set();
+    this.nodes = [];
+    this.pips = [];
+    this.card = [];
   }
 
   create(): void {
+    // The story starts in Berry's room, and he boards the train once before it becomes the hub.
+    if (!isCleared(STOPS[0].id)) {
+      this.scene.start(SceneKeys.Explore, arrivalPlace(STOPS[0].id));
+      return;
+    }
+    if (!hasSeen('boarded')) {
+      this.scene.start(SceneKeys.Explore, { stop: STOPS[0].id, place: 'depart' } satisfies ExploreData);
+      return;
+    }
+
     fadeIn(this);
     music.play('level_select');
-
-    this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
-    this.add.sprite(BERRY_X, BERRY_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit);
-    this.rival = this.add.sprite(RIVAL_X, BERRY_Y, Tex.berrySit).setScale(PX);
+    this.train = this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
+    this.seatCrew();
 
     const toMenu = () => {
       if (this.busy || isLeaving(this)) return;
-      this.preview?.remove();
       music.play('menu');
       goTo(this, SceneKeys.Menu);
     };
-    addHeader(this, 'Story', toMenu);
-    addHints(this, 'Left / Right: choose a stop     Enter: play     Esc: back', 'Swipe or tap the arrows to choose a stop, then tap Play');
+    addHeader(this, 'The Line', toMenu);
+    addHints(this, 'Left / Right: choose a stop     Enter: ride     B: backup     Esc: back', 'Tap a stop on the map, then Ride');
 
-    this.buildPanel();
-    this.statusText = addBody(this, PANEL_CX, PANEL.y + PANEL.h + 44, '', 24, { stroke: true, bold: true });
+    this.buildMap();
+    this.buildCard();
+    this.statusText = addBody(this, GAME_W / 2, GAME_H - 80, '', 24, { stroke: true, bold: true });
+    this.doors = new Doors(this, 500, COLORS.purple);
+    this.doors.open();
 
-    this.left = addMenuArrow(this, 44, PANEL.y + PANEL.h / 2, 'left', () => this.change(-1));
-    this.right = addMenuArrow(this, GAME_W - 44, PANEL.y + PANEL.h / 2, 'right', () => this.change(1));
-    onSwipe(this, { left: () => this.change(1), right: () => this.change(-1) });
-
-    this.pole = this.buildPole();
+    onSwipe(this, { left: () => this.select(this.index + 1), right: () => this.select(this.index - 1) });
     this.loadCharts();
     this.noteNewlyOpened();
-    this.refreshPanel();
-    this.refreshRival(this.index);
+    this.refresh();
 
     menuKeys(this, {
-      left: () => this.change(-1),
-      right: () => this.change(1),
-      confirm: () => void this.start(),
+      left: () => this.select(this.index - 1),
+      right: () => this.select(this.index + 1),
+      confirm: () => this.ride(),
       back: () => {
         if (this.busy) return;
         playSfx(this.game, 'back');
         toMenu();
       },
     });
+    this.input.keyboard?.on('keydown-B', () => this.changeBackup());
   }
 
-  private buildPanel(): void {
-    const { x, y, w } = PANEL;
-    addBox(this, PANEL.x, PANEL.y, PANEL.w, PANEL.h);
+  // -------------------------------------------------------------------------
+  // The bench
+  // -------------------------------------------------------------------------
 
-    this.countText = addBody(this, x + 28, y + 38, '', 20, { origin: [0, 0.5], color: CSS.grey });
-    this.rivalTag = addBox(this, x + w - 24 - 216, y + 16, 216, 44, 'tag');
-    this.rivalText = addText(this, x + w - 24 - 108, y + 38, '', 24, { stroke: false });
-
-    this.nameText = addText(this, PANEL_CX, y + 112, '', 64);
-    this.blurbText = addBody(this, PANEL_CX, y + 170, '', 24, { color: CSS.lilac, wrapWidth: w - 64 });
-    this.add.rectangle(x + 32, y + 212, w - 64, 4, COLORS.purple, 0.6).setOrigin(0, 0.5);
-
-    this.difficultyLabel = addText(this, x + 40, y + 252, 'Difficulty', 24, { origin: [0, 0.5], stroke: false });
-    this.pips = Array.from({ length: MAX_DIFFICULTY }, (_, i) => this.add.image(x + 256 + i * 46, y + 250, Tex.berries, 0).setScale(2));
-    this.infoText = addBody(this, PANEL_CX, y + 300, '', 22, { color: CSS.grey });
-    this.bestText = addBody(this, PANEL_CX, y + 342, '', 24, { bold: true });
-    this.lockText = addBody(this, PANEL_CX, y + 322, '', 24, { bold: true, color: CSS.yellow, wrapWidth: w - 64 });
-
-    const buttonY = y + 412;
-    this.playButton = addUiButton(this, PANEL_CX, buttonY, 'Play', () => void this.start(), { width: 320, sfx: null }).setFocused(true);
-    this.lockedButton = addUiButton(this, PANEL_CX, buttonY, 'Locked', () => undefined, { width: 320, icon: 'icon_lock' }).setEnabled(false);
-    // A disabled button ignores presses, so this zone gives a locked stage its "no" feedback.
-    this.lockedZone = this.add.zone(PANEL_CX, buttonY, 320, 64).setInteractive();
-    this.lockedZone.on(Phaser.Input.Events.POINTER_UP, () => void this.start());
-
-    const tag = addBox(this, -148, -22, 296, 44, 'tag').setTint(COLORS.yellow);
-    const label = addText(this, 0, 0, 'New stage open!', 24, { stroke: false, color: CSS.ink });
-    this.newTag = this.add.container(PANEL_CX, y, [tag, label]);
-    this.tweens.add({ targets: this.newTag, y: y - 6, duration: 420, ease: 'Sine.easeInOut', yoyo: true, repeat: -1 });
+  /** Berry in the middle of the bench and the crew around him. Between The Club and the Rooftop he rides alone. */
+  private seatCrew(): void {
+    this.add.sprite(BERRY_SEAT * PX, SEAT_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit).setDepth(2);
+    crewOnBoard()
+      .slice(0, SEAT_OFFSETS.length)
+      .forEach((fruit, i) => {
+        const x = (BERRY_SEAT + SEAT_OFFSETS[i] * SEAT_GAP) * PX;
+        const art = CAST[fruit].seat;
+        if (art && this.textures.exists(art.texture) && this.anims.exists(art.anim)) {
+          // Each starts the breathing loop at a different point, so they do not bob in step.
+          this.add.sprite(x, SEAT_Y, art.texture).setScale(PX).play({ key: art.anim, startFrame: (i * 3) % 12 }).setDepth(1);
+        } else {
+          // No seated art: they stand by the bench. Frames are 64x64 with the feet on row 62.
+          this.add.sprite(x, FLOOR_Y, characterSheet(this, fruit).texture, 0).setOrigin(0.5, 63 / 64).setScale(PX).setDepth(1);
+        }
+      });
   }
 
-  /** A blurred pole rushing past the window, wide enough to hide the info panel while it swaps. */
-  private buildPole(): Phaser.GameObjects.Container {
-    const h = GAME_H + 40;
-    const parts = [
-      this.add.rectangle(0, 0, POLE_W + 160, h, COLORS.ink, 0.25),
-      this.add.rectangle(0, 0, POLE_W + 80, h, COLORS.ink, 0.5),
-      this.add.rectangle(0, 0, POLE_W, h, COLORS.ink, 1),
-      this.add.rectangle(-POLE_W * 0.18, 0, POLE_W * 0.2, h, 0x2c3458, 1),
-      this.add.rectangle(-POLE_W * 0.2, 0, POLE_W * 0.05, h, 0x4a5684, 1),
-    ];
-    return this.add.container(0, GAME_H / 2, parts).setDepth(100).setVisible(false);
+  // -------------------------------------------------------------------------
+  // The route map
+  // -------------------------------------------------------------------------
+
+  private buildMap(): void {
+    addBox(this, MAP.x, MAP.y, MAP.w, MAP.h);
+    const line = this.add.graphics();
+    for (let i = 0; i < STOPS.length - 1; i++) {
+      line.fillStyle(TIME_COLORS[STOPS[i + 1].time], 1).fillRect(nodeX(i), NODE_Y - 4, nodeX(i + 1) - nodeX(i), 8);
+    }
+    // The next stop to win pulses.
+    this.current = this.add.rectangle(0, NODE_Y, NODE + 18, NODE + 18).setStrokeStyle(4, COLORS.yellow, 0.7).setFillStyle(0, 0);
+    if (!getSettings().reduceMotion) this.tweens.add({ targets: this.current, scale: 1.1, alpha: 0.4, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    STOPS.forEach((stop, i) => {
+      const x = nodeX(i);
+      const frame = this.add.rectangle(x, NODE_Y, NODE + 8, NODE + 8, COLORS.ink).setStrokeStyle(4, COLORS.purple);
+      const face = this.add.image(x, NODE_Y, Tex.portraits, this.portraitFor(stop.fruit)).setDisplaySize(NODE, NODE);
+      const number = addText(this, x, NODE_Y + NODE / 2 + 20, String(stop.number), 20, { color: CSS.cream });
+      const badge = addIcon(this, x + NODE / 2, NODE_Y - NODE / 2, 'icon_check', 3);
+      const hit = this.add.zone(x, NODE_Y + 8, NODE + 24, NODE + 40).setInteractive({ useHandCursor: true });
+      hit.on(Phaser.Input.Events.POINTER_UP, () => {
+        if (this.index === i) this.ride();
+        else this.select(i);
+      });
+      this.nodes.push({ frame, face, number, badge });
+    });
+    this.cursor = addText(this, nodeX(this.index), MAP.y + 10, 'v', 24, { color: CSS.yellow });
+  }
+
+  private portraitFor(fruit: FruitId): number {
+    const frame = portraitFrame({ who: fruit, mood: 'neutral' });
+    return this.textures.get(Tex.portraits).has(String(frame)) ? frame : 0;
+  }
+
+  // -------------------------------------------------------------------------
+  // The card
+  // -------------------------------------------------------------------------
+
+  private buildCard(): void {
+    const { x, y, w } = CARD;
+    const box = addBox(this, x, y, w, CARD.h);
+    this.countText = addBody(this, x + 28, y + 26, '', 20, { origin: [0, 0.5], color: CSS.grey });
+    this.nameText = addText(this, x + 28, y + 70, '', 48, { origin: [0, 0.5] });
+    this.blurbText = addBody(this, x + 28, y + 118, '', 22, { origin: [0, 0.5], color: CSS.lilac });
+
+    const mid = x + 540;
+    this.rivalTag = addBox(this, mid, y + 14, 236, 40, 'tag');
+    this.rivalText = addText(this, mid + 118, y + 34, '', 22, { stroke: false });
+    this.pips = Array.from({ length: MAX_DIFFICULTY }, (_, i) => this.add.image(mid + 22 + i * 44, y + 80, Tex.berries, 0).setScale(1.6));
+    this.infoText = addBody(this, mid, y + 118, '', 20, { origin: [0, 0.5], color: CSS.grey });
+    this.bestText = addBody(this, mid + 252, y + 34, '', 20, { origin: [0, 0.5], bold: true });
+    this.exploredText = addBody(this, mid + 252, y + 80, '', 20, { origin: [0, 0.5], color: CSS.grey });
+
+    const right = x + w - 144;
+    this.rideButton = addUiButton(this, right, y + 48, 'Ride', () => this.ride(), { width: 240, icon: 'icon_next', sfx: null }).setFocused(true);
+    this.lockedButton = addUiButton(this, right, y + 48, 'Locked', () => undefined, { width: 240, icon: 'icon_lock' }).setEnabled(false);
+    // A disabled button ignores presses, so this zone gives a locked stop its "no" feedback.
+    this.lockedZone = this.add.zone(right, y + 48, 240, 64).setInteractive();
+    this.lockedZone.on(Phaser.Input.Events.POINTER_UP, () => this.ride());
+    // The backup: whose ability Berry's Flair fires in this stop (see story/crew.ts).
+    this.backupButton = addUiButton(this, right, y + 114, '', () => this.changeBackup(), { width: 240, height: 44, size: 18, sfx: null });
+
+    this.card = [box, this.countText, this.nameText, this.blurbText, this.rivalTag, this.rivalText, ...this.pips, this.infoText, this.bestText, this.exploredText];
   }
 
   private loadCharts(): void {
@@ -207,163 +279,119 @@ export class LevelSelectScene extends Phaser.Scene {
   private onChart(run: number, index: number, chart: Chart | null): void {
     if (run !== this.run || !this.scene.isActive()) return;
     this.charts[index] = chart;
-    if (index === this.index) this.refreshPanel();
+    if (index === this.index) this.refresh();
   }
 
-  private isLocked(): boolean {
-    return !isStopOpen(this.index);
-  }
-
-  /** Work out which levels opened since the last visit and announce the first of them. */
+  /** Announce a stop that opened since the player last looked. */
   private noteNewlyOpened(): void {
     const open = STOPS.map((_, i) => i).filter((i) => isStopOpen(i));
     const seen = readOpened();
     writeOpened(open.map((i) => STOPS[i].id));
-    // A first visit has nothing to compare against, so nothing is announced.
-    if (seen === null) return;
-    const opened = open.filter((i) => !seen.has(STOPS[i].id));
+    const opened = seen === null ? [] : open.filter((i) => !seen.has(STOPS[i].id));
     if (opened.length === 0) return;
-    for (const i of opened) this.fresh.add(i);
-    const first = opened[0];
-    const name = STOPS[first].station;
+    const name = STOPS[opened[0]].station;
     this.time.delayedCall(450, () => {
       playSfx(this.game, 'bonus');
-      this.statusText.setText(`${name} is now open!`).setColor(CSS.yellow);
-      if (this.index < first) this.right.flash();
+      this.statusText.setText(`Next stop: ${name}`).setColor(CSS.yellow);
     });
   }
 
-  private refreshPanel(): void {
+  private refresh(): void {
     const stop = STOPS[this.index];
-    const chart = this.charts[this.index];
-    const locked = this.isLocked();
-    const fruit = CAST[stop.fruit];
+    const open = isStopOpen(this.index);
+    const next = nextStopIndex();
 
-    this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}`);
-    this.nameText.setText(stop.station).setFontSize(64).setAlpha(locked ? 0.55 : 1);
-    // Long station names step down in size until they fit the panel.
-    for (let size = 56; this.nameText.width > NAME_W && size >= 32; size -= 8) this.nameText.setFontSize(size);
-    this.blurbText.setText(stopTeaser(stop)).setAlpha(locked ? 0.55 : 1);
-    this.rivalTag.setTint(fruit.tag);
-    this.rivalText.setText(`vs ${fruit.name}`).setColor(fruit.darkTag ? CSS.ink : CSS.cream);
-
-    this.playButton.setVisible(!locked);
-    this.lockedButton.setVisible(locked);
-    if (locked) this.lockedZone.setInteractive();
-    else this.lockedZone.disableInteractive();
-    this.lockText.setVisible(locked);
-    if (locked) this.lockText.setText(`Win at ${STOPS[this.index - 1].station} to open`);
-    this.newTag.setVisible(!locked && this.fresh.has(this.index));
-    this.infoText.setVisible(!locked);
-    this.bestText.setVisible(!locked);
-
-    const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
-    this.difficultyLabel.setAlpha(chart && !locked ? 1 : 0.45);
-    this.pips.forEach((pip, i) => {
-      const on = i < difficulty;
-      pip.setAlpha((on ? 1 : 0.45) * (locked ? 0.6 : 1)).setTint(on ? 0xffffff : 0x6a5a86);
+    this.nodes.forEach((node, i) => {
+      const available = isStopOpen(i);
+      const cleared = isCleared(STOPS[i].id);
+      node.frame.setStrokeStyle(4, i === this.index ? COLORS.yellow : cleared ? COLORS.perfect : available ? COLORS.lilac : 0x3a3458);
+      if (available) node.face.clearTint().setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);
+      else node.face.setTint(0x2a2440).setTintMode(Phaser.TintModes.FILL).setAlpha(0.9);
+      node.badge.setVisible(cleared);
+      node.number.setColor(i === this.index ? CSS.yellow : available ? CSS.cream : CSS.grey);
     });
-    if (chart) this.infoText.setText(`${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM`);
-    else this.infoText.setText(chart === null ? 'This stop is not ready yet' : 'Loading...');
+    this.current.setVisible(next < STOPS.length).setX(nodeX(Math.min(next, STOPS.length - 1)));
+    this.cursor.setX(nodeX(this.index));
+
+    const fruit = CAST[stop.fruit];
+    this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}`);
+    this.nameText.setText(open ? stop.station : '? ? ?').setFontSize(48).setAlpha(open ? 1 : 0.6);
+    for (let size = 44; this.nameText.width > 500 && size >= 28; size -= 4) this.nameText.setFontSize(size);
+    this.blurbText.setText(open ? stopTeaser(stop) : `Win at ${STOPS[this.index - 1].station} to ride on`);
+    this.rivalTag.setTint(open ? fruit.tag : 0x3a3458);
+    this.rivalText.setText(open ? `vs ${fruit.name}` : 'vs ? ? ?').setColor(open && fruit.darkTag ? CSS.ink : CSS.cream);
+
+    const chart = this.charts[this.index];
+    const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
+    this.pips.forEach((pip, i) => pip.setAlpha(i < difficulty && open ? 1 : 0.35).setTint(i < difficulty ? 0xffffff : 0x6a5a86));
+    this.infoText.setText(!open ? '' : chart ? `${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM` : chart === null ? 'This stop is not ready yet' : 'Loading...');
 
     const best = getBest(stop.chartId);
-    if (best) {
-      const flag = best.fullCombo ? '   Full combo!' : '';
-      this.bestText.setText(`Best ${formatScore(best.score)}   Rank ${best.rank}${flag}`).setColor(CSS.yellow);
-    } else {
-      this.bestText.setText(isCleared(stop.id) ? 'Cleared' : 'Not cleared yet').setColor(CSS.cream);
-    }
+    if (best) this.bestText.setText(`Best ${formatScore(best.score)} ${best.rank}`).setColor(CSS.yellow);
+    else this.bestText.setText(isCleared(stop.id) ? 'Cleared' : open ? 'Not won yet' : '').setColor(CSS.cream);
+    const spots = lookHotspots(stop);
+    const found = spots.filter((spot) => hasInspected(spot.key)).length;
+    this.exploredText.setText(open && spots.length > 0 ? `Looked at ${found} of ${spots.length}` : '');
 
-    this.left.image.setAlpha(this.index > 0 ? 1 : 0.25);
-    this.right.image.setAlpha(this.index < STOPS.length - 1 ? 1 : 0.25);
+    this.rideButton.setVisible(open);
+    this.lockedButton.setVisible(!open);
+    if (open) this.lockedZone.disableInteractive();
+    else this.lockedZone.setInteractive();
+    this.refreshBackup(stop, open);
   }
 
-  /** Seat the stop's fruit beside Berry. A locked stop only shows their outline. */
-  private refreshRival(index: number): void {
-    const id = STOPS[index].fruit;
-    const seat = CAST[id].seat;
-    const rival = this.rival;
-    if (seat && this.textures.exists(seat.texture) && this.anims.exists(seat.anim)) {
-      rival.setVisible(true).setOrigin(0.5).setPosition(RIVAL_X, BERRY_Y);
-      rival.play(seat.anim, true);
-    } else {
-      // No seated art yet: they stand at the bench. Frames are 64x64 with the feet on row 62.
-      rival.anims.stop();
-      rival.setVisible(true).setTexture(characterSheet(this, id).texture, 0).setOrigin(0.5, 63 / 64).setPosition(RIVAL_X, FLOOR_Y);
-    }
-    if (isStopOpen(index)) rival.clearTint().setTintMode(Phaser.TintModes.MULTIPLY).setAlpha(1);
-    else rival.setTint(COLORS.ink).setTintMode(Phaser.TintModes.FILL).setAlpha(0.85);
+  /** The backup choice for this stop, from the crew who are with Berry there. */
+  private refreshBackup(stop: StopDef, open: boolean): void {
+    const allies = crewAt(stop);
+    const backup = getBackup(allies);
+    this.backupButton.setVisible(open && backup !== null);
+    if (backup) this.backupButton.setLabel(`Backup: ${CAST[backup].name}`);
   }
 
-  private change(dir: number): void {
+  private changeBackup(): void {
     if (this.busy || isLeaving(this)) return;
-    const next = this.index + dir;
-    if (next < 0 || next >= STOPS.length) return;
-    this.busy = true;
-    (dir < 0 ? this.left : this.right).flash();
+    const stop = STOPS[this.index];
+    const allies = crewAt(stop);
+    if (!isStopOpen(this.index) || listAvailable(allies).length < 2) return;
+    cycleBackup(1, allies);
     playSfx(this.game, 'move');
-    this.statusText.setText('');
-
-    // Moving on means the train runs forward, so the pole passes right to left.
-    // The panel and the opponent each swap as the pole covers them.
-    const edge = GAME_W / 2 + dir * (GAME_W / 2 + POLE_W / 2 + 80);
-    const passed = (x: number) => (dir > 0 ? this.pole.x <= x : this.pole.x >= x);
-    let panelSwapped = false;
-    let rivalSwapped = false;
-    this.pole.setVisible(true).setX(edge);
-    this.tweens.add({
-      targets: this.pole,
-      x: GAME_W - edge,
-      duration: WIPE_MS,
-      ease: 'Linear',
-      onUpdate: () => {
-        if (!rivalSwapped && passed(RIVAL_X)) {
-          rivalSwapped = true;
-          this.refreshRival(next);
-        }
-        if (!panelSwapped && passed(PANEL_CX)) {
-          panelSwapped = true;
-          this.index = next;
-          lastIndex = next;
-          this.refreshPanel();
-        }
-      },
-      onComplete: () => {
-        this.pole.setVisible(false);
-        this.busy = false;
-      },
-    });
-
-    // The original played each level's song as it came up. Wait a beat so flicking through stays quiet.
-    // A locked level keeps its song a surprise.
-    this.preview?.remove();
-    const song = isStopOpen(next) ? (STOPS[next].song as MusicKey) : 'level_select';
-    this.preview = this.time.delayedCall(500, () => music.play(song, 500));
+    this.refreshBackup(stop, true);
   }
 
-  private async start(): Promise<void> {
+  private select(index: number): void {
+    if (this.busy || isLeaving(this) || index < 0 || index >= STOPS.length || index === this.index) return;
+    playSfx(this.game, 'move');
+    this.index = index;
+    lastIndex = index;
+    this.statusText.setText('');
+    this.refresh();
+  }
+
+  // -------------------------------------------------------------------------
+  // Riding to a stop
+  // -------------------------------------------------------------------------
+
+  /** The train slows, the doors shut with the station's name on them, and they open on its platform. */
+  private ride(): void {
     if (this.busy || isLeaving(this)) return;
-    if (this.isLocked()) {
+    if (!isStopOpen(this.index)) {
       playSfx(this.game, 'miss');
-      this.tweens.killTweensOf(this.lockText);
-      this.lockText.setX(PANEL_CX);
-      this.tweens.add({ targets: this.lockText, x: PANEL_CX + 10, duration: 45, yoyo: true, repeat: 3, onComplete: () => this.lockText.setX(PANEL_CX) });
+      this.statusText.setText(`Win at ${STOPS[this.index - 1].station} first`).setColor(CSS.miss);
       return;
     }
     this.busy = true;
-    const run = this.run;
     const stop = STOPS[this.index];
     playSfx(this.game, 'select');
-    this.statusText.setText('Loading...').setColor(CSS.cream);
-    try {
-      this.preview?.remove();
-      await playSegment(this, { stop: stop.id, segment: firstSegment(stop, isCleared(stop.id)) });
-      if (run === this.run) music.stop();
-    } catch (error) {
-      if (run !== this.run || !this.scene.isActive()) return;
-      playSfx(this.game, 'back');
-      this.statusText.setText(error instanceof Error ? error.message : `${stop.station} could not be loaded`).setColor(CSS.miss);
-      this.busy = false;
-    }
+    music.stop(800);
+    this.statusText.setText('');
+    const quick = getSettings().reduceMotion;
+    this.tweens.add({ targets: this.card, alpha: 0, duration: 200 });
+    const anim = this.train.anims;
+    this.tweens.addCounter({ from: 1, to: 0.05, duration: quick ? 1 : 900, ease: 'Quad.easeOut', onUpdate: (tween) => void (anim.timeScale = tween.getValue() ?? 1) });
+    if (!quick) this.time.delayedCall(850, () => this.cameras.main.shake(180, 0.004));
+    const sub = stop.number === 1 ? 'Home' : `Stop ${stop.number}`;
+    this.time.delayedCall(quick ? 50 : 1000, () =>
+      this.doors.close(stop.station, sub, () => this.time.delayedCall(300, () => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)))),
+    );
   }
 }
