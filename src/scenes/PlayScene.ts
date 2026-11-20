@@ -37,7 +37,7 @@ import { BASE_SCROLL_SPEED, Depth, FLOOR_Y, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, 
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
-import { effectCards } from '../play/fighterCard';
+import { effectChips } from '../play/fighterCard';
 import { HypeMode } from '../play/HypeMode';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
@@ -313,8 +313,8 @@ export class PlayScene extends Phaser.Scene {
       });
     }
 
-    // The Flair meter sits first in the HUD's effects rack.
-    if (this.rules.ability && this.rules.abilityOwner) this.hud.setRackOffset(1);
+    // The Flair meter sits first in the HUD's effect row.
+    this.hud.setFlair(!!(this.rules.ability && this.rules.abilityOwner));
 
     // Hype: the player's streak reward in a battle (not in the Coach's lessons).
     if (this.rival && segment?.kind !== 'lesson') {
@@ -334,7 +334,7 @@ export class PlayScene extends Phaser.Scene {
 
     this.countText = addText(this, GAME_W / 2, 390, '', 64).setDepth(Depth.overlay);
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
-    if (tag) addBody(this, GAME_W / 2, 212, tag, 22, { color: CSS.yellow, bold: true, stroke: true }).setDepth(Depth.hud);
+    if (tag) addBody(this, GAME_W / 2, 776, tag, 16, { color: CSS.yellow, bold: true, stroke: true }).setAlpha(0.8).setDepth(Depth.hud);
 
 
     this.buildPauseMenu();
@@ -948,7 +948,7 @@ export class PlayScene extends Phaser.Scene {
       }
       const combo = this.engine.stats.combo;
       if (combo >= this.nextMilestone) {
-        this.hud.callout(`${this.nextMilestone} combo!`);
+        // The milestone shows in the dancer's showpiece and the combo count by the lanes, not a centre call-out.
         this.player.special();
         this.stage.flash(COLORS.yellow, 0.22);
         this.stage.punch();
@@ -1106,19 +1106,12 @@ export class PlayScene extends Phaser.Scene {
     }
   }
 
-  /** The effect cards for the HUD right now: the enemy's pressure, the ability running, hype. */
-  private effectList(time: number): ReturnType<typeof effectCards> {
+  /** The effect chips for the HUD right now: the ability running, then hype. Gimmicks are telegraphed on the field. */
+  private effectList(time: number): ReturnType<typeof effectChips> {
     if (this.state !== 'playing') return [];
-    const effects = this.effects;
-    const scramble = effects?.scrambleStatus(time) ?? { beats: 0, left: 0 };
-    return effectCards({
-      ability: effects?.abilityStatus(time) ?? null,
-      scrambleBeats: scramble.beats,
-      scrambleLeft: scramble.left,
-      meltdown: effects?.meltdownNow(time) ?? false,
-      hype: this.hype?.active ? { ...this.hype.status(), streak: this.engine.stats.combo } : null,
-      flash: effects?.flashStatus(time) ?? null,
-      gimmick: this.rules.gimmick,
+    return effectChips({
+      ability: this.effects?.abilityStatus(time) ?? null,
+      hype: this.hype?.active ? this.hype.status() : null,
     });
   }
 

@@ -156,8 +156,8 @@ export class BattleEffects {
   record(event: JudgeEvent): void {
     const { judgement, part } = event;
     if (this.meter && !this.active(this.time) && !this.spent && this.meter.add(judgement)) {
+      // The meter itself glows when it is full; the sound says so too.
       this.setup.hooks.sfx('flair');
-      this.setup.hooks.callout(this.setup.touch ? 'Flair! Tap it!' : 'Flair! Press Space!', CSS.yellow);
     }
     // A missed note still uses up one of Eureka's eight.
     if (judgement === 'miss' && part !== 'holdEnd' && this.eurekaLeft > 0) this.useEureka();
