@@ -27,6 +27,7 @@ import { getSettings, keyLabel } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { getAudioContext, loadSongBuffer } from '../core/songs';
 import { TouchLanes } from '../core/touchLanes';
+import { onBackGesture } from '../core/backGesture';
 import { SCHEME_INFO } from '../core/touchSchemes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { createPlayer, createRival, type Dancer } from '../play/characters';
@@ -117,6 +118,10 @@ export class PlayScene extends Phaser.Scene {
   private laneInput: LaneInput | null = null;
   private touchLanes: TouchLanes | null = null;
   private pauseButton!: Phaser.GameObjects.Image;
+  /** The pause menu is open outside a song (over a conversation or loading). */
+  private menuOnly = false;
+  /** A song that finished loading while that menu was open. */
+  private pendingBuffer: AudioBuffer | null = null;
   private stopRotateWatch: (() => void) | null = null;
   private playerField!: NoteField;
   private rivalField: NoteField | null = null;
@@ -199,6 +204,8 @@ export class PlayScene extends Phaser.Scene {
     this.loadingBack = null;
     this.idleClock = 0;
     this.touchLanes = null;
+    this.menuOnly = false;
+    this.pendingBuffer = null;
     this.stopRotateWatch = null;
     this.autoHeld = [null, null, null, null];
     this.nextMilestone = COMBO_MILESTONES[0];
@@ -312,9 +319,7 @@ export class PlayScene extends Phaser.Scene {
     const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
     pause.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
       event.stopPropagation();
-      // While the song is still loading there is nothing to pause, so the button leaves instead.
-      if (this.state === 'loading') this.quit();
-      else this.pauseGame();
+      this.openPause();
     });
 
     this.countText = addText(this, GAME_W / 2, 390, '', 64).setDepth(Depth.overlay);
@@ -340,10 +345,8 @@ export class PlayScene extends Phaser.Scene {
     if (intro.length > 0) {
       this.introDone = false;
       this.touchLanes?.setGuideVisible(false);
-      this.pauseButton.setVisible(false);
       this.startDialogue(intro, () => {
         this.introDone = true;
-        this.pauseButton.setVisible(true);
         this.maybeBegin();
       });
     } else {
@@ -403,6 +406,11 @@ export class PlayScene extends Phaser.Scene {
 
   private begin(buffer: AudioBuffer): void {
     if (!this.sys.isActive() || this.state !== 'loading' || isLeaving(this)) return;
+    // The song waits while the pause menu is open over the loading screen.
+    if (this.menuOnly) {
+      this.pendingBuffer = buffer;
+      return;
+    }
     const ctx = getAudioContext(this.game);
     if (ctx.state !== 'running') {
       // Browsers keep audio locked until the page is clicked or a key is pressed.
@@ -503,6 +511,8 @@ export class PlayScene extends Phaser.Scene {
         onDone();
       },
     });
+    // A conversation that starts while the pause menu is open waits behind it.
+    if (this.menuOnly) this.dialogue.setSuspended(true);
   }
 
   private pauseGame(): void {
@@ -533,7 +543,46 @@ export class PlayScene extends Phaser.Scene {
     music.play(this.chart.song === PAUSE_SONG ? PAUSE_SONG_SPARE : PAUSE_SONG, 400);
   }
 
+  /**
+   * Every way of asking to stop comes here: the pause button, P, the back
+   * gesture and the touch gestures. In a song it pauses; anywhere else (a
+   * conversation, loading, the lines after a song) it opens the same menu over
+   * what is on screen, so Exit is always one tap away.
+   */
+  private openPause(): void {
+    if (isLeaving(this)) return;
+    if (this.state === 'playing' || this.state === 'resuming') {
+      this.pauseGame();
+      return;
+    }
+    if (this.state === 'paused' || this.menuOnly) return;
+    this.menuOnly = true;
+    this.dialogue?.setSuspended(true);
+    this.pauseFocus.focus(0, true);
+    this.pauseLayer.setVisible(true);
+    playSfx(this.game, 'back');
+  }
+
+  private closeMenuOnly(): void {
+    if (!this.menuOnly) return;
+    this.menuOnly = false;
+    this.pauseLayer.setVisible(false);
+    this.dialogue?.setSuspended(false);
+    const buffer = this.pendingBuffer;
+    this.pendingBuffer = null;
+    if (buffer) this.begin(buffer);
+  }
+
+  /** True while the pause menu is on screen, over a paused song or over anything else. */
+  private pauseOpen(): boolean {
+    return this.state === 'paused' || this.menuOnly;
+  }
+
   private resumeGame(): void {
+    if (this.menuOnly) {
+      this.closeMenuOnly();
+      return;
+    }
     if (this.state !== 'paused' || isRotateNoticeShown()) return;
     this.state = 'resuming';
     this.pauseLayer.setVisible(false);
@@ -664,7 +713,6 @@ export class PlayScene extends Phaser.Scene {
       if (outro.length === 0 || isLeaving(this)) after();
       else {
         this.countText.setText('');
-        this.pauseButton.setVisible(false);
         this.startDialogue(outro, after, hoodDown);
       }
     };
@@ -790,7 +838,7 @@ export class PlayScene extends Phaser.Scene {
       this.touchLanes = new TouchLanes(
         { down: (lane, timeMs) => this.laneDown(lane, timeMs), up: (lane, timeMs) => this.laneUp(lane, timeMs) },
         (event) => this.state !== 'playing' || this.isOverPauseButton(event) || this.isOverFlair(event),
-        { scheme: settings.touchScheme, alwaysShowGuide: settings.touchGuides, onPause: () => this.state === 'playing' && this.pauseGame() },
+        { scheme: settings.touchScheme, alwaysShowGuide: settings.touchGuides, onPause: () => this.openPause() },
       );
     }
     this.stopRotateWatch = onRotateNoticeChange((shown) => shown && this.pauseGame());
@@ -798,10 +846,14 @@ export class PlayScene extends Phaser.Scene {
     menuKeys(this, {
       left: () => this.state === 'paused' && this.backupButton !== null && this.pauseFocus.index === 1 && this.swapBackup(-1),
       right: () => this.state === 'paused' && this.backupButton !== null && this.pauseFocus.index === 1 && this.swapBackup(1),
-      up: () => this.state === 'paused' && this.pauseFocus.move(-1),
-      down: () => this.state === 'paused' && this.pauseFocus.move(1),
-      confirm: () => this.state === 'paused' && this.pauseFocus.activate(),
+      up: () => this.pauseOpen() && this.pauseFocus.move(-1),
+      down: () => this.pauseOpen() && this.pauseFocus.move(1),
+      confirm: () => this.pauseOpen() && this.pauseFocus.activate(),
       back: () => {
+        if (this.menuOnly) {
+          this.closeMenuOnly();
+          return;
+        }
         // A conversation reads Esc itself (skip); that press must not also pause or leave.
         if (this.dialogue?.busy) return;
         if (this.state === 'playing') this.pauseGame();
@@ -810,7 +862,12 @@ export class PlayScene extends Phaser.Scene {
       },
     });
     this.input.keyboard?.on('keydown-P', () => {
-      if (this.state === 'playing') this.pauseGame();
+      if (!this.pauseOpen()) this.openPause();
+    });
+    // The browser's or phone's back gesture: the first opens the pause menu, a second one leaves.
+    onBackGesture(this, () => {
+      if (this.pauseOpen()) this.quit();
+      else this.openPause();
     });
     // Space fires the backup's ability, unless the player has given Space to a lane.
     const spaceIsLane = getSettings().keys.some((codes) => codes.includes('Space'));

@@ -74,6 +74,7 @@ export class Dialogue {
   private readonly body: Phaser.GameObjects.Text;
   private readonly next: Phaser.GameObjects.Image;
   private readonly help: Phaser.GameObjects.Text;
+  private suspended = false;
   private readonly skip: UiButton;
   private readonly advanceCodes: Set<string>;
   private readonly calm: boolean;
@@ -112,6 +113,16 @@ export class Dialogue {
     scene.events.on(Phaser.Scenes.Events.UPDATE, this.onUpdate);
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.showLine(0);
+  }
+
+  /**
+   * While suspended (a pause menu is open over the conversation) taps and keys
+   * are left alone. Turning it off waits a frame, so the tap that closed the
+   * menu does not also turn the page.
+   */
+  setSuspended(suspended: boolean): void {
+    if (suspended) this.suspended = true;
+    else this.scene.events.once(Phaser.Scenes.Events.POST_UPDATE, () => (this.suspended = false));
   }
 
   /** True while the conversation is on screen. */
@@ -251,7 +262,7 @@ export class Dialogue {
   };
 
   private readonly onKey = (event: KeyboardEvent): void => {
-    if (!this.open || event.repeat) return;
+    if (!this.open || event.repeat || this.suspended) return;
     if (event.code === 'Escape') {
       playSfx(this.scene.game, 'back');
       this.finish();
@@ -262,7 +273,7 @@ export class Dialogue {
 
   private readonly onPointer = (pointer: Phaser.Input.Pointer): void => {
     // The Skip button answers its own taps.
-    if (!this.open || this.skip.container.getBounds().contains(pointer.x, pointer.y)) return;
+    if (!this.open || this.suspended || this.skip.container.getBounds().contains(pointer.x, pointer.y)) return;
     this.advance();
   };
 }

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { onBackGesture } from '../core/backGesture';
 import { COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music, type MusicKey } from '../core/music';
@@ -260,6 +261,8 @@ export class ExploreScene extends Phaser.Scene {
       keyboard.on('keydown', this.onKey);
       this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => keyboard.off('keydown', this.onKey));
     }
+    // The browser's or phone's back gesture works like the Back button instead of leaving the site.
+    onBackGesture(this, () => this.back());
     // A tap on the floor walks there.
     this.input.on(Phaser.Input.Events.POINTER_UP, (pointer: Phaser.Input.Pointer) => {
       if (!this.ready() || pointer.y < 90) return;
