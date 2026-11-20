@@ -22,6 +22,9 @@ export interface OptionalImage {
   file: string;
 }
 
+/** Characters with a walk cycle sheet besides Berry. */
+export const WALKERS = ['raspberry', 'pear', 'lemon', 'watermelon', 'instructor', 'banana', 'grape', 'plum', 'dragonfruit', 'coconut', 'orange', 'pineapple', 'blueberry', 'npc'] as const;
+
 /** Every optional sheet the game knows how to use, with its size. */
 export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   ...[Tex.banana, Tex.grape, Tex.plum, Tex.dragonfruit, Tex.watermelon, Tex.coconut, Tex.orange, Tex.pineapple, Tex.blueberry].map((key) => ({
@@ -35,6 +38,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   { key: 'npc', file: 'npc.png', frameWidth: 64, frameHeight: 64 },
   // Berry walking to the right: 6 frames in the dancers' 64x64 layout (feet on row 62), for the station and street walk.
   { key: 'berry_walk', file: 'berry_walk.png', frameWidth: 64, frameHeight: 64 },
+  // Everyone else's walk: 6 frames walking right in the same layout, keyed '<id>_walk' (the Coach is 'instructor_walk'). See tools/build_walks.py.
+  ...WALKERS.map((id) => ({ key: `${id}_walk`, file: `${id}_walk.png`, frameWidth: 64, frameHeight: 64 })),
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -51,6 +56,7 @@ export const PRESENT_SHEETS: readonly string[] = [
   Tex.watermelonSit,
   'npc',
   'berry_walk',
+  ...WALKERS.map((id) => `${id}_walk`),
 ];
 
 /**
