@@ -5,9 +5,11 @@ What it does
   1. Decodes each song in public/assets/audio with ffmpeg (mono, 44.1 kHz float),
      which is the same decode path browsers use for these files.
   2. Measures tempo, drift and the first-beat offset of all six tracks.
-  3. Builds the six story beat maps (public/charts/*.json) from the detected
-     onsets, following a hand-written section plan per level (who plays when,
-     how dense, which lanes). Note positions and lanes come from the audio.
+  3. Builds the beat maps in public/charts from the detected onsets, following
+     a hand-written section plan per chart (who plays when, how dense, which
+     lanes). Note positions and lanes come from the audio. The twelve story
+     stops are stop01 to stop12; the older charts (tutorial, level1 to level3,
+     bonus-title, bonus-menu) are kept as they were.
   4. Validates every chart and prints a report. Exits non-zero on a violation.
 
 Run from the repo root:
@@ -15,6 +17,7 @@ Run from the repo root:
     python3 tools/analyze_audio.py --clicks DIR    # also write click-track wavs to DIR
     python3 tools/analyze_audio.py --no-write      # report only
     python3 tools/analyze_audio.py --show level1   # print an ASCII view of a chart
+    python3 tools/analyze_audio.py --only stop04   # build and report only these charts
 
 Needs: Python 3.10+, numpy, scipy, and ffmpeg on the PATH.
 The output is deterministic: the same audio always gives the same charts.
@@ -29,7 +32,7 @@ import json
 import subprocess
 import sys
 import wave
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -442,6 +445,20 @@ class Section:
     hold_sustain: float = 1.0
     lanes: tuple[int, ...] = (0, 1, 2, 3)
     floor: float = 0.30
+    # Two-lane accents for the rival, like `doubles` for the player.
+    rival_doubles: float = 0
+    # Holds allowed for the rival; None keeps the old rule (one fewer than the player's).
+    rival_holds: int | None = None
+    # How strong (low plus mid onset strength) a beat must be to carry a double.
+    double_accent: float = 1.5
+    # Shortest hold in beats: a ringing sound that qualifies is held at least this long,
+    # for charts built around holds. None: holds last as long as the sound rings.
+    hold_min: float | None = None
+    # How clearly a pitched note must start for its sound to become a hold.
+    hold_tonal: float = 0.08
+    # Sixteenth-note runs per bar: the bar's best stretch of four (or three) back-to-back
+    # sixteenths that all have an onset is charted in full, on top of the other picks.
+    runs: int = 0
 
 
 @dataclass
@@ -457,6 +474,17 @@ class Plan:
     # True: split the lanes at the quartiles of this side's own notes rather than of every
     # onset in the song, so a chart that leans on low sounds still uses all four lanes.
     balance_lanes: bool = False
+    # Closest two holds on one side may start, in slots. None: a bar apart for solo_holds
+    # charts, two bars otherwise.
+    hold_spacing: int | None = None
+    # Two notes in one lane closer than this many slots are avoided when choosing lanes
+    # (None: only a sixteenth apart). Used for charts that must read slowly.
+    lane_gap: int | None = None
+    # No two-lane notes at all on either side.
+    no_doubles: bool = False
+    # Split the lanes by each note's rank in pitch (ties scattered) rather than by value,
+    # so songs where many onsets read as the same pitch still use all four lanes evenly.
+    rank_lanes: bool = False
 
 
 PLANS = [
@@ -555,6 +583,149 @@ PLANS = [
 ]
 
 
+
+def _reuse(source: str, chart_id: str, title: str, rival: str) -> Plan:
+    """A story stop that plays the same notes as an earlier chart under its own id."""
+    plan = next(p for p in PLANS if p.chart_id == source)
+    return replace(plan, chart_id=chart_id, title=title, rival=rival)
+
+
+# The twelve stops of the story (docs/STORY_BIBLE.md). Each chart shows its fruit's
+# gimmick where the gimmick lives in the chart; the visual ones come from the game.
+PLANS += [
+    # Stop 1, Raspberry: an even chart with no gimmick, the first boss. Level 1's notes.
+    _reuse("level1", "stop01", "Stop 1", "raspberry"),
+    # Stop 2, Banana: an easy warm-up. His notes slide in from the next lane in the game,
+    # so the chart reads slowly: no doubles and no lane twice within a beat.
+    Plan(
+        "stop02", "tutorial", "Stop 2", "banana", 1, max_nps=3, solo_holds=True, lane_gap=4, no_doubles=True,
+        sections=[
+            Section(0, 4, "trade", grid=4, notes=3, rival_notes=3, unit=1),
+            Section(4, 12, "trade", grid=4, notes=4, rival_notes=4, unit=2, holds=1),
+            Section(12, 20, "trade", grid=2, notes=4, rival_notes=4, unit=1, holds=1),
+            Section(20, 24, "both", grid=4, notes=4, rival_notes=3),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 3, Pear: slow start, strong finish. Level 2's notes.
+    _reuse("level2", "stop03", "Stop 3", "pear"),
+    # Stop 4, Grape: notes arrive in pairs, on both sides, chords on the strong beats.
+    Plan(
+        "stop04", "menu", "Stop 4", "grape", 3, max_nps=6, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=5, rival_doubles=2, double_accent=0.6),
+            Section(1, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, doubles=2, rival_doubles=2, double_accent=0.6),
+            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+            Section(12, 16, "both", grid=2, notes=6, rival_notes=5, doubles=2, rival_doubles=1, double_accent=0.6),
+            Section(16, 24, "trade", grid=2, notes=7, rival_notes=6, unit=1, doubles=2, rival_doubles=2, double_accent=0.6, holds=1),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 5, Dr. Lemon: erratic. Level 3's notes.
+    _reuse("level3", "stop05", "Stop 5", "lemon"),
+    # Stop 6, Plum: long rests and patient patterns. Every phrase leaves the player at
+    # least a bar of quiet, and some bars nobody plays at all.
+    Plan(
+        "stop06", "title", "Stop 6", "plum", 3, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=4, rival_notes=3),
+            Section(1, 2, "player", grid=4, notes=4),
+            Section(2, 3, "rest"),
+            Section(3, 4, "rival", grid=4, rival_notes=4),
+            Section(4, 6, "player", grid=2, notes=5, holds=1, hold_sustain=0.4, hold_min=2),
+            Section(6, 7, "rest"),
+            Section(7, 8, "rival", grid=2, rival_notes=5),
+            Section(8, 10, "player", grid=2, notes=6, holds=1, hold_sustain=0.4, hold_min=2),
+            Section(10, 11, "rest"),
+            Section(11, 12, "rival", grid=2, rival_notes=5),
+            Section(12, 14, "both", grid=2, notes=6, rival_notes=4),
+            Section(14, 15, "rest"),
+            Section(15, 16, "rival", grid=2, rival_notes=5),
+            Section(16, 18, "player", grid=2, notes=6, holds=1, hold_sustain=0.4, hold_min=2),
+            Section(18, 19, "rest"),
+            Section(19, 20, "rival", grid=2, rival_notes=5),
+            Section(20, 23, "both", grid=2, notes=6, rival_notes=5, doubles=0.5, holds=1, hold_sustain=0.4, hold_min=2),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 7, Dragon Fruit: a flashy boss. Dense and syncopated on the sixteenth grid,
+    # nothing like stop 1 on the same song.
+    Plan(
+        "stop07", "level1", "Stop 7", "dragonfruit", 4, max_nps=5, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 4, "trade", grid=2, notes=6, rival_notes=6, unit=1, bursts=1),
+            Section(4, 8, "trade", grid=1, notes=7, rival_notes=6, unit=2, floor=0.22),
+            Section(8, 12, "both", grid=2, notes=7, rival_notes=5, bursts=2, doubles=0.5, holds=1),
+            Section(12, 16, "trade", grid=1, notes=8, rival_notes=7, unit=1, floor=0.2),
+            Section(16, 20, "both", grid=1, notes=8, rival_notes=6, doubles=1),
+            Section(20, 24, "trade", grid=1, notes=8, rival_notes=8, unit=1, bursts=2),
+            Section(24, 29, "both", grid=1, notes=9, rival_notes=6, doubles=1, floor=0.2),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 8, Watermelon: long holds of one to four beats on both sides, taps around them.
+    Plan(
+        "stop08", "tutorial", "Stop 8", "watermelon", 3, max_nps=4, solo_holds=False, hold_spacing=8,
+        sections=[
+            Section(0, 4, "trade", grid=2, notes=5, rival_notes=5, unit=1, holds=2, rival_holds=2, max_hold=4, hold_sustain=0.3, hold_min=1.5, hold_tonal=0.03, floor=0.2),
+            Section(4, 12, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=4, rival_holds=4, max_hold=4, hold_sustain=0.3, hold_min=2, hold_tonal=0.03, floor=0.2),
+            Section(12, 20, "both", grid=2, notes=7, rival_notes=5, holds=5, rival_holds=4, max_hold=4, hold_sustain=0.3, hold_min=2, hold_tonal=0.03, floor=0.2),
+            Section(20, 24, "trade", grid=2, notes=6, rival_notes=6, unit=1, holds=3, rival_holds=2, max_hold=4, hold_sustain=0.3, hold_min=1.5, hold_tonal=0.03),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 9, Coconut: hard, steady and unrelenting. Eighth notes almost all the way.
+    Plan(
+        "stop09", "title", "Stop 9", "coconut", 4, max_nps=4, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 8, "both", grid=2, notes=7, rival_notes=6, doubles=0.5),
+            Section(8, 16, "trade", grid=2, notes=8, rival_notes=8, unit=1, doubles=0.5),
+            Section(16, 24, "both", grid=2, notes=8, rival_notes=6, doubles=1, bursts=1),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 10, Orange: rapid bursts, then rests. A bar of sixteenth runs, then a bar of
+    # quiet while he fires his own.
+    Plan(
+        "stop10", "level_select", "Stop 10", "orange", 4, max_nps=6, solo_holds=False,
+        sections=[
+            Section(0, 2, "trade", grid=2, notes=5, rival_notes=5, unit=1),
+            Section(2, 16, "trade", grid=2, notes=6, rival_notes=6, unit=1, runs=1, floor=0.12),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 11, Pineapple: precise, clean and punishing. No gimmick shapes, just accuracy.
+    Plan(
+        "stop11", "pause", "Stop 11", "pineapple", 5, max_nps=5, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=6),
+            Section(1, 4, "both", grid=2, notes=7, rival_notes=5, floor=0.2),
+            Section(4, 8, "both", grid=1, notes=9, rival_notes=6, bursts=1, floor=0.15),
+            Section(8, 12, "trade", grid=1, notes=10, rival_notes=8, unit=1, runs=1, floor=0.12),
+            Section(12, 16, "both", grid=1, notes=10, rival_notes=6, bursts=2, doubles=0.5, floor=0.15),
+            Section(16, 20, "both", grid=1, notes=10, rival_notes=6, runs=1, doubles=0.5, floor=0.15),
+            Section(20, 24, "both", grid=1, notes=10, rival_notes=7, bursts=2, doubles=1, floor=0.15),
+            Section(24, 28, "both", grid=2, notes=5, rival_notes=4, holds=1, floor=0.12),
+        ],
+        rank_lanes=True,
+    ),
+    # Stop 12, Blueberry: the hardest clean chart in the game, no gimmick.
+    Plan(
+        "stop12", "menu", "Stop 12", "blueberry", 5, max_nps=5, solo_holds=False,
+        sections=[
+            Section(0, 1, "rival", grid=2, rival_notes=7),
+            Section(1, 4, "both", grid=2, notes=8, rival_notes=6, bursts=2, doubles=1),
+            Section(4, 8, "trade", grid=1, notes=9, rival_notes=9, unit=1, floor=0.2),
+            Section(8, 12, "both", grid=1, notes=10, rival_notes=7, doubles=1, runs=1, floor=0.15),
+            Section(12, 16, "trade", grid=1, notes=10, rival_notes=10, unit=1, runs=1, floor=0.15),
+            Section(16, 24, "both", grid=1, notes=10, rival_notes=7, doubles=1, bursts=2, runs=1, holds=2, floor=0.15),
+        ],
+        rank_lanes=True,
+    ),
+]
+
 @dataclass
 class Note:
     slot: int  # sixteenth index from beat 0
@@ -622,6 +793,28 @@ class Charter:
                 if all(abs(s - t) > 4 for t in taken):
                     taken.append(s)
                     chosen[s] = sc
+        if section.runs:
+            used: set[int] = set()
+            for _ in range(section.runs):
+                best = None
+                for length in (4, 3):
+                    for a in range(0, BAR_SLOTS - length + 1):
+                        window = range(a, a + length)
+                        # Runs start on an eighth and stay clear of each other.
+                        if a % 2 or any(abs(s - u) <= 2 for s in window for u in used):
+                            continue
+                        if all(ok[s] and score[s] >= section.floor for s in window):
+                            total = float(sum(score[s] for s in window))
+                            if best is None or total > best[0]:
+                                best = (total, window)
+                    if best:
+                        break
+                if not best:
+                    break
+                for s in best[1]:
+                    # Ranked above ordinary picks, so the density cap thins those first.
+                    chosen[s] = max(chosen.get(s, 0.0), float(score[s]) + 0.5)
+                    used.add(s)
         return sorted(chosen.items())
 
     # -- building ----------------------------------------------------------
@@ -681,8 +874,10 @@ class Charter:
 
         span_end = sec.end * BAR_SLOTS
         player = self._add_holds(player, sec, 0, limit=sec.holds, span_end=span_end)
-        rival = self._add_holds(rival, sec, 0, limit=max(0, sec.holds - 1), span_end=span_end)
-        player = self._add_doubles(player, sec)
+        rival_holds = max(0, sec.holds - 1) if sec.rival_holds is None else sec.rival_holds
+        rival = self._add_holds(rival, sec, 0, limit=rival_holds, span_end=span_end)
+        player = self._add_doubles(player, sec, sec.doubles)
+        rival = self._add_doubles(rival, sec, sec.rival_doubles)
         return player, rival
 
     def _add_holds(self, notes: list[Note], sec: Section, base: int, limit: int, span_end: int) -> list[Note]:
@@ -694,9 +889,11 @@ class Charter:
         options = []
         for i, n in enumerate(notes):
             s = base + n.slot
-            if s >= g.count or g.tonal[s] < 0.08 or g.sustain[s] < sec.hold_sustain:
+            if s >= g.count or g.tonal[s] < sec.hold_tonal or g.sustain[s] < sec.hold_sustain:
                 continue
             beats = min(sec.max_hold, max(1.0, np.floor(g.sustain[s] * 2) / 2))
+            if sec.hold_min is not None:
+                beats = min(sec.max_hold, max(beats, sec.hold_min))
             length = int(beats * SLOTS_PER_BEAT)
             if n.slot + length > span_end - 2:
                 length = (span_end - 2 - n.slot) // 2 * 2
@@ -706,6 +903,8 @@ class Charter:
         options.sort(key=lambda o: (-o[0], o[1]))
         held: list[tuple[int, int]] = []
         spacing = BAR_SLOTS if self.plan.solo_holds else 2 * BAR_SLOTS
+        if self.plan.hold_spacing is not None:
+            spacing = self.plan.hold_spacing
         for _, i, length in options:
             if len(held) >= limit:
                 break
@@ -719,21 +918,21 @@ class Charter:
             notes = [n for n in notes if n.length or not any(h < n.slot < h + ln + 2 for h, ln in held)]
         return notes
 
-    def _add_doubles(self, notes: list[Note], sec: Section) -> list[Note]:
-        if sec.doubles <= 0:
+    def _add_doubles(self, notes: list[Note], sec: Section, rate: float) -> list[Note]:
+        if rate <= 0 or self.plan.no_doubles:
             return notes
         g = self.grid
         out = list(notes)
         bars = sorted({n.slot // BAR_SLOTS for n in notes})
         budget = 0.0
         for bar in bars:
-            budget = min(budget + sec.doubles, 2.0)
+            budget = min(budget + rate, 2.0)
             options = []
             for n in notes:
                 if n.slot // BAR_SLOTS != bar or n.length or n.slot % 4 != 0:
                     continue
                 accent = g.strength["low"][n.slot] + g.strength["mid"][n.slot]
-                if accent >= 1.5:
+                if accent >= sec.double_accent:
                     options.append((accent, n))
             options.sort(key=lambda o: (-o[0], o[1].slot))
             for accent, n in options:
@@ -762,7 +961,19 @@ class Charter:
             b = int(np.searchsorted(edges, v))
             return n.allowed[k - 1 - b if mirror else b]
 
-        want = [m.lane if m.lane >= 0 else want_lane(m, v) for m, v in zip(mains, values)]
+        if self.plan.rank_lanes and len(mains) >= 8:
+            order = sorted(range(len(mains)), key=lambda i: (values[i], (mains[i].slot * 7919) % 97))
+            rank = {i: r for r, i in enumerate(order)}
+
+            def ranked_lane(i: int) -> int:
+                n = mains[i]
+                k = len(n.allowed)
+                b = min(k - 1, rank[i] * k // len(mains))
+                return n.allowed[k - 1 - b if mirror else b]
+
+            want = [m.lane if m.lane >= 0 else ranked_lane(i) for i, m in enumerate(mains)]
+        else:
+            want = [m.lane if m.lane >= 0 else want_lane(m, v) for m, v in zip(mains, values)]
         fixed = [m.lane >= 0 for m in mains]
 
         # Runs of 3+ notes moving in one direction become stair patterns across the lanes.
@@ -805,6 +1016,8 @@ class Charter:
                     gap = n.slot - last_slot
                     if gap <= 1 and c == last_lane:
                         return False
+                    if self.plan.lane_gap is not None and any(lane == c and n.slot - slot < self.plan.lane_gap for slot, lane in prev[-4:]):
+                        return False
                     if gap <= 2 and c == last_lane and len(prev) > 1 and prev[-2][1] == c and last_slot - prev[-2][0] <= 2:
                         return False
                 return True
@@ -828,7 +1041,9 @@ class Charter:
                 continue
             main = by_slot[n.slot]
             taken = {lane for a, b, lane in hold_spans if a <= n.slot <= b} | {main.lane}
-            near = {m.lane for m in mains if 0 < abs(n.slot - m.slot) <= 1}
+            # Ranked-lane charts also keep a double's second note out of eighth-note runs.
+            reach = 2 if self.plan.rank_lanes else 1
+            near = {m.lane for m in mains if 0 < abs(n.slot - m.slot) <= reach}
             options = [3 - main.lane] + [c for c in n.allowed if abs(c - main.lane) >= 2] + list(n.allowed)
             n.lane = next((c for c in options if c in n.allowed and c not in taken and c not in near), -1)
         notes[:] = [n for n in notes if n.lane >= 0]
@@ -926,8 +1141,15 @@ def validate(chart: dict, grid: Grid, plan: Plan) -> tuple[list[str], dict]:
             problems.append(f"{side}: three or more notes at once")
         if any(len(set(lanes)) != len(lanes) for lanes in by_time.values()):
             problems.append(f"{side}: two notes in the same lane at the same time")
-        if doubles and plan.chart_id == "tutorial":
-            problems.append(f"{side}: doubles in the tutorial")
+        if doubles and (plan.chart_id == "tutorial" or plan.no_doubles):
+            problems.append(f"{side}: doubles in a chart that must not have them")
+        if plan.lane_gap is not None:
+            lane_gap = plan.lane_gap / SLOTS_PER_BEAT
+            for lane in range(4):
+                beats = sorted(n["b"] for n in notes if n["l"] == lane)
+                if any(b - a < lane_gap - 1e-9 for a, b in zip(beats, beats[1:])):
+                    problems.append(f"{side}: lane {lane} repeats faster than the chart allows")
+                    break
         for lane in range(4):
             lane_notes = sorted((n for n in notes if n["l"] == lane), key=lambda n: n["b"])
             for a, b in zip(lane_notes, lane_notes[1:]):
@@ -938,16 +1160,17 @@ def validate(chart: dict, grid: Grid, plan: Plan) -> tuple[list[str], dict]:
                     problems.append(f"{side}: lane {lane} notes closer than a quarter beat at beat {b['b']}")
         if any(0 < n.get("d", 0) < 1 for n in notes):
             problems.append(f"{side}: hold shorter than one beat")
-        # Runs of the same lane at eighth speed or faster.
-        order = sorted(notes, key=lambda n: n["b"])
-        run = 1
+        # Runs of the same lane at eighth speed or faster: notes in a row (one chord after
+        # another, each at most half a beat after the last) that all use one lane.
+        chords = sorted(by_time.items())
+        run = [0, 0, 0, 0]
         longest = 1
-        for a, b in zip(order, order[1:]):
-            if b["l"] == a["l"] and 0 < b["b"] - a["b"] <= 0.5:
-                run += 1
-                longest = max(longest, run)
-            elif b["b"] != a["b"]:
-                run = 1
+        prev_beat = None
+        for beat_at, lanes in chords:
+            close = prev_beat is not None and beat_at - prev_beat <= 0.5
+            run = [(run[lane] + 1 if close else 1) if lane in lanes else 0 for lane in range(4)]
+            longest = max(longest, *run)
+            prev_beat = beat_at
         if longest > 2 and len({n["l"] for n in notes}) > 1:
             problems.append(f"{side}: {longest} notes in a row in one lane at eighth speed")
         counts = [int(((times >= t) & (times < t + 1.0)).sum()) for t in times]
@@ -1048,6 +1271,7 @@ def main() -> int:
     parser.add_argument("--no-write", action="store_true", help="do not write chart files")
     parser.add_argument("--show", action="append", default=[], help="print an ASCII view of this chart id (repeatable, or 'all')")
     parser.add_argument("--stats", type=Path, help="write the report numbers to this JSON file")
+    parser.add_argument("--only", action="append", default=[], help="build only this chart id (repeatable)")
     args = parser.parse_args()
 
     tracks = {name: Track(name) for name in TRACKS}
@@ -1077,6 +1301,8 @@ def main() -> int:
     report = {"tempo": {n: {"bpm": t.bpm, "offset": t.offset, "duration": round(tracks[n].duration, 3)} for n, t in tempos.items()}, "charts": {}}
     failed = False
     for plan in PLANS:
+        if args.only and plan.chart_id not in args.only:
+            continue
         track = tracks[plan.song]
         grid = Grid(track, tempos[plan.song], lead)
         player, rival = Charter(plan, grid).build()
