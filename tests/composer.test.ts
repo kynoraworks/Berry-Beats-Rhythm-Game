@@ -279,3 +279,46 @@ describe('first use', () => {
     expect(isFirstComposerVisit(broken)).toBe(false);
   });
 });
+
+describe('EditorDoc.replaceNotes', () => {
+  it('swaps the whole map and its tempo in one undo step', () => {
+    const doc = new EditorDoc(blank());
+    doc.add(0, 1, 2);
+    doc.add(1, 2, 3, 1);
+    doc.markSaved();
+    const before = doc.toChart();
+    doc.replaceNotes([{ b: 4, l: 0 }, { b: 5, l: 3, d: 2 }, { b: 6, l: 1 }], [{ b: 8, l: 2 }], { bpm: 96, offset: 0.25, difficulty: 3 });
+    expect(doc.count(0)).toBe(3);
+    expect(doc.count(1)).toBe(1);
+    expect(doc.meta).toMatchObject({ bpm: 96, offset: 0.25, difficulty: 3, title: 'Test' });
+    expect(doc.dirty).toBe(true);
+    expect(doc.toChart().notes).toEqual([{ b: 4, l: 0 }, { b: 5, l: 3, d: 2 }, { b: 6, l: 1 }]);
+    // New notes are ordinary notes: they can be edited and have ids of their own.
+    const ids = doc.notes.map((n) => n.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(doc.remove([ids[0]])).toBe(1);
+
+    expect(doc.undo()).toBe(true);
+    expect(doc.count(0)).toBe(3);
+    expect(doc.undo()).toBe(true);
+    expect(doc.toChart()).toEqual(before);
+    expect(doc.dirty).toBe(false);
+    expect(doc.redo()).toBe(true);
+    expect(doc.meta.bpm).toBe(96);
+    expect(doc.count(0)).toBe(3);
+  });
+
+  it('drops overlapping notes and discards a half-finished drag first', () => {
+    const doc = new EditorDoc(blank());
+    doc.add(0, 0, 1, 0, true);
+    expect(doc.previewing).toBe(true);
+    doc.replaceNotes([{ b: 2, l: 0, d: 2 }, { b: 3, l: 0 }, { b: 2, l: 1 }], []);
+    expect(doc.previewing).toBe(false);
+    expect(doc.notes.map((n) => [n.b, n.l])).toEqual([
+      [2, 0],
+      [2, 1],
+    ]);
+    doc.undo();
+    expect(doc.notes).toEqual([]);
+  });
+});

@@ -307,8 +307,14 @@ export class ComposerScene extends Phaser.Scene {
     this.loadingText.setVisible(false);
     this.ready = true;
     this.refreshUi();
-    if (this.hintAutoChart && this.doc.notes.length === 0) showToast(this, 'Empty map: press G or Auto chart to draft notes from the audio', CSS.cream, 7000);
+    this.showAutoChartHint();
+  }
+
+  /** Point out auto chart once when an empty map is opened, after the first-visit help is out of the way. */
+  private showAutoChartHint(): void {
+    if (!this.hintAutoChart || !this.ready || this.help.length > 0) return;
     this.hintAutoChart = false;
+    if (this.doc.notes.length === 0) showToast(this, 'Empty map: press G or Auto chart to draft notes from the audio', CSS.cream, 7000);
   }
 
   /** Pick a new audio file for a map whose audio is missing on this device. */
@@ -1280,6 +1286,7 @@ export class ComposerScene extends Phaser.Scene {
     if (this.help.length > 0) {
       for (const object of this.help) object.destroy();
       this.help = [];
+      this.showAutoChartHint();
       return;
     }
     this.pause();

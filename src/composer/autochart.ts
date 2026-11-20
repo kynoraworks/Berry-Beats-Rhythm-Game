@@ -762,21 +762,28 @@ async function measureTempo(f: Features, pacer: Pacer): Promise<Tempo | 'cancell
     for (let i = 0; i + lag < steps; i++) sum += size[i] * size[i + lag];
     return sum / energy;
   };
+  // The pulse is in 100..200 per minute; the beat people count is that or half of it.
   const lags = [2, 4, 8, 16];
   const repeats = lags.map(repeat);
   const strongest = Math.max(...repeats);
-  let beatSteps: number;
-  if (strongest < 0.2) {
-    // No clear pattern: take the octave that sits in the comfortable range.
-    beatSteps = pulseBpm <= 180 ? 2 : 4;
-  } else {
+  let halve = pulseBpm > 180;
+  if (strongest >= 0.2) {
+    // The shortest stretch after which the music repeats, in half pulses.
     const basic = lags[repeats.findIndex((r) => r >= 0.75 * strongest)];
-    // A backbeat (kick, snare, kick, snare) repeats every two beats; an even pulse every beat.
-    const halfFilled = presence(basic / 2) >= 0.5;
-    beatSteps = clamp(halfFilled ? basic / 2 : basic, 2, 4);
-    // Above 180 the slower reading is the one people count.
-    if (beatSteps === 2 && pulseBpm > 180) beatSteps = 4;
+    const lone = presence(basic / 2) < 0.5;
+    if (basic >= 4 && lone) {
+      // Nothing lands on every other pulse, so the pulse was found an octave too fast.
+      halve = true;
+    } else if (pulseBpm >= 130 && pulseBpm <= 180) {
+      // Both readings are a plausible tempo. A pattern that alternates pulse by pulse
+      // (kick, snare) is the beat itself; one that takes eight pulses to come round is
+      // a bar of four slower beats. In between, take the reading nearer a walking pace.
+      if (basic <= 4) halve = false;
+      else if (basic === 16) halve = true;
+      else halve = pulseBpm > 148;
+    }
   }
+  const beatSteps = halve ? 4 : 2;
   const bpm = (pulseBpm * 2) / beatSteps;
   const beat = period * beatSteps;
 
