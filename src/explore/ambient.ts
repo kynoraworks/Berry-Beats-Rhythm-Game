@@ -17,7 +17,7 @@ export const EXTRA_FEET = 46;
 const EXTRA_HALF = 9;
 
 /** No-art effects a setting can have. */
-export type AmbientEffect = 'beams' | 'neon' | 'steam' | 'bubbles' | 'confetti' | 'birds' | 'lanterns' | 'traffic';
+export type AmbientEffect = 'beams' | 'neon' | 'steam' | 'bubbles' | 'confetti' | 'birds' | 'lanterns';
 
 export interface SettingLife {
   /** Extras sheet, or null for none. */
@@ -36,12 +36,12 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
   stop01: { station: { group: 'town', dancing: false, effects: ['birds'] } },
   stop02: {
     station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'street', dancing: false, effects: ['birds', 'traffic'] },
+    street: { group: 'street', dancing: false, effects: ['birds'] },
     battle: { group: 'street', dancing: true, effects: ['birds'] },
   },
   stop03: {
     station: { group: 'commuters', dancing: false, effects: [] },
-    street: { group: 'street', dancing: true, effects: ['traffic'] },
+    street: { group: 'street', dancing: true, effects: [] },
     battle: { group: 'street', dancing: true, effects: [] },
   },
   stop04: {
@@ -71,7 +71,7 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
   },
   stop09: {
     station: { group: 'tunnel', dancing: false, effects: [] },
-    street: { group: 'tunnel', dancing: false, effects: ['traffic'] },
+    street: { group: 'tunnel', dancing: false, effects: [] },
     battle: { group: 'tunnel', dancing: true, effects: [] },
   },
   stop10: {

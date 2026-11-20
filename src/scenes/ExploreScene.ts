@@ -8,6 +8,8 @@ import { UiButton, addBody, addIcon, addText, addUiButton, isLeaving } from '../
 import { breathStrength, gradeAt, gradeStrength, lampStrength, leafCount, type Setting } from '../core/atmosphere';
 import { BreathPuffs, LampPool, LeafFall, gradeBackdrop, gradePerson } from '../core/atmosphereFx';
 import { getSettings } from '../core/settings';
+import { blockedRanges, extraCount, placeExtras, placeLife, stopSeed } from '../explore/ambient';
+import { AmbientEffects, Extras } from '../explore/ambientFx';
 import { FEET_ORIGIN_Y, npcSheet, placeBackground, placeProps } from '../explore/backgrounds';
 import { Doors } from '../explore/doors';
 import { Walker } from '../explore/Walker';
@@ -65,6 +67,8 @@ export class ExploreScene extends Phaser.Scene {
   private leaves: LeafFall | null = null;
   private breath: BreathPuffs | null = null;
   private lamp: LampPool | null = null;
+  private extras: Extras | null = null;
+  private effects: AmbientEffects | null = null;
 
   constructor() {
     super(SceneKeys.Explore);
@@ -87,6 +91,8 @@ export class ExploreScene extends Phaser.Scene {
     this.leaves = null;
     this.breath = null;
     this.lamp = null;
+    this.extras = null;
+    this.effects = null;
   }
 
   create(): void {
@@ -150,7 +156,9 @@ export class ExploreScene extends Phaser.Scene {
       }
       this.spots.push({ hotspot, ...this.addMarker(hotspot) });
     }
+    this.addExtras();
     this.addAtmosphere();
+    this.addEffects();
     this.refreshMarkers();
   }
 
@@ -184,6 +192,45 @@ export class ExploreScene extends Phaser.Scene {
     this.breath = new BreathPuffs(this, calm ? 0 : breathStrength(stop.time, stop.number, setting), DEPTH.people + 3, this.world);
     this.breath.track(this.berry.sprite);
     for (const walker of this.crew) this.breath.track(walker.sprite);
+  }
+
+  /**
+   * The people who live here: a few extras a little behind the walking line,
+   * clear of every hotspot. They are added before the light so they take the
+   * place's grade like its props.
+   */
+  private addExtras(): void {
+    const place = this.place;
+    const life = placeLife(this.stop.id, place.kind);
+    if (!life.group) return;
+    const seed = stopSeed(this.stop, place.kind);
+    const spots = placeExtras(place.width, blockedRanges(place), extraCount(place.kind), seed);
+    this.extras = new Extras(this, `ambient_${life.group}`, spots, place.floor - 3, {
+      depth: DEPTH.people - 2,
+      dancing: life.dancing,
+      calm: getSettings().reduceMotion,
+      seed,
+      addTo: (sprite) => this.world.add(sprite),
+    });
+  }
+
+  /** Light beams, neon, steam, bubbles, confetti, birds and lantern glow, as the place calls for. */
+  private addEffects(): void {
+    const place = this.place;
+    const life = placeLife(this.stop.id, place.kind);
+    if (life.effects.length === 0) return;
+    const sources = place.hotspots.filter((h) => h.kind === 'look').map((h) => ({ x: (h.x + h.w / 2) * PX, y: h.y * PX }));
+    this.effects = new AmbientEffects(this, {
+      effects: life.effects,
+      region: { x0: 0, x1: place.width * PX, y0: 0, y1: place.floor * PX },
+      sources,
+      time: this.stop.time,
+      calm: getSettings().reduceMotion,
+      seed: stopSeed(this.stop, place.kind) + 11,
+      backDepth: DEPTH.people - 3,
+      frontDepth: DEPTH.people + 3,
+      addTo: (object) => this.world.add(object),
+    });
   }
 
   /** A bobbing tag over a hotspot: a speech mark for people, an eye for things, an arrow for exits. */
@@ -513,6 +560,8 @@ export class ExploreScene extends Phaser.Scene {
 
   override update(_time: number, deltaMs: number): void {
     const dt = Math.min(0.05, deltaMs / 1000);
+    this.extras?.update(deltaMs);
+    this.effects?.update(dt);
     if (this.ready() && this.keys) {
       const direction = (this.keys.right.isDown || this.keys.d.isDown ? 1 : 0) - (this.keys.left.isDown || this.keys.a.isDown ? 1 : 0);
       if (direction !== 0) {
