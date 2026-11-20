@@ -19,6 +19,8 @@ export interface Settings {
   noFail: boolean;
   /** Turn off camera shakes, flashes and background pulsing. */
   reduceMotion: boolean;
+  /** Tilt the battle into 2.5D during a hype streak (reduce motion keeps it flat). */
+  hypeCamera: boolean;
   /** KeyboardEvent.code values bound to each lane (left, up, down, right). */
   keys: string[][];
 }
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hitSounds: false,
   noFail: false,
   reduceMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  hypeCamera: true,
   keys: [
     ['ArrowLeft', 'KeyD'],
     ['ArrowUp', 'KeyF'],
@@ -63,6 +66,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     hitSounds: typeof raw.hitSounds === 'boolean' ? raw.hitSounds : d.hitSounds,
     noFail: typeof raw.noFail === 'boolean' ? raw.noFail : d.noFail,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
+    hypeCamera: typeof raw.hypeCamera === 'boolean' ? raw.hypeCamera : d.hypeCamera,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),
   };
 }

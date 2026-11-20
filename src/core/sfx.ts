@@ -30,7 +30,9 @@ export type SfxName =
   | 'flair'
   | 'ability'
   | 'warn'
-  | 'zap';
+  | 'zap'
+  | 'hype'
+  | 'hypeOut';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -116,6 +118,16 @@ const RECIPES: Record<SfxName, Layer[]> = {
     { type: 'sawtooth', from: 1600, to: 180, dur: 0.22, gain: 0.09 },
     { type: 'noise', from: 3000, to: 600, dur: 0.25, gain: 0.06 },
   ],
+  // A riser that lands on a bright chord as the stage tilts.
+  hype: [
+    { type: 'noise', from: 400, to: 7000, dur: 0.55, gain: 0.08, attack: 0.45 },
+    { type: 'sawtooth', from: 110, to: 440, dur: 0.5, gain: 0.06, attack: 0.3 },
+    { type: 'square', from: note(-12), to: note(0), dur: 0.5, gain: 0.05, attack: 0.35 },
+    ...arpeggio([12, 16, 19, 24], 0.04, 0.3, 0.1, 'square').map((layer) => ({ ...layer, delay: (layer.delay ?? 0) + 0.48 })),
+    { type: 'noise', from: 6000, dur: 0.4, gain: 0.05, delay: 0.5 },
+  ],
+  // The camera settling back: a short falling whoosh.
+  hypeOut: [{ type: 'noise', from: 4000, to: 500, dur: 0.24, gain: 0.06, attack: 0.02 }],
 };
 
 let noiseBuffer: AudioBuffer | null = null;

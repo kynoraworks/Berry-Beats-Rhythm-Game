@@ -9,6 +9,13 @@ import { STOPS, stopForChart, TUTORIAL, type StopDef } from '../story/stops';
 const SPOT_COLOR = 0xfff0c0;
 const PULSE_DARK = 0xd2cdea;
 
+export interface StageLayers {
+  background: Phaser.GameObjects.Image;
+  crowd: Phaser.GameObjects.Sprite | null;
+  spots: Record<'player' | 'rival', Phaser.GameObjects.Graphics>;
+  grade: readonly [number, number, number, number];
+}
+
 /**
  * The stage behind the dancers: background, spotlights, a crowd in front and
  * the reactions to the music. With reduced motion only the spotlights remain,
@@ -57,6 +64,11 @@ export class StageFx {
           .setScale(PX)
           .setDepth(Depth.characters + 1)
       : null;
+  }
+
+  /** The pieces the hype camera moves: the back wall, the crowd, the spotlights and the time of day's tint. */
+  get layers(): StageLayers {
+    return { background: this.background, crowd: this.crowd, spots: this.spots, grade: this.grade };
   }
 
   /** Light whoever is dancing. `rest` and unknown turns leave the lights as they are. */

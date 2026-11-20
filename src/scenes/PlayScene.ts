@@ -36,6 +36,7 @@ import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
 import { CrewScoreboard } from '../play/CrewScoreboard';
+import { HypeMode } from '../play/HypeMode';
 import { StageFx } from '../play/StageFx';
 import { VersusCard } from '../play/VersusCard';
 import { ABILITIES } from '../story/abilities';
@@ -105,6 +106,7 @@ export class PlayScene extends Phaser.Scene {
   private origin = 0;
   private rules: BattleRules = NO_RULES;
   private effects: BattleEffects | null = null;
+  private hype: HypeMode | null = null;
   private backupLabel: Phaser.GameObjects.Text | null = null;
   private backupButton: UiButton | null = null;
   private chart!: Chart;
@@ -164,6 +166,7 @@ export class PlayScene extends Phaser.Scene {
     this.origin = data.crew?.start ?? 0;
     this.rules = NO_RULES;
     this.effects = null;
+    this.hype = null;
     this.backupLabel = null;
     this.backupButton = null;
     this.chart = data.chart;
@@ -292,6 +295,16 @@ export class PlayScene extends Phaser.Scene {
             this.player.special();
           },
         },
+      });
+    }
+
+    // Hype: the player's streak reward in a battle (not in the Coach's lessons).
+    if (this.rival && segment?.kind !== 'lesson') {
+      this.hype = new HypeMode(this, {
+        chart, engine: this.engine, stage: this.stage, player: this.player, rival: this.rival,
+        playerField: this.playerField, rivalField: this.rivalField, playerLanes: PLAYER_LANES, rivalLanes: RIVAL_LANES, playerX, rivalX: RIVAL_X,
+        camera: settings.hypeCamera && !settings.reduceMotion,
+        hooks: { sfx: (name) => playSfx(this.game, name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch() },
       });
     }
 
@@ -607,6 +620,7 @@ export class PlayScene extends Phaser.Scene {
       };
     }
     this.effects?.finish();
+    this.hype?.finish();
     // The turn label and any queued call-outs belong to the song, not to what follows it.
     this.hud.endOfSong();
     const results: FlairResults = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
@@ -840,6 +854,7 @@ export class PlayScene extends Phaser.Scene {
       this.battle?.record('player', note.t, judgement);
       this.flawless?.record(note.t, judgement);
       this.effects?.record(event);
+      this.hype?.record(event);
       if (judgement === 'miss') {
         // A missed hold reports its head and tail together: show it once.
         if (part === 'holdEnd' && note.state === 'missed') continue;
@@ -1010,7 +1025,7 @@ export class PlayScene extends Phaser.Scene {
     if (this.state !== 'paused') {
       if (this.state === 'playing') {
         this.player.setHolding(([0, 1, 2, 3] as Lane[]).some((lane) => this.engine.heldNote(lane) !== null));
-        this.player.setHype(this.engine.stats.multiplier >= 4);
+        this.player.setHype(this.engine.stats.multiplier >= 4 || !!this.hype?.active);
         this.player.setGrooving(time >= 0);
         this.rival?.setGrooving(time >= 0);
         const rivalEngine = this.rivalEngine;
@@ -1019,6 +1034,7 @@ export class PlayScene extends Phaser.Scene {
       this.player.update(dt, beat);
       this.rival?.update(dt, beat);
       this.stage.update(beat, dt);
+      this.hype?.update(time, dt, this.speed, this.state === 'playing');
       const progress = this.crew ? (time - this.crew.start) / (this.crew.end - this.crew.start) : time / conductor.duration;
       this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, Phaser.Math.Clamp(progress, 0, 1), beat, dt);
     }

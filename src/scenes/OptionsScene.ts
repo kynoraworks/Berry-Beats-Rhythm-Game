@@ -31,7 +31,7 @@ const RIGHT: Bounds = { x: 680, y: 112, w: 560, h: 588 };
 const DESC: Bounds = { x: 40, y: 528, w: 624, h: 92 };
 const ROW_H = 48;
 const ROW_DY = 52;
-const KEY_DY = 64;
+const KEY_DY = 54;
 const SLOT_W = 112;
 const SLOT_H = 48;
 /** Keys the menus and the pause screen rely on. */
@@ -132,14 +132,15 @@ export class OptionsScene extends Phaser.Scene {
     }));
     this.addToggle(RIGHT, rightY(1), 'No fail', 'Keep playing when the bar runs out.', 'noFail');
     this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, bright bursts and pulsing. Flashes become dark smoke.', 'reduceMotion');
+    this.addToggle(RIGHT, rightY(3), 'Hype camera', 'Tilt the stage into 2.5D during a hype streak. Off, or with Reduce motion, hype stays flat.', 'hypeCamera');
 
-    const controlsY = rightY(2) + 56;
+    const controlsY = rightY(3) + 48;
     if (isTouch()) {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Touch controls');
       this.addTouchGuide(controlsY + 40);
     } else {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
-      LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 60 + lane * KEY_DY));
+      LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 52 + lane * KEY_DY));
       addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Press Enter to change one.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
     }
 
@@ -228,7 +229,7 @@ export class OptionsScene extends Phaser.Scene {
     this.rows.push({ hint, bounds, refresh, adjust });
   }
 
-  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion'): void {
+  private addToggle(panel: Bounds, y: number, label: string, hint: string, key: 'hitSounds' | 'noFail' | 'reduceMotion' | 'hypeCamera'): void {
     const index = this.rows.length;
     const bounds = this.rowBounds(panel, y);
     const at = controls(panel);
@@ -280,7 +281,7 @@ export class OptionsScene extends Phaser.Scene {
       addText(this, x, top + 104, capital(name), 24, { stroke: false });
     });
     const lines = ['The screen is split into four columns.', 'Tap a column to hit its arrow, and keep', 'holding for long notes. Tap the pause', 'button in the corner to stop.'];
-    addBody(this, cx, top + 212, lines.join('\n'), 22, { color: CSS.lilac });
+    addBody(this, cx, top + 200, lines.join('\n'), 22, { color: CSS.lilac });
   }
 
   private addKeyRow(lane: number, y: number): void {
