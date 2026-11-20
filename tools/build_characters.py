@@ -24,12 +24,20 @@ Lemon below), but a slot always means the same thing to the game.
 Directions are named by where the pose points on screen. (The Unity project
 labelled 11-12 "down right" and 13-14 "down left", the other way round.)
 
-Blackberry's frames 0-20 are the original 2021 sprites. His frames 21-50, all
-of Raspberry's frames and all of the Coach's frames were generated with an
-image model from the original art, then converted to real pixel art by
-tools/pixelize_sprites.py. Those converted sheets live in
-archive/generated-sprites and can be edited by hand; rerun this script
-afterwards.
+Blackberry and Raspberry were redesigned in November 2026 (Berry with his
+hood half up, grey joggers and high-tops; Raspberry in sporty streetwear with
+two hair puffs, a cropped bomber and track shorts). All 51 frames of both are
+generated sheets, made the same way as the Pear's and the Lemon's: each of the
+nine 3x2 sheets (blackberry_a..i, raspberry_a..i) was drawn from a design
+sheet plus the old character's six poses for those slots, then converted with
+tools/pixelize_sprites.py and the character's palette. Sheet d holds frames
+18-20 and three spare poses (dab, finger guns, kick). Pixel sizes:
+  blackberry  10.45 for every sheet except e (spin) at 11.0
+  raspberry   10.45 for every sheet except a (idle, lanes) at 10.8
+The first versions (Blackberry's 21 original 2021 sprites plus 30 generated
+frames, and the first Raspberry) are kept in archive/generated-sprites/v1
+with their sources and palettes: blackberry_v1.png and raspberry_v1.png.
+The 2021 sprites themselves are still in archive/unity-project.
 
 The Coach (instructor.png) is the tutorial's instructor redrawn in the berry
 characters' proportions. The 2021 art of her (dancer.png, 160x160 frames) is a
@@ -128,7 +136,6 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
 GEN = ROOT / "archive" / "generated-sprites"
-ORIGINAL_BLACKBERRY = ROOT / "archive" / "unity-project" / "Assets" / "Sprites" / "Blackberry Moves.png"
 OUT = ROOT / "public" / "assets" / "img"
 
 CELL = 64
@@ -138,24 +145,6 @@ CENTER_X = 32
 BASELINE = 62  # y of the lowest pixel row of a character standing on the floor
 
 # frame index -> (sheet name, cell number in that sheet)
-BLACKBERRY = {21 + i: ("blackberry_e", i) for i in range(6)}
-BLACKBERRY |= {27 + i: ("blackberry_f", i) for i in range(6)}
-BLACKBERRY |= {33 + i: ("blackberry_g", i) for i in range(6)}
-BLACKBERRY |= {39 + i: ("blackberry_h", i) for i in range(6)}
-BLACKBERRY |= {45 + i: ("blackberry_i", i) for i in range(6)}
-
-RASPBERRY = {i: ("raspberry_a", i) for i in range(6)}
-RASPBERRY |= {6: ("raspberry_b", 0), 7: ("raspberry_b", 1), 8: ("raspberry_b", 2), 9: ("raspberry_b", 3), 10: ("raspberry_b", 4)}
-# The two lunges are assigned by which way they point on screen.
-RASPBERRY |= {11: ("raspberry_b", 5), 12: ("raspberry_c", 0), 13: ("raspberry_c", 1), 14: ("raspberry_c", 2)}
-RASPBERRY |= {15: ("raspberry_c", 3), 16: ("raspberry_c", 4), 17: ("raspberry_c", 5)}
-RASPBERRY |= {18: ("raspberry_d", 0), 19: ("raspberry_d", 1), 20: ("raspberry_d", 2)}
-RASPBERRY |= {21 + i: ("raspberry_e", i) for i in range(6)}
-RASPBERRY |= {27 + i: ("raspberry_f", i) for i in range(6)}
-RASPBERRY |= {33 + i: ("raspberry_g", i) for i in range(6)}
-RASPBERRY |= {39 + i: ("raspberry_h", i) for i in range(6)}
-RASPBERRY |= {45 + i: ("raspberry_i", i) for i in range(6)}
-
 INSTRUCTOR = {i: ("instructor_a", i) for i in range(6)}
 INSTRUCTOR |= {6 + i: ("instructor_b", i) for i in range(6)}  # ends with a down-left lunge (frame 11)
 INSTRUCTOR |= {12 + i: ("instructor_c", i) for i in range(6)}
@@ -176,6 +165,8 @@ def standard(prefix: str) -> dict[int, tuple[str, int]]:
 
 
 # Both were checked frame by frame: 11-12 point down-left on screen and 13-14 down-right.
+BLACKBERRY = standard("blackberry")
+RASPBERRY = standard("raspberry")
 PEAR = standard("pear")
 LEMON = standard("lemon")
 LEMON |= {38: ("lemon_j", 2), 41: ("lemon_j", 3), 42: ("lemon_j", 4)}
@@ -272,7 +263,7 @@ def build_lite(name: str) -> None:
 
 
 if __name__ == "__main__":
-    build("blackberry", BLACKBERRY, Image.open(ORIGINAL_BLACKBERRY).convert("RGBA"))
+    build("blackberry", BLACKBERRY, None)
     build("raspberry", RASPBERRY, None)
     build("instructor", INSTRUCTOR, None)
     build("pear", PEAR, None)

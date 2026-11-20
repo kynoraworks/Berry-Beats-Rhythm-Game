@@ -69,7 +69,7 @@ export const SceneKeys = {
 export const Tex = {
   room: 'room', // 256x160
   train: 'train', // 25 frames, 256x160
-  berrySit: 'berry_sit', // 25 frames, 75x75
+  berrySit: 'berry_sit', // 5 frames, 75x75 (layout in tools/make_seated.py)
   blackberry: 'blackberry', // 51 frames, 64x64, feet at y=62 (layout in tools/build_characters.py)
   raspberry: 'raspberry', // 51 frames, 64x64, same layout as blackberry
   dancer: 'dancer', // 39 frames, 160x160 (the original instructor art, kept as a fallback)

@@ -1,37 +1,29 @@
 #!/usr/bin/env python3
-"""Build the rivals' seated sprites for the train (level select).
+"""Build the seated sprites for the train (level select).
 
 Run from the repo root:  python3 tools/make_seated.py
 
-Berry's seated sprite (berry_sit.png, 75x75 frames) is original art. The rivals
-had no seated art, so theirs was generated with an image model from Berry's
-frame (for scale, style and pose) and each rival's own sprite, converted to
-real pixel art with tools/pixelize_sprites.py and touched up by hand
-(Raspberry's eyes, the Coach's sleeve shading).
+Everyone on the bench (Berry, Raspberry, the Coach, the Pear, the Lemon and
+Watermelon) was redrawn in November 2026 at the same pixel scale as their
+standing sprites: the first seated sprites were drawn about 1.3 times larger
+than everything else in the game. Each pair was generated with an image model
+on one sheet that also held each character's standing sprite, and converted
+with tools/pixelize_sprites.py at the pixel size that gives the standing copy
+its real height, so the seated poses come out at the same scale:
+  berry, raspberry 13.29   pear 11.94   lemon 11.31   coach 12.22   watermelon 12.06
+The first versions (Berry's 25-frame original seated animation and the
+rivals' larger seated art) are kept in archive/generated-sprites/v1.
 
-The hand-editable sources are in archive/generated-sprites:
-  raspberry_sit.png, coach_sit.png: three 75x75 cells each (neutral, blink,
-  head tilt), already placed like Berry's frames: body centred on x=38, feet on
-  row 66. Drawn at the same position as Berry but further along the bench, a
-  rival sits on the same seat line.
-  pear_sit.png, lemon_sit.png: the same three cells and placement. Their eyes
-  are hidden, so the middle cell is not a blink: the Pear dips his chin as if
-  nodding to a beat, and the Lemon shuts his grin into a tight little smile.
-  The Pear sits slouched with his knees apart. The Lemon sits with one leg
-  crossed over the other, his coat tails spread on the seat and his flask in
-  his lap (a first version faced straight ahead and read as standing, so it
-  was redrawn). In both, the second and third cells reuse the first cell's
-  body below the chest (row 42 for the Pear, row 36 for the Lemon) so that only
-  the head moves. A few stray pixels in the Pear's beanie brim were fixed, and
-  the Lemon's closed smile and tilted grin were redrawn by hand.
-
-  watermelon_sit.png: the same three cells (closed-eye smile, open laugh, head
-  tilt), sitting wide with his hands on his belly; the second and third cells
-  reuse the first cell's body below row 27 (the neck).
+The hand-editable sources are in archive/generated-sprites/<name>.png: three
+75x75 cells each (neutral, a middle frame, head tilt), placed with the seated
+body centred on x=38 and the feet on row 66, so a sprite drawn at the bench
+position sits on the seat line. The middle frame is a nod for Berry and the
+Pear (their eyes are hidden), a tight smile for the Lemon, a laugh for
+Watermelon and a blink for Raspberry and the Coach.
 
 This script adds a one-pixel "breathing" variant of the neutral and tilt frames
 and writes five-frame sheets to public/assets/img:
-  0 neutral, 1 neutral (bob), 2 blink (Pear: nod, Lemon: tight smile), 3 tilt, 4 tilt (bob)
+  0 neutral, 1 neutral (bob), 2 middle frame, 3 tilt, 4 tilt (bob)
 """
 from pathlib import Path
 
@@ -44,7 +36,7 @@ OUT = ROOT / "public" / "assets" / "img"
 CELL = 75
 
 # Row (within the 75px cell) of the character's lap: everything above it sinks by one pixel on the bob.
-LAP_ROW = {"raspberry_sit": 36, "coach_sit": 42, "pear_sit": 50, "lemon_sit": 49, "watermelon_sit": 48}
+LAP_ROW = {"berry_sit": 50, "raspberry_sit": 50, "coach_sit": 48, "pear_sit": 47, "lemon_sit": 46, "watermelon_sit": 48}
 
 
 def cells(sheet: Image.Image) -> list[np.ndarray]:

@@ -78,15 +78,10 @@ export class PreloadScene extends Phaser.Scene {
       frameRate: 12,
       repeat: -1,
     });
-    this.anims.create({
-      key: Anim.berrySit,
-      frames: this.anims.generateFrameNumbers(Tex.berrySit, { start: 0, end: 24 }),
-      frameRate: 12,
-      repeat: -1,
-    });
-    // Seated rivals: a slow breathing bob with a blink and a head tilt (frames are listed in tools/make_seated.py).
+    // Everyone on the bench: a slow breathing bob with a blink or nod and a head tilt (frames are listed in tools/make_seated.py).
     const seatedLoop = [0, 1, 0, 1, 2, 1, 0, 1, 3, 4, 3, 4];
     for (const [key, texture] of [
+      [Anim.berrySit, Tex.berrySit],
       [Anim.raspberrySit, Tex.raspberrySit],
       [Anim.coachSit, Tex.coachSit],
       [Anim.watermelonSit, Tex.watermelonSit],

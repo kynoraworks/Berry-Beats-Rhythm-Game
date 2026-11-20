@@ -190,7 +190,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   /** Berry in the middle of the bench and the crew around him. Between The Club and the Rooftop he rides alone. */
   private seatCrew(): void {
-    this.light.light(this.add.sprite(BERRY_SEAT * PX, SEAT_Y, Tex.berrySit).setScale(PX).play(Anim.berrySit).setDepth(2));
+    this.light.light(this.add.sprite(BERRY_SEAT * PX, SEAT_Y, Tex.berrySit).setScale(PX).play({ key: Anim.berrySit, startFrame: 6 }).setDepth(2));
     crewOnBoard()
       .slice(0, SEAT_OFFSETS.length)
       .forEach((fruit, i) => {

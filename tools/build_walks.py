@@ -10,15 +10,15 @@ sheets of 64x64 cells, generated with an image model from the character's own
 idle and side poses and converted to pixel art with tools/pixelize_sprites.py
 at a pixel size chosen so the walk matches the character's idle height:
 
-  raspberry 10.24  pear 9.75  lemon 10.42  instructor 10.78  watermelon 10.70
+  berry 10.8 (redesign)  raspberry 11.1 (redesign)  pear 9.75  lemon 10.42  instructor 10.78  watermelon 10.70
   banana 10.29  grape 9.96  plum, dragonfruit, coconut, orange, pineapple,
   blueberry and npc: see the size printed when they were converted.
 
 This script stands every frame's lowest pixel on row 62 (the dancers' baseline)
 and keeps the head steady: frames are centred on the head, not on the legs, so
 the stride swings around the body instead of the body sliding. The output is
-public/assets/img/<id>_walk.png, 384x64. Berry's own walk (berry_walk.png) is
-not built here.
+public/assets/img/<id>_walk.png, 384x64 (Berry's is berry_walk.png). The
+first Berry and Raspberry walks are kept in archive/generated-sprites/v1.
 """
 from pathlib import Path
 
@@ -34,7 +34,7 @@ CENTER_X = 32
 FRAMES = 6
 
 WALKERS = [
-    "raspberry", "pear", "lemon", "watermelon", "instructor", "banana", "grape", "plum",
+    "berry", "raspberry", "pear", "lemon", "watermelon", "instructor", "banana", "grape", "plum",
     "dragonfruit", "coconut", "orange", "pineapple", "blueberry", "npc",
 ]
 

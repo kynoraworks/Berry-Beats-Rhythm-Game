@@ -26,6 +26,11 @@ thirty 64x64 cells in a row, each bust centred and standing on the bottom edge.
  28 station NPC (a kiwi commuter), neutral only
  29 Blackberry, hood down and eyes showing (bold), for the last scene only
 
+Frames 0-3 (Blackberry and Raspberry) and 29 were regenerated in November
+2026 for their redesign (Berry with his hood half up, Raspberry in sporty
+streetwear), from their design sheets and frames 4-9 and 26-27 as a style
+reference, converted at 10.4; the first versions are in
+archive/generated-sprites/v1/portraits_v1.png.
 Frames 10-29 were generated three characters (or the extras) to a 3x2 sheet
 from a design lineup of the new fruits and frames 0-9 as a style reference,
 converted at an art pixel of 10.6 source pixels with one palette per character.
