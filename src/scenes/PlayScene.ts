@@ -66,6 +66,13 @@ import type { Line } from '../story/types';
 type State = 'loading' | 'playing' | 'paused' | 'resuming' | 'ended';
 
 /**
+ * Development aid: "Auto-hit" in the pause menu makes the game hit every note.
+ * It stays on for the rest of the session (every battle after it), so a tester
+ * can run through the story; results played with it are never saved as scores.
+ */
+let devAutoHit = false;
+
+/**
  * Play data with battle rules set by the caller (the crew battle sets each
  * round's gimmick and ability). Without them a story stop's own apply.
  */
@@ -196,13 +203,20 @@ export class PlayScene extends Phaser.Scene {
   /** The combo as it stood after the last hit, so a miss knows what it broke. */
   private lastCombo = 0;
   private perfectRun = 0;
+  /** True once auto-hit was on at any point in this song, so its result is not saved as a score. */
+  private autoUsed = false;
+  private autoTag: Phaser.GameObjects.Text | null = null;
+  private autoButton: UiButton | null = null;
 
   constructor() {
     super(SceneKeys.Play);
   }
 
   init(data: RuledPlayData): void {
-    this.playData = data;
+    this.playData = devAutoHit && !data.autoplay ? { ...data, autoplay: true } : data;
+    this.autoUsed = !!this.playData.autoplay;
+    this.autoTag = null;
+    this.autoButton = null;
     this.crew = data.crew ?? null;
     this.origin = data.crew?.start ?? 0;
     this.rules = NO_RULES;
@@ -407,7 +421,7 @@ export class PlayScene extends Phaser.Scene {
 
     this.countText = addText(this, GAME_W / 2, 390, '', 64).setDepth(Depth.overlay);
     const tag = this.playData.practice ? 'Test play' : this.playData.autoplay ? 'Autoplay' : '';
-    if (tag) addBody(this, GAME_W / 2, 776, tag, 16, { color: CSS.yellow, bold: true, stroke: true }).setAlpha(0.8).setDepth(Depth.hud);
+    this.autoTag = addBody(this, GAME_W / 2, 776, tag, 16, { color: CSS.yellow, bold: true, stroke: true }).setAlpha(0.8).setDepth(Depth.hud);
 
 
     this.buildPauseMenu();
@@ -767,7 +781,7 @@ export class PlayScene extends Phaser.Scene {
     this.hype?.finish();
     // The turn label and any queued call-outs belong to the song, not to what follows it.
     this.hud.endOfSong();
-    const results: FlairResults = { play: this.playData, stats: this.engine.stats, failed, battle: summary };
+    const results: FlairResults = { play: { ...this.playData, autoplay: this.autoUsed || this.playData.autoplay }, stats: this.engine.stats, failed, battle: summary };
     if (this.effects && this.rules.ability) {
       results.flairUsed = this.effects.flairUsed;
       results.abilityName = ABILITIES[this.rules.ability].name;
@@ -925,7 +939,8 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
-    if (!this.playData.autoplay) {
+    // Built even under autoplay, so auto-hit can be switched off from the pause menu.
+    {
       this.laneInput = new LaneInput({
         down: (lane, timeMs) => this.laneDown(lane, timeMs),
         up: (lane, timeMs) => this.laneUp(lane, timeMs),
@@ -994,7 +1009,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private laneDown(lane: Lane, timeMs: number): void {
-    if (this.state !== 'playing') return;
+    if (this.state !== 'playing' || this.playData.autoplay) return;
     this.playerField.setPressed(lane, true);
     const held = ([0, 1, 2, 3] as Lane[]).filter((l) => l !== lane && (this.laneInput?.isDown(l) || this.touchLanes?.isDown(l)));
     this.player.dance(lane, held);
@@ -1002,6 +1017,7 @@ export class PlayScene extends Phaser.Scene {
   }
 
   private laneUp(lane: Lane, timeMs: number): void {
+    if (this.playData.autoplay) return;
     this.playerField.setPressed(lane, false);
     if (this.state !== 'playing') return;
     this.handleEvents(this.engine.release(lane, this.eventTime(timeMs)));
@@ -1368,7 +1384,7 @@ export class PlayScene extends Phaser.Scene {
     dim.setInteractive();
     // A story battle's backup can be swapped here, when there is more than one to choose from.
     const canSwap = !this.playData.rules && this.rules.ability !== null && listAvailable(this.storyCrew()).length > 1;
-    const extra = canSwap ? 170 : 0;
+    const extra = (canSwap ? 170 : 0) + 84;
     const top = 180 - extra / 2;
     const panelW = canSwap ? 600 : 480;
     const panel = addBox(this, GAME_W / 2 - panelW / 2, top, panelW, 440 + extra, 'panel');
@@ -1377,15 +1393,17 @@ export class PlayScene extends Phaser.Scene {
     const entries: [string, () => void, 'select' | 'back' | null][] = [
       ['Resume', () => this.resumeGame(), null],
       [this.crew ? 'Restart round' : 'Restart', () => this.restart(), 'select'],
+      [this.autoLabel(), () => this.toggleAutoHit(), 'select'],
       [this.crew ? 'Exit to lineup' : 'Exit', () => this.quit(), 'back'],
     ];
     if (canSwap) entries.splice(1, 0, [this.backupText(), () => this.swapBackup(1), 'select']);
     const buttons = entries.map(([label, action, sfx], i) => addUiButton(this, GAME_W / 2, top + 170 + i * 84, label, action, { width: 400, sfx }));
+    this.autoButton = buttons[entries.length - 2];
     const parts: Phaser.GameObjects.GameObject[] = [dim, panel, title, ...buttons.map((button) => button.container)];
     if (canSwap) {
       this.backupButton = buttons[1];
       const hint = isTouch() ? 'Tap to change backup' : 'Left / Right: change backup';
-      this.backupLabel = addBody(this, GAME_W / 2, top + 170 + 84 * 3 + 64, '', 22, { color: CSS.grey, wrapWidth: panelW - 64 }).setOrigin(0.5, 0);
+      this.backupLabel = addBody(this, GAME_W / 2, top + 170 + 84 * (entries.length - 1) + 64, '', 22, { color: CSS.grey, wrapWidth: panelW - 64 }).setOrigin(0.5, 0);
       this.backupLabel.setText(`${this.backupBlurb()}\n${hint}`);
       parts.push(this.backupLabel);
     }
@@ -1394,6 +1412,25 @@ export class PlayScene extends Phaser.Scene {
       .container(0, 0, parts)
       .setDepth(Depth.overlay + 10)
       .setVisible(false);
+  }
+
+  private autoLabel(): string {
+    return `Auto-hit (dev): ${this.playData.autoplay ? 'On' : 'Off'}`;
+  }
+
+  /** The pause menu's dev switch: the game hits every note for you, from now until switched off. */
+  private toggleAutoHit(): void {
+    const on = !this.playData.autoplay;
+    devAutoHit = on;
+    this.playData = { ...this.playData, autoplay: on };
+    if (on) this.autoUsed = true;
+    else {
+      // Let go of anything auto-hit was holding; the resume drops holds no key is holding.
+      ([0, 1, 2, 3] as Lane[]).forEach((lane) => this.playerField.setPressed(lane, false));
+      this.autoHeld = [null, null, null, null];
+    }
+    this.autoButton?.setLabel(this.autoLabel());
+    if (!this.playData.practice) this.autoTag?.setText(on ? 'Autoplay' : '');
   }
 
   private backupText(): string {
