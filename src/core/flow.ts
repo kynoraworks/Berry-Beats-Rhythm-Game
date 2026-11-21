@@ -1,4 +1,5 @@
 import type { Chart } from './chart';
+import type { Difficulty } from './difficulty';
 import type { Stats } from './engine';
 import type { StoryRef } from '../story/flow';
 
@@ -27,6 +28,8 @@ export interface PlayData {
   autoMiss?: number | number[];
   /** Part of the story: which stop and which of its segments this is. */
   story?: StoryRef;
+  /** The difficulty a story battle is played on (its beat map, rival and timing). Unset: Normal. */
+  difficulty?: Difficulty;
 }
 
 /** Outcome of a dance battle against a rival who is scored too. */

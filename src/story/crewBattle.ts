@@ -53,6 +53,21 @@ export const CREW_ROUNDS: readonly CrewRoundDef[] = [
   { enemy: 'blueberry', chartId: 'stop12', chartUrl: 'charts/stop12.json', startBar: 16, endBar: 48, skill: 4, before: ROUND_LINES.slice(4) },
 ];
 
+/**
+ * The crew battle is danced in three sets, the Grand Stage's battles A, B and
+ * C: Grape and Coconut, then Pineapple and Dragon Fruit, then Berry against
+ * Blueberry. A won set is a checkpoint: a lost set is danced again from its
+ * own first round, with the rounds before it kept. Points and the 6-point
+ * total are as before; a set is won on its own points (see setOutcome).
+ */
+export const CREW_SETS: readonly (readonly number[])[] = [[0, 1], [2, 3], [4]];
+
+/** Which set (0 to 2) a round (0 to 4) belongs to. */
+export function setOfRound(round: number): number {
+  const set = CREW_SETS.findIndex((rounds) => rounds.includes(round));
+  return set < 0 ? CREW_SETS.length - 1 : set;
+}
+
 /** Points each round is worth: the last, Berry against Blueberry, counts double. */
 export const ROUND_POINTS: readonly number[] = [1, 1, 1, 1, 2];
 export const TOTAL_POINTS = ROUND_POINTS.reduce((sum, points) => sum + points, 0);
@@ -122,6 +137,29 @@ export function outcome(results: readonly RoundResult[]): Outcome {
   return results[ROUND_POINTS.length - 1].won ? 'won' : 'lost';
 }
 
+/**
+ * Where one set stands once its rounds are danced: won with more of the set's
+ * points; a split set goes to whoever danced better across it (the player's
+ * accuracy minus the rival's, summed; level goes to the player, as in every
+ * battle). Open until the set's last round is in.
+ */
+export function setOutcome(results: readonly RoundResult[], set: number): Outcome {
+  const rounds = CREW_SETS[set] ?? [];
+  if (rounds.some((round) => results[round] === undefined)) return 'open';
+  let player = 0;
+  let rival = 0;
+  let margin = 0;
+  for (const round of rounds) {
+    const result = results[round];
+    const worth = ROUND_POINTS[round] ?? 0;
+    if (result.won) player += worth;
+    else rival += worth;
+    margin += result.playerAccuracy - result.rivalAccuracy;
+  }
+  if (player !== rival) return player > rival ? 'won' : 'lost';
+  return margin >= 0 ? 'won' : 'lost';
+}
+
 /** Part of a chart: the notes that start inside the bars, holds trimmed to end with it. */
 export function sliceChart(chart: Chart, startBar: number, endBar: number, id: string, difficulty = chart.difficulty): Chart {
   const from = startBar * BEATS_PER_BAR;
@@ -182,6 +220,8 @@ export function counterTip(ally: Dancer, enemy: FruitId): string | null {
 /** What carries from one round to the next. Kept in memory: a reload starts again from the lineup. */
 export interface CrewSession {
   order: FruitId[];
+  /** The set being danced (0 to 2). */
+  set: number;
   results: RoundResult[];
   /** The shared bar, carried into the next round. */
   health: number;
@@ -190,6 +230,58 @@ export interface CrewSession {
 }
 
 const ORDER_KEY = 'berrybeats.crew.order.v1';
+/** The rounds of the sets won so far, and the order they were danced in. */
+const CHECKPOINT_KEY = 'berrybeats.crew.sets.v1';
+
+export interface CrewCheckpoint {
+  order: FruitId[];
+  /** Results of rounds 1 onwards, up to the end of the last set won. */
+  results: RoundResult[];
+}
+
+function isResult(value: unknown): value is RoundResult {
+  const r = value as RoundResult;
+  return typeof r === 'object' && r !== null && typeof r.won === 'boolean' && typeof r.playerAccuracy === 'number' && typeof r.rivalAccuracy === 'number' && typeof r.playerScore === 'number';
+}
+
+export function loadCheckpoint(): CrewCheckpoint | null {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(CHECKPOINT_KEY);
+    const value = raw ? (JSON.parse(raw) as { order?: unknown; results?: unknown } | null) : null;
+    if (!value || !Array.isArray(value.results) || !value.results.every(isResult)) return null;
+    const order = sanitizeOrder(Array.isArray(value.order) ? (value.order as unknown[]).filter((item): item is string => typeof item === 'string') : null);
+    return { order, results: (value.results as RoundResult[]).slice(0, CREW_ROUNDS.length) };
+  } catch {
+    return null;
+  }
+}
+
+function saveCheckpoint(checkpoint: CrewCheckpoint): void {
+  try {
+    localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(checkpoint));
+  } catch {
+    // The checkpoint lasts until the page closes.
+  }
+}
+
+/** Forget the sets won so far (the crew battle starts again from set one). */
+export function clearCheckpoint(): void {
+  try {
+    localStorage.removeItem(CHECKPOINT_KEY);
+  } catch {
+    // Nothing to forget.
+  }
+}
+
+/**
+ * The rounds before a set, as the checkpoint has them. A save that won the set
+ * before there were checkpoints has none: those rounds count as won, with no
+ * accuracy to show.
+ */
+export function roundsBefore(set: number, checkpoint: CrewCheckpoint | null): RoundResult[] {
+  const first = CREW_SETS[set]?.[0] ?? 0;
+  return Array.from({ length: first }, (_, i) => checkpoint?.results[i] ?? { playerAccuracy: 0, rivalAccuracy: 0, playerScore: 0, won: true });
+}
 
 function loadOrder(): FruitId[] {
   try {
@@ -216,12 +308,27 @@ export function currentOrder(): FruitId[] {
   return session ? session.order.slice() : loadOrder();
 }
 
-/** Start the crew battle afresh with this order. */
-export function startSession(order: readonly FruitId[], health: number): CrewSession {
-  const clean = sanitizeOrder(order);
+/**
+ * Start one set of the crew battle with this order. A later set keeps the
+ * rounds before it from the checkpoint, and its order: the dancers who already
+ * danced stay where they were.
+ */
+export function startSession(order: readonly FruitId[], health: number, set = 0): CrewSession {
+  const checkpoint = set > 0 ? loadCheckpoint() : null;
+  const clean = sanitizeOrder(checkpoint?.order ?? order);
   saveOrder(clean);
-  session = { order: clean, results: [], health, roundHealth: health };
+  session = { order: clean, set, results: roundsBefore(set, checkpoint), health, roundHealth: health };
   return session;
+}
+
+/** Where the set in progress stands after the round just recorded. */
+export function setVerdict(): Outcome {
+  return session ? setOutcome(session.results, session.set) : 'open';
+}
+
+/** Keep the rounds danced so far as the checkpoint for the next set. */
+export function checkpointSession(): void {
+  if (session) saveCheckpoint({ order: session.order.slice(), results: session.results.slice() });
 }
 
 export function getSession(): CrewSession | null {

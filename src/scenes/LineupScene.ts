@@ -11,18 +11,23 @@ import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
 import {
   CREW_ROUNDS,
+  CREW_SETS,
   ROUND_POINTS,
   counterTip,
   crewLineup,
   currentOrder,
   endSession,
   getSession,
+  loadCheckpoint,
+  roundsBefore,
   saveOrder,
   startSession,
   swapOrder,
   tally,
   type Dancer,
+  type RoundResult,
 } from '../story/crewBattle';
+import { chosenBattle } from '../story/progress';
 import { GIMMICK_TRAITS } from '../story/gimmicks';
 import { stageTexture } from '../story/placeholders';
 import { playCrewRound } from '../story/run';
@@ -34,8 +39,12 @@ export interface LineupData {
   intro?: boolean;
   /** A round has just been won or lost and the battle goes on. */
   between?: boolean;
-  /** The crew battle was just lost: pick again. */
+  /** The set was just lost: dance it again. */
   lost?: boolean;
+  /** Which set (0 to 2, the Grand Stage's battles A to C) to dance. Unset: the one picked on the train. */
+  set?: number;
+  /** This set was just won: the next one is up. */
+  setWon?: number;
   autoplay?: boolean;
 }
 
@@ -77,6 +86,10 @@ export class LineupScene extends Phaser.Scene {
   private ui: Phaser.GameObjects.GameObject[] = [];
   private dialogue: Dialogue | null = null;
   private between = false;
+  /** The set being lined up (0 to 2). */
+  private set = 0;
+  /** Rounds already danced, shown on the rows: the set in progress, or the sets won before this one. */
+  private shown: RoundResult[] = [];
 
   constructor() {
     super(SceneKeys.Lineup);
@@ -98,6 +111,15 @@ export class LineupScene extends Phaser.Scene {
     const session = getSession();
     this.between = !!data?.between && !!session && session.results.length > 0 && session.results.length < CREW_ROUNDS.length;
     if (!this.between && session) endSession();
+    const final = stopById('stop12');
+    const picked = data?.setWon !== undefined ? data.setWon + 1 : (data?.set ?? (final ? chosenBattle(final) : 0));
+    this.set = this.between && session ? session.set : Math.min(CREW_SETS.length - 1, Math.max(0, picked));
+    // After a won set the next set's opening is said straight away.
+    if (data?.setWon !== undefined) this.opts.intro = true;
+    const checkpoint = this.set > 0 ? loadCheckpoint() : null;
+    // The order is set before the first set; later sets keep it.
+    if (checkpoint && !this.between) this.order = checkpoint.order.slice();
+    this.shown = this.between && session ? session.results.slice() : roundsBefore(this.set, checkpoint);
     this.focus = DANCE_INDEX;
   }
 
@@ -111,7 +133,7 @@ export class LineupScene extends Phaser.Scene {
     }
     this.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.84).setOrigin(0);
 
-    const intro = this.opts.intro && !this.between ? (stop?.script.intro ?? []) : [];
+    const intro = this.opts.intro && !this.between ? (stop?.script.battles[this.set]?.intro ?? []) : [];
     if (intro.length > 0) {
       this.dialogue = new Dialogue(this, {
         lines: intro,
@@ -164,11 +186,12 @@ export class LineupScene extends Phaser.Scene {
       const points = tally(session.results);
       const last = session.results[next - 1];
       const verdict = last.won ? 'Round to your crew!' : `Round to ${CAST[CREW_ROUNDS[next - 1].enemy].name}.`;
+      // Only the set's own rounds are danced again after a loss, so the bar starts full each set.
       this.info = addBody(this, GAME_W / 2, 578, `${verdict} Points ${points.player} to ${points.rival}. Bar ${Math.round(session.health * 100)}%.`, 24, { color: last.won ? CSS.blue : CSS.cream });
       if (this.opts.autoplay) this.time.delayedCall(1500, () => this.start());
     } else {
-      this.danceButton = addUiButton(this, GAME_W / 2, 656, 'Dance!', () => this.start(), { width: 300 });
-      this.baseInfo = this.opts.lost ? "Blueberry's crew took it. Change the order and go again." : "Rounds 1 to 4 are worth a point, Berry's round two. Win more than 3 of 6.";
+      this.danceButton = addUiButton(this, GAME_W / 2, 656, this.set === 0 ? 'Dance!' : `Set ${this.set + 1}: Dance!`, () => this.start(), { width: 300 });
+      this.baseInfo = this.setInfo();
       this.baseColor = this.opts.lost ? CSS.yellow : CSS.lilac;
       this.info = addBody(this, GAME_W / 2, 586, this.baseInfo, 22, { color: this.baseColor, wrapWidth: 1100 });
       if (this.opts.autoplay) this.time.delayedCall(800, () => this.start());
@@ -184,8 +207,8 @@ export class LineupScene extends Phaser.Scene {
     const lineup = crewLineup(this.order);
     CREW_ROUNDS.forEach((round, i) => {
       const y = ROW_Y + i * ROW_H;
-      const result = this.between ? session?.results[i] : undefined;
-      const current = this.between && i === session?.results.length;
+      const result: RoundResult | undefined = this.shown[i];
+      const current = this.between ? i === session?.results.length : CREW_SETS[this.set]?.includes(i) === true;
       const done = !!result;
 
       const parts: Phaser.GameObjects.GameObject[] = [];
@@ -199,13 +222,15 @@ export class LineupScene extends Phaser.Scene {
       parts.push(ally);
       const enemy = this.enemyCard(ENEMY_X, y, round.enemy, result ? (!result.won ? CAST[round.enemy].color : null) : null);
       parts.push(enemy);
-      const middle = done && result ? `${Math.round(result.playerAccuracy)}% - ${Math.round(result.rivalAccuracy)}%` : 'vs';
+      // A set won before there were checkpoints has no accuracy to show.
+      const scored = result && (result.playerScore > 0 || result.playerAccuracy > 0);
+      const middle = done && result ? (scored ? `${Math.round(result.playerAccuracy)}% - ${Math.round(result.rivalAccuracy)}%` : 'Won') : 'vs';
       parts.push(addText(this, GAME_W / 2, y, middle, done ? 18 : 28, { color: done ? (result?.won ? CSS.blue : CAST[round.enemy].css) : CSS.lilac }));
-      if (!this.between && counterTip(lineup[i], round.enemy)) {
+      if (this.canReorder() && counterTip(lineup[i], round.enemy)) {
         parts.push(addIcon(this, ALLY_X + CARD_W - 22, y - CARD_H / 2 + 20, 'icon_star', 3));
       }
       const row = this.add.container(0, 0, parts);
-      if (!this.between && i < 4) this.makeDraggable(ally, i);
+      if (this.canReorder() && i < 4) this.makeDraggable(ally, i);
       this.rows.push(row);
     });
   }
@@ -265,9 +290,28 @@ export class LineupScene extends Phaser.Scene {
   // Choosing
   // ---------------------------------------------------------------------
 
+  /** The order is picked before set one; the sets after it keep it. */
+  private canReorder(): boolean {
+    return !this.between && this.set === 0;
+  }
+
+  /** What the info line says before a set. */
+  private setInfo(): string {
+    if (this.opts.lost) return this.set === 0 ? "Blueberry's crew took the set. Change the order and go again." : "Blueberry's crew took the set. Dance it again.";
+    if (this.set === 0) return 'Three sets. Rounds 1 to 4 are worth a point, Berry\'s round two. Win each set to go on.';
+    const points = tally(this.shown);
+    const rounds = (CREW_SETS[this.set] ?? []).map((round) => round + 1).join(' and ');
+    return `Set ${this.set + 1} of 3: round${rounds.includes('and') ? 's' : ''} ${rounds}. Points so far ${points.player} to ${points.rival}.`;
+  }
+
   private step(delta: number): void {
     if (this.dialogue || !this.danceButton) return;
     if (this.between) return;
+    if (!this.canReorder()) {
+      this.focus = DANCE_INDEX;
+      this.refreshFocus();
+      return;
+    }
     if (this.held !== null && this.focus < 4) {
       const target = this.focus + delta;
       if (target < 0 || target > 3) return;
@@ -283,7 +327,7 @@ export class LineupScene extends Phaser.Scene {
 
   private confirm(): void {
     if (this.dialogue || !this.danceButton) return;
-    if (this.between || this.focus === DANCE_INDEX) {
+    if (this.between || !this.canReorder() || this.focus === DANCE_INDEX) {
       this.danceButton.click();
       return;
     }
@@ -343,8 +387,8 @@ export class LineupScene extends Phaser.Scene {
   private start(): void {
     if (isLeaving(this) || this.dialogue) return;
     const session = getSession();
-    const index = this.between && session ? session.results.length : 0;
-    if (!this.between) startSession(this.order, START_HEALTH);
+    const index = this.between && session ? session.results.length : (CREW_SETS[this.set]?.[0] ?? 0);
+    if (!this.between) startSession(this.order, START_HEALTH, this.set);
     music.stop(300);
     playCrewRound(this, index, { autoplay: this.opts.autoplay }).catch(() => {
       this.info?.setText('The song could not be loaded. Check your connection and try again.').setColor(CSS.miss);

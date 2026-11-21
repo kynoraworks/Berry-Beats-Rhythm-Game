@@ -20,7 +20,7 @@ import { CAST } from '../story/cast';
 import { firstSegment } from '../story/flow';
 import { crewAt, placeOf, talkKey, type ExploreData, type Hotspot, type PlaceDef, type PlaceKind } from '../story/places';
 import { characterSheet } from '../story/placeholders';
-import { hasInspected, hasTalked, isCleared, markInspected, markSeen, markTalked } from '../story/progress';
+import { chosenBattle, hasInspected, hasTalked, isCleared, isStopStarted, markInspected, markSeen, markTalked } from '../story/progress';
 import { playSegment } from '../story/run';
 import { STOPS, stopById, type StopDef } from '../story/stops';
 import type { Line } from '../story/types';
@@ -518,7 +518,9 @@ export class ExploreScene extends Phaser.Scene {
     playSfx(this.game, 'banner');
     music.stop(300);
     this.uiCamera.fadeOut(250, 18, 10, 36);
-    playSegment(this, { stop: this.stop.id, segment: firstSegment(this.stop, isCleared(this.stop.id)) }).catch((error: unknown) => {
+    // The battle picked on the train (A, B or C), else the next one to win.
+    const segment = firstSegment(this.stop, chosenBattle(this.stop), isStopStarted(this.stop));
+    playSegment(this, { stop: this.stop.id, segment }).catch((error: unknown) => {
       this.uiCamera.fadeIn(1);
       this.locked = false;
       this.say(error instanceof Error ? error.message : 'This stop could not be loaded', 2600, CSS.miss);

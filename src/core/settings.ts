@@ -1,4 +1,5 @@
 import { LANE_COUNT } from './config';
+import { isDifficulty, type Difficulty } from './difficulty';
 import { DEFAULT_TOUCH_SCHEME, TOUCH_SCHEMES, type TouchScheme } from './touchSchemes';
 
 /** How much the battle camera moves: bumps, punches, leaning in on turns and shakes. */
@@ -36,6 +37,8 @@ export interface Settings {
   touchGuides: boolean;
   /** KeyboardEvent.code values bound to each lane (left, up, down, right). */
   keys: string[][];
+  /** Story battles: Easy, Normal or Hard beat maps (core/difficulty.ts). */
+  difficulty: Difficulty;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -57,6 +60,7 @@ export const DEFAULT_SETTINGS: Settings = {
     ['ArrowDown', 'KeyJ'],
     ['ArrowRight', 'KeyK'],
   ],
+  difficulty: 'normal',
 };
 
 const STORAGE_KEY = 'berrybeats.settings.v1';
@@ -89,6 +93,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     touchScheme: TOUCH_SCHEMES.includes(raw.touchScheme as TouchScheme) ? (raw.touchScheme as TouchScheme) : d.touchScheme,
     touchGuides: typeof raw.touchGuides === 'boolean' ? raw.touchGuides : d.touchGuides,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),
+    difficulty: isDifficulty(raw.difficulty) ? raw.difficulty : d.difficulty,
   };
 }
 

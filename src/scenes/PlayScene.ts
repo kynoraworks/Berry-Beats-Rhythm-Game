@@ -55,12 +55,13 @@ import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
-import { STOPS, rivalLevelFor, stopById, stopForChart } from '../story/stops';
-import { CREW_ROUNDS, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
+import { STOPS, battleForChart, rivalLevelFor, stopById, stopForChart } from '../story/stops';
+import { CREW_ROUNDS, checkpointSession, endSession, getSession, recordRound, setVerdict, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
 import { feetY } from '../explore/floors';
-import { markCleared, markSeen } from '../story/progress';
+import { markBattleWon, markSeen } from '../story/progress';
+import { windowsFor } from '../core/difficulty';
 import { nextRef, playSegment } from '../story/run';
 import type { Line } from '../story/types';
 
@@ -301,6 +302,8 @@ export class PlayScene extends Phaser.Scene {
     const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson';
 
     this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail });
+    // Easy gives a little more timing slack (core/difficulty.ts).
+    this.engine.mods.windows = windowsFor(this.playData.difficulty);
     // The crew battle's bar carries over from the round before.
     if (crew) this.engine.adjustHealth(crew.health - START_HEALTH);
     this.rules = isBattle ? this.resolveRules() : NO_RULES;
@@ -308,7 +311,7 @@ export class PlayScene extends Phaser.Scene {
     if (hasRival) {
       this.rivalEngine = new Engine(toTimedNotes(chart, rivalChart), { noFail: true });
       const notes = this.rivalEngine.notes;
-      rivalPlan = planRival(notes.length, rivalLevelFor(chart), chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
+      rivalPlan = planRival(notes.length, rivalLevelFor(chart, this.playData.difficulty), chart.id, { flawless: !isBattle, personality: rivalPersonality(rivalKind), notes });
       this.rivalDriver = new PlannedPlayer(this.rivalEngine, rivalPlan);
       this.turns = buildTurns(chart, chart.notes, rivalChart);
     }
@@ -484,7 +487,8 @@ export class PlayScene extends Phaser.Scene {
     if (this.playData.practice) return NO_RULES;
     const stop = this.story?.stop ?? stopForChart(this.chart.id);
     if (!stop) return NO_RULES;
-    return battleRules(stop.gimmick, getBackup(crewAt(stop)));
+    // The gimmick is the opponent's: at Orange Plaza, battles A and B are Banana and Plum.
+    return battleRules(battleForChart(this.chart.id)?.gimmick ?? stop.gimmick, getBackup(crewAt(stop)));
   }
 
   // ---------------------------------------------------------------------
@@ -603,7 +607,7 @@ export class PlayScene extends Phaser.Scene {
 
   /** Run a conversation over the stage, lighting whoever is speaking. */
   private startDialogue(lines: readonly Line[], onDone: () => void, hoodDown = false): void {
-    const onStage = this.crew ? this.chart.rivalCharacter : this.story?.stop.fruit;
+    const onStage = this.crew ? this.chart.rivalCharacter : (battleForChart(this.chart.id)?.opponent ?? this.story?.stop.fruit);
     const playerWho = this.crew?.ally ?? 'berry';
     this.dialogue = new Dialogue(this, {
       lines,
@@ -822,10 +826,11 @@ export class PlayScene extends Phaser.Scene {
       // The story only moves on after a won battle. A loss earns a line of banter and a rematch.
       // A chart without rival notes has no battle to win: getting through it is enough.
       if (playerOnTop && (summary ? summary.won : true)) {
-        markCleared(this.story.stop);
+        // Each of the stop's three battles ends on its results; the next one is offered there.
+        markBattleWon(segment.battle);
         outro = segment.win;
         hoodDown = segment.hoodDown;
-        after = this.story.last ? toResults : () => this.continueStory();
+        after = toResults;
       } else {
         outro = segment.lose;
         after = () => this.rematch();
@@ -860,7 +865,8 @@ export class PlayScene extends Phaser.Scene {
   /** Record a crew round, carry the bar forward, and say what comes next. */
   private settleCrewRound(failed: boolean, won: boolean): { outro: readonly Line[]; after: () => void; hoodDown: boolean } {
     const final = stopById('stop12');
-    const script = final?.script;
+    const set = getSession()?.set ?? 0;
+    const script = final?.script.battles[set];
     const battle = this.battle;
     const result: RoundResult = {
       playerAccuracy: battle?.accuracy('player') ?? 0,
@@ -869,14 +875,22 @@ export class PlayScene extends Phaser.Scene {
       won: won && !failed,
     };
     const toLineup = (data: object) => goTo(this, SceneKeys.Lineup, { ...data, autoplay: this.playData.autoplay }, 400);
-    const lose = { outro: script?.lose ?? [], after: () => { endSession(); toLineup({ lost: true }); }, hoodDown: false };
-    // An empty bar loses the whole battle, whatever the points say.
+    const lose = { outro: script?.lose ?? [], after: () => { endSession(); toLineup({ lost: true, set }); }, hoodDown: false };
+    // An empty bar loses the set, whatever the points say.
     if (failed) return lose;
-    const state = recordRound(result, this.engine.stats.health);
+    recordRound(result, this.engine.stats.health);
     const session = getSession();
+    // The crew battle is danced in three sets (story/crewBattle.ts): a lost set is danced again.
+    const state = setVerdict();
     if (state === 'lost') return lose;
+    if (state === 'won' && final && set < 2) {
+      markBattleWon(final.battles[set]);
+      checkpointSession();
+      return { outro: script?.win ?? [], after: () => { endSession(); toLineup({ setWon: set }); }, hoodDown: false };
+    }
     if (state === 'won') {
-      if (final) markCleared(final);
+      if (final) markBattleWon(final.battles[2]);
+      checkpointSession();
       markSeen('ending');
       const results = session?.results.slice() ?? [];
       const order = session?.order.slice() ?? [];

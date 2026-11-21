@@ -1,9 +1,46 @@
 import { Tex } from '../core/config';
+import { rivalLevelAt, type Difficulty } from '../core/difficulty';
 import { CAST } from './cast';
 import { SCRIPT } from './script';
-import type { FruitId, GimmickId, StopRole, StopScript, TimeOfDay } from './types';
+import type { BattleScript, FruitId, GimmickId, StopRole, StopScript, TimeOfDay } from './types';
 
 export type StopId = 'stop01' | 'stop02' | 'stop03' | 'stop04' | 'stop05' | 'stop06' | 'stop07' | 'stop08' | 'stop09' | 'stop10' | 'stop11' | 'stop12';
+
+export type BattleKey = 'a' | 'b' | 'c';
+export const BATTLE_KEYS: readonly BattleKey[] = ['a', 'b', 'c'];
+
+/**
+ * One of a stop's three battles. A teaches the stop's gimmick gently on a short
+ * song of its own, B twists it on another, and C is the stop's rival battle on
+ * its main song (the battle every stop had before there were three). B opens
+ * once A is won, C once B is.
+ */
+export interface BattleDef {
+  /** The chart id, and the key its wins and best scores are kept under: stop01a, stop01b, stop01. */
+  id: string;
+  stop: StopId;
+  index: 0 | 1 | 2;
+  key: BattleKey;
+  /** "A", "B" or "C". */
+  letter: string;
+  /** What the battle is called on the train, e.g. "Ticket check". */
+  name: string;
+  /** Who dances against Berry (stop 12: the first enemy of the set). */
+  opponent: FruitId;
+  /** The opponent's gimmick, as in their own stop. */
+  gimmick: GimmickId;
+  /** The song it is danced to. */
+  song: string;
+  /**
+   * False while battles A and B still dance to the start of the boss song,
+   * until their own songs are generated (TEMPORARY, see AWAITING_SONGS).
+   */
+  ownSong: boolean;
+  chartUrl: string;
+  /** How well the opponent dances (1 to 5): a little below the boss in A, closer in B. */
+  rivalLevel: number;
+  script: BattleScript;
+}
 
 /** One stop on the Line. Station and street backgrounds are for Phase 3; time of day for Phase 5. */
 export interface StopDef {
@@ -40,9 +77,17 @@ export interface StopDef {
    * charts and gimmicks carry most of the difficulty.
    */
   rivalLevel: number;
-  /** The fruit who joins Berry's crew after this stop's win, if any. */
+  /** The fruit who joins Berry's crew after this stop's win (battle C), if any. */
   joins?: FruitId;
   script: StopScript;
+  /** Battles A, B and C. C is the stop's own chart and song (`chartId`, `song`). */
+  battles: readonly [BattleDef, BattleDef, BattleDef];
+}
+
+/** Name and opponent of a stop's battle. The opponent defaults to the stop's fruit. */
+interface BattleSeed {
+  name: string;
+  opponent?: FruitId;
 }
 
 interface StopSeed {
@@ -57,6 +102,8 @@ interface StopSeed {
   stage?: string;
   /** False for stops without a street. An existing stage is the street when the stop has one. */
   street?: boolean;
+  /** Battles A, B and C (docs/STORY_BIBLE.md, "Three battles per stop"). */
+  battles: [BattleSeed, BattleSeed, BattleSeed];
 }
 
 const SEEDS: StopSeed[] = [
@@ -68,6 +115,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Ordinary World, Call, Mentor',
     arc: 'The Coach teaches the beat, Raspberry confronts Berry for hiding since summer, they battle, then the Coach hands over a ticket. Raspberry joins.',
     song: 'berry_town',
+    battles: [{ name: 'Round one' }, { name: 'Round two' }, { name: 'Round three' }],
     stage: Tex.room,
     street: false,
   },
@@ -79,6 +127,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Crossing the Threshold',
     arc: 'First stop outside home. Berry barely speaks. A slapstick warm-up under a poster of Blueberry.',
     song: 'peel_street',
+    battles: [{ name: 'Ticket check' }, { name: 'Mind the peel' }, { name: 'The stamp' }],
   },
   {
     station: 'Graffiti Corner',
@@ -88,6 +137,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Allies',
     arc: "Pear joins. A wall mural shows a step-slide that looks like Berry's.",
     song: 'graffiti_corner',
+    battles: [{ name: 'The cypher' }, { name: 'Finish strong' }, { name: 'The back half' }],
     stage: Tex.stageStreet,
   },
   {
@@ -98,6 +148,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Enemies',
     arc: "First of Blueberry's crew. Grape says the step is their captain's.",
     song: 'vine_crossing',
+    battles: [{ name: 'One grape' }, { name: 'Two grapes' }, { name: 'The whole bunch' }],
   },
   {
     station: 'Citrus Labs',
@@ -107,6 +158,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Allies',
     arc: "Lemon joins, with footage of Blueberry's crew using Berry's footwork.",
     song: 'citrus_labs',
+    battles: [{ name: 'Calibration' }, { name: 'Trial two' }, { name: 'Full meltdown' }],
     stage: Tex.stageLab,
   },
   {
@@ -117,6 +169,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Tests, false high',
     arc: "The crew's best night. Plum asks who is missing from Berry's dance. A scout in a dragon scarf takes notes.",
     song: 'lantern_market',
+    battles: [{ name: 'First lantern' }, { name: 'Best of three' }, { name: 'Last lantern' }],
   },
   {
     station: 'The Club',
@@ -126,6 +179,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Ordeal, low point',
     arc: 'Berry wins alone and the crew walks out because he never says what he feels. The crowd goes silent.',
     song: 'the_club',
+    battles: [{ name: 'The door' }, { name: 'Soloists only' }, { name: 'The main floor' }],
     stage: Tex.stageClub,
   },
   {
@@ -136,6 +190,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Reward',
     arc: 'Berry speaks his first full line and admits what happened in July. The crew returns. Watermelon makes five.',
     song: 'rooftop',
+    battles: [{ name: 'Table for one' }, { name: 'Big feelings' }, { name: 'Last dance' }],
     // A rooftop food court: its own street (street_rooftop), danced at its far end, Watermelon's grill (stage_rooftop).
   },
   {
@@ -146,6 +201,7 @@ const SEEDS: StopSeed[] = [
     journey: 'The Road Back',
     arc: "Blueberry's crew blocks the line. Coconut says the captain never laughs anymore.",
     song: 'the_tunnel',
+    battles: [{ name: 'First gate' }, { name: 'Second gate' }, { name: 'Third gate' }],
   },
   {
     station: 'Orange Plaza',
@@ -155,6 +211,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Resurrection I',
     arc: "The Grand Dance opens. The crowd chants for Berry's face. He says not yet.",
     song: 'orange_plaza',
+    battles: [{ name: 'Qualifier: Banana', opponent: 'banana' }, { name: 'Qualifier: Plum', opponent: 'plum' }, { name: 'The exhibition' }],
   },
   {
     station: 'Pineapple Hall',
@@ -164,6 +221,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Resurrection II',
     arc: 'Pineapple reveals the captain keeps asking about a hoodie who never answered.',
     song: 'pineapple_hall',
+    battles: [{ name: 'Etiquette' }, { name: 'The mirror room' }, { name: 'The main hall' }],
   },
   {
     station: 'Grand Stage',
@@ -173,6 +231,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Return with the Elixir',
     arc: 'Five against five. Berry vs Blueberry. Berry finally says yes, the hood comes down, the trio reunites.',
     song: 'grand_stage',
+    battles: [{ name: 'Set one', opponent: 'grape' }, { name: 'Set two', opponent: 'pineapple' }, { name: 'Set three' }],
     street: false,
   },
 ];
@@ -183,6 +242,18 @@ const SEEDS: StopSeed[] = [
  * ten with ordinary timing can win every stop, and one who hits seven in ten cannot.
  */
 const RIVAL_LEVELS = [2, 1.5, 2.2, 2.4, 2.6, 2.6, 2.8, 2.8, 3, 3, 3.1, 4];
+
+/**
+ * TEMPORARY: the stops whose battles A and B do not have their own songs yet.
+ * Until they are generated, A and B dance to the start of the boss song, on
+ * lighter charts of it (tools/analyze_audio.py, SUBLEVELS), and stop 12's sets
+ * one and two dance to stretches of each enemy's own stop song, as the crew
+ * battle always did. Drop a stop from this set once its songs are in.
+ */
+export const AWAITING_SONGS: ReadonlySet<number> = new Set([7, 8, 9, 10, 11, 12]);
+
+/** How far below the boss's skill the opponents of battles A and B dance. */
+const BATTLE_SKILL_DROP = [0.4, 0.2, 0];
 
 /** Allies join the crew when their stop is won. */
 const ALLIES: Partial<Record<FruitId, true>> = { raspberry: true, pear: true, lemon: true, watermelon: true };
@@ -196,6 +267,28 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
   const id = `stop${String(number).padStart(2, '0')}` as StopId;
   const script = SCRIPT.find((s) => s.stop === number);
   if (!script) throw new Error(`No dialogue for stop ${number}`);
+  const ownSongs = !AWAITING_SONGS.has(number);
+  const battle = (index: 0 | 1 | 2): BattleDef => {
+    const key = BATTLE_KEYS[index];
+    const boss = index === 2;
+    const opponent = seed.battles[index].opponent ?? seed.fruit;
+    const chartId = boss ? id : `${id}${key}`;
+    return {
+      id: chartId,
+      stop: id,
+      index,
+      key,
+      letter: key.toUpperCase(),
+      name: seed.battles[index].name,
+      opponent,
+      gimmick: CAST[opponent].gimmick ?? 'even',
+      song: boss || !ownSongs ? seed.song : `${seed.song}_${key}`,
+      ownSong: boss || ownSongs,
+      chartUrl: `charts/${chartId}.json`,
+      rivalLevel: Math.max(1, Math.round((RIVAL_LEVELS[i] - BATTLE_SKILL_DROP[index]) * 10) / 10),
+      script: script.battles[index],
+    };
+  };
   return {
     id,
     number,
@@ -215,6 +308,7 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
     rivalLevel: RIVAL_LEVELS[i],
     joins: ALLIES[seed.fruit] ? seed.fruit : undefined,
     script,
+    battles: [battle(0), battle(1), battle(2)],
   };
 });
 
@@ -225,15 +319,31 @@ export function stopById(id: string | undefined): StopDef | undefined {
   return STOPS.find((stop) => stop.id === id);
 }
 
-/** How well the rival dances a chart: its stop's level in the story, else the chart's own difficulty. */
-export function rivalLevelFor(chart: { id: string; difficulty?: number }): number | undefined {
-  return stopForChart(chart.id)?.rivalLevel ?? chart.difficulty;
+/**
+ * How well the rival dances a chart: its battle's level in the story, else the
+ * chart's own difficulty, moved up or down by the difficulty it is played on.
+ */
+export function rivalLevelFor(chart: { id: string; difficulty?: number }, difficulty?: Difficulty): number | undefined {
+  const level = battleForChart(chart.id)?.rivalLevel ?? chart.difficulty;
+  return level === undefined ? undefined : rivalLevelAt(level, difficulty);
 }
 
-/** The stop whose battle uses this chart. */
+/** The stop whose battle (A, B or C) uses this chart. */
 export function stopForChart(chartId: string): StopDef | undefined {
-  return STOPS.find((stop) => stop.chartId === chartId);
+  return STOPS.find((stop) => stop.battles.some((battle) => battle.id === chartId));
 }
+
+/** The battle that uses this chart. */
+export function battleForChart(chartId: string): BattleDef | undefined {
+  for (const stop of STOPS) {
+    const battle = stop.battles.find((b) => b.id === chartId);
+    if (battle) return battle;
+  }
+  return undefined;
+}
+
+/** Every battle of the story, stop by stop, A to C. */
+export const BATTLES: readonly BattleDef[] = STOPS.flatMap((stop) => stop.battles);
 
 /** Short line under a stop's name on the train. */
 export function stopTeaser(stop: StopDef): string {

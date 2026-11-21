@@ -1,4 +1,4 @@
-import { stopById, TUTORIAL, type StopDef, type StopId } from './stops';
+import { stopById, TUTORIAL, type BattleDef, type StopDef, type StopId } from './stops';
 import type { Line } from './types';
 
 /**
@@ -26,6 +26,8 @@ export interface LessonSegment extends PlaySegment {
 
 export interface BattleSegment extends PlaySegment {
   kind: 'battle';
+  /** Which of the stop's three battles this is. */
+  battle: BattleDef;
   /** Said after a won battle, before the results. */
   win: Line[];
   /** Said after a lost battle, before the retry. */
@@ -41,18 +43,18 @@ export interface StoryRef {
 }
 
 export function segmentsFor(stop: StopDef): Segment[] {
-  const { script } = stop;
-  const battle: BattleSegment = {
+  const battles: BattleSegment[] = stop.battles.map((battle) => ({
     kind: 'battle',
-    chartId: stop.chartId,
-    chartUrl: stop.chartUrl,
+    battle,
+    chartId: battle.id,
+    chartUrl: battle.chartUrl,
     stage: stop.stage,
-    before: [],
-    win: script.win,
-    lose: script.lose,
-    hoodDown: stop.role === 'final',
-  };
-  if (script.tutorial) {
+    before: battle.script.intro,
+    win: battle.script.win,
+    lose: battle.script.lose,
+    hoodDown: stop.role === 'final' && battle.index === 2,
+  }));
+  if (stop.script.tutorial) {
     // Stop 1: the Coach's lesson in Berry's room, then Raspberry finds him there.
     // (The neighbour's line is said at Berry's door, before the Coach arrives.)
     const lesson: LessonSegment = {
@@ -60,12 +62,12 @@ export function segmentsFor(stop: StopDef): Segment[] {
       chartId: TUTORIAL.id,
       chartUrl: TUTORIAL.chartUrl,
       stage: TUTORIAL.stage,
-      before: script.tutorial,
+      before: stop.script.tutorial,
       after: [],
     };
-    return [lesson, { ...battle, before: script.intro }];
+    return [lesson, ...battles];
   }
-  return [{ ...battle, before: script.intro }];
+  return battles;
 }
 
 export function segmentAt(ref: StoryRef | undefined): { stop: StopDef; segment: Segment; last: boolean } | null {
@@ -77,18 +79,27 @@ export function segmentAt(ref: StoryRef | undefined): { stop: StopDef; segment: 
   return segment ? { stop, segment, last: ref.segment === segments.length - 1 } : null;
 }
 
-/**
- * Riding back to a cleared stop 1 is a rematch with Raspberry: the train goes
- * straight to her battle, past the room, the neighbour and the lesson.
- */
-export function rideStraightToBattle(stop: StopDef, cleared: boolean): boolean {
-  return cleared && segmentsFor(stop).some((segment) => segment.kind === 'lesson');
+/** The segment index of one of the stop's battles (0 A, 1 B, 2 C). */
+export function battleSegment(stop: StopDef, battle: number): number {
+  const segments = segmentsFor(stop);
+  const index = segments.findIndex((segment) => segment.kind === 'battle' && segment.battle.index === battle);
+  return index < 0 ? 0 : index;
 }
 
-/** First segment to play when a stop is chosen. A cleared stop 1 skips straight past the lesson. */
-export function firstSegment(stop: StopDef, cleared: boolean): number {
-  const segments = segmentsFor(stop);
-  if (!cleared) return 0;
-  const battle = segments.findIndex((segment) => segment.kind === 'battle');
-  return battle < 0 ? 0 : battle;
+/**
+ * Riding back to stop 1 once Raspberry has been beaten at least once is a
+ * rematch: the train goes straight to her battle, past the room, the
+ * neighbour and the lesson.
+ */
+export function rideStraightToBattle(stop: StopDef, started: boolean): boolean {
+  return started && segmentsFor(stop).some((segment) => segment.kind === 'lesson');
+}
+
+/**
+ * First segment to play when one of a stop's battles is chosen. The lesson
+ * comes first only before Berry's first win at stop 1.
+ */
+export function firstSegment(stop: StopDef, battle: number, started: boolean): number {
+  if (!started && battle === 0) return 0;
+  return battleSegment(stop, battle);
 }

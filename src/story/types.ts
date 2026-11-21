@@ -16,6 +16,16 @@ export interface Line {
   role?: string;
 }
 
+/** What is said around one battle. */
+export interface BattleScript {
+  /** Said before the song starts. */
+  intro: Line[];
+  /** Said after a won battle, before the results. */
+  win: Line[];
+  /** Retry banter after a lost battle. */
+  lose: Line[];
+}
+
 /** Everything said at one stop, in the bible's sections. */
 export interface StopScript {
   stop: number;
@@ -23,10 +33,11 @@ export interface StopScript {
   station: Line[];
   /** Stop 1 only: the Coach's lesson in Berry's room. */
   tutorial?: Line[];
-  intro: Line[];
-  win: Line[];
-  /** Retry banter after a lost battle. */
-  lose: Line[];
+  /**
+   * The stop's three battles, A, B and C (see BATTLES in stops.ts). Battle A's intro is the
+   * stop's first meeting; battle C, on the stop's main song, ends with the stop's win lines.
+   */
+  battles: readonly [BattleScript, BattleScript, BattleScript];
   /** Stop 12 only: one line per round of the crew battle, then Berry's. */
   rounds?: Line[];
 }

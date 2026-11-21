@@ -195,14 +195,40 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - COACH (bold): Good. Now keep it going. Don't think. Just move.
 - COACH (neutral): There. Beats are like dough, kid. They just need time.
 
-**Intro**
+**Battle A intro**
 
 - RASPBERRY (bold): Found you. Three months in this room, Berry. Three months!
 - RASPBERRY (neutral): Blueberry's top of Fruit City now. And you? You just vanished.
 - BERRY (neutral): ...
 - RASPBERRY (bold): Fine. If you won't talk, dance. Win and I'll leave you alone.
 
-**Win**
+**Battle A win**
+
+- RASPBERRY (bold): Lucky. That was one. Best of three, and don't you dare sit down.
+
+**Battle A lose**
+
+- RASPBERRY (neutral): Three months off and it shows. Up. Again.
+
+**Battle B intro**
+
+- COACH (neutral): Mind the muffins, you two. That tray took me all morning.
+- RASPBERRY (bold): Round two. Try to keep up, Berry.
+
+**Battle B win**
+
+- RASPBERRY (neutral): Okay. Okay! You're warming up. I hate that.
+
+**Battle B lose**
+
+- RASPBERRY (bold): You're thinking again. Don't think. Again.
+
+**Battle C intro**
+
+- RASPBERRY (bold): Last round. Win this one and I really will leave you alone.
+- BERRY (neutral): ...
+
+**Battle C win**
 
 - RASPBERRY (neutral): Still got it. Of course you do. That's the annoying part.
 - COACH (bold): A ticket to the Grand Dance in Fruit City. Last stop on the Line.
@@ -210,7 +236,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - BERRY (neutral): ...
 - RASPBERRY (bold): Pack a coat. It's November, and I'm coming with you.
 
-**Lose**
+**Battle C lose**
 
 - RASPBERRY (neutral): Nope. You're not hiding behind a loss. Again.
 
@@ -220,19 +246,46 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - ATTENDANT (neutral): That's Blueberry on the poster. Champion three years running. Never misses.
 
-**Intro**
+**Battle A intro**
 
 - BANANA (bold): Ticket check! Mind the floor, it's a little sli... WHOA!
 - BANANA (neutral): Hoodie! New in town? We have a no-slip policy. I just break it.
 - RASPBERRY (neutral): He's harmless. Mostly. Show him your feet, Berry.
 - BANANA (bold): Beat me and I stamp your pass. Lose, and I slip anyway!
 
-**Win**
+**Battle A win**
+
+- BANANA (bold): Stamp... wait. My stamp slipped. Best of three!
+
+**Battle A lose**
+
+- BANANA (neutral): Ticket denied! Kidding. Mostly. Go again.
+
+**Battle B intro**
+
+- BANANA (bold): Round two, out on the street! Mind the peel. It's mine.
+- RASPBERRY (neutral): He does this to everyone. Just dance, Berry.
+
+**Battle B win**
+
+- BANANA (bold): Okay, okay! Three out of five!
+- RASPBERRY (bold): No.
+- BANANA (neutral): Best of three, then. That was always the plan. Honest.
+
+**Battle B lose**
+
+- BANANA (bold): Slipped you up! That's the street for you. Again!
+
+**Battle C intro**
+
+- BANANA (bold): Last one, at my stand. Win and the stamp is yours. For real!
+
+**Battle C win**
 
 - BANANA (bold): Stamped! Smooth moves, hoodie. Smoother than my floors.
 - RASPBERRY (bold): See? Outside didn't bite. Next stop!
 
-**Lose**
+**Battle C lose**
 
 - BANANA (neutral): Whoops! That one was my slip, honest. Go again.
 
@@ -242,19 +295,45 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - ARTIST (neutral): Blueberry's crew painted that step-slide on the wall. Looks like yours.
 
-**Intro**
+**Battle A intro**
 
 - PEAR (neutral): Chill... new face. Sit. The corner ain't going anywhere.
 - PEAR (bold): I start slow. Always do. By the end, you'll be begging.
 - RASPBERRY (neutral): Be nice, Pear. He's a work in progress.
 - PEAR (bold): Everyone is. Let's go.
 
-**Win**
+**Battle A win**
+
+- PEAR (neutral): Not bad... for a warm-up. Stay in the circle, man.
+
+**Battle A lose**
+
+- PEAR (neutral): Easy, bro. The circle's patient. Again.
+
+**Battle B intro**
+
+- PEAR (neutral): Rule of the corner. I only dance with people who finish.
+- RASPBERRY (neutral): Says the guy with half a mural.
+- PEAR (bold): Half a mural is still a mural. Go.
+
+**Battle B win**
+
+- PEAR (bold): You finished. Huh. Respect.
+
+**Battle B lose**
+
+- PEAR (neutral): You faded out, man. Finish it this time.
+
+**Battle C intro**
+
+- PEAR (bold): Okay. Now I'm warmed up. Watch the back half.
+
+**Battle C win**
 
 - PEAR (bold): Okay, okay! The hoodie's got heat. Count me in.
 - RASPBERRY (bold): That's three. We need five.
 
-**Lose**
+**Battle C lose**
 
 - PEAR (neutral): Slow start is my thing, bro. Not yours. Again.
 
@@ -264,7 +343,34 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - GUARD (neutral): Five dancers to enter the Grand Dance. You have three. Find two more.
 
-**Intro**
+**Battle A intro**
+
+- GRAPE (bold): We guard the crossing! (...) Sorry. It's just me right now.
+- GRAPE (neutral): The others are on lunch. I'm usually more of us.
+- RASPBERRY (neutral): One grape. We can take one grape, Berry.
+
+**Battle A win**
+
+- GRAPE (neutral): I lost. (...) No echo. That's the worst part.
+
+**Battle A lose**
+
+- GRAPE (bold): I won! (...) Somebody say I won. Again!
+
+**Battle B intro**
+
+- GRAPE (bold): We're back! (We're back!) Two of us now! (Two!)
+- PEAR (neutral): Man... they doubled.
+
+**Battle B win**
+
+- GRAPE (neutral): Two wasn't enough. (Not enough.) Get everyone! (Everyone!)
+
+**Battle B lose**
+
+- GRAPE (bold): Two beats one! (Two!) Again! (Again!)
+
+**Battle C intro**
 
 - GRAPE (bold): We are Grape! (We are Grape!) We guard the crossing! (We guard it!)
 - GRAPE (neutral): Ooh. That step-slide. Where did you learn it? (Where?)
@@ -272,12 +378,12 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - RASPBERRY (neutral): Coincidence. Fruit City loves a step-slide.
 - BERRY (neutral): ...
 
-**Win**
+**Battle C win**
 
 - GRAPE (neutral): We lost. (We lost.) We're not sure how. (Not sure.)
 - GRAPE (bold): Go on through! (Go on!) The captain won't be this nice. (He won't!)
 
-**Lose**
+**Battle C lose**
 
 - GRAPE (bold): Out of sync, hoodie! (Out of sync!) Again! (Again!)
 
@@ -287,19 +393,45 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - ASSISTANT (neutral): Dr. Lemon filmed the captain's crew forty-seven times. He's obsessed.
 
-**Intro**
+**Battle A intro**
 
 - LEMON (bold): EUREKA! A subject! Don't touch anything. Or anyone. Or me.
 - LEMON (neutral): I filmed a crew last week. Same step-slide as yours. Coincidence? No!
 - PEAR (neutral): Man... that's the third time someone's said that.
 - LEMON (bold): Hypothesis: you lose. Results pending!
 
-**Win**
+**Battle A win**
+
+- LEMON (bold): Calibration complete! Your feet are twelve percent faster than predicted!
+
+**Battle A lose**
+
+- LEMON (neutral): Calibration error. Probably you. Recalibrating!
+
+**Battle B intro**
+
+- LEMON (neutral): Trial two. I've made it harder. Scientifically.
+- LEMON (bold): Streaks, then chaos! Try not to melt down. I always do.
+
+**Battle B win**
+
+- LEMON (bold): Fascinating! Hypothesis rejected! Again, with more chaos!
+
+**Battle B lose**
+
+- LEMON (neutral): Data point recorded. A sad one. Go again.
+
+**Battle C intro**
+
+- LEMON (bold): Final trial! Full meltdown! Goggles on, everybody!
+- PEAR (neutral): We don't have goggles, man.
+
+**Battle C win**
 
 - LEMON (bold): EUREKA! The data is beautiful! May I join your crew? I have snacks.
 - RASPBERRY (bold): Four of us now. One more to go.
 
-**Lose**
+**Battle C lose**
 
 - LEMON (neutral): Fascinating failure! Recording. Please go again.
 
@@ -309,20 +441,45 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - STALL KEEPER (neutral): Tea's free if you smile. Your friend in the hoodie hasn't yet.
 
-**Intro**
+**Battle A intro**
 
 - PLUM (neutral): The market is quiet tonight. Dance for the lanterns, young ones.
 - PLUM (neutral): You dance like someone is missing. Who is it?
 - RASPBERRY (neutral): Don't answer that, Berry. Just dance.
 
-**Win**
+**Battle A win**
+
+- PLUM (neutral): One lantern lit. The market is waking up.
+
+**Battle A lose**
+
+- PLUM (neutral): Too fast, young one. Lanterns light slowly.
+
+**Battle B intro**
+
+- PLUM (bold): Best of three, young ones. Plum has time.
+- LEMON (neutral): She said that like a threat.
+
+**Battle B win**
+
+- PLUM (neutral): Two lanterns. One more, and the whole street is bright.
+
+**Battle B lose**
+
+- PLUM (neutral): Rest is part of the dance. Rest, then go again.
+
+**Battle C intro**
+
+- PLUM (bold): The last lantern. Dance it slowly.
+
+**Battle C win**
 
 - PLUM (bold): Lovely. Remember, rest between notes is also a note.
 - PEAR (bold): Best night ever, hoodie!
 - LEMON (bold): Statistically, yes!
 - PLUM (neutral): A fruit in a dragon scarf watched all night. Taking notes.
 
-**Lose**
+**Battle C lose**
 
 - PLUM (neutral): Patience, young one. Breathe. Then begin again.
 
@@ -332,7 +489,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - BOUNCER (neutral): No hoods on the main floor. The captain's rule.
 
-**Intro**
+**Battle A intro**
 
 - DRAGON FRUIT (bold): Behold! The Club! Where nobody hides. Hoodie, that's a problem.
 - DRAGON FRUIT (neutral): Same footwork as the captain. You just wear it like an apology.
@@ -340,7 +497,34 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - BERRY (neutral): ...
 - PEAR (neutral): Bro...
 
-**Win (the crew walks out)**
+**Battle A win**
+
+- DRAGON FRUIT (bold): A spark! Tiny, but hot. The floor is yours. Briefly.
+
+**Battle A lose**
+
+- DRAGON FRUIT (neutral): Darling, the door stays shut for dim lights. Again.
+
+**Battle B intro**
+
+- DRAGON FRUIT (bold): Club rule: the floor is for one. Your friends can watch.
+- PEAR (neutral): Bro... we're right here.
+- BERRY (neutral): ...
+
+**Battle B win**
+
+- DRAGON FRUIT (bold): Ooh, he burns alone. Just like the captain.
+- RASPBERRY (neutral): Berry. Look at us. Say something.
+
+**Battle B lose**
+
+- DRAGON FRUIT (bold): The spotlight dims! One more try, hoodie.
+
+**Battle C intro**
+
+- DRAGON FRUIT (bold): The main floor! Full lights! Let's see you shine, hoodie.
+
+**Battle C win (the crew walks out)**
 
 - DRAGON FRUIT (neutral): Flawless. Cold. Exactly like him. Welcome to the top.
 - LEMON (neutral): Berry, that was perfect. And I felt nothing. Why?
@@ -349,7 +533,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - BERRY (neutral): ...
 - RASPBERRY (neutral): I can't dance with a wall. I'm sorry.
 
-**Lose**
+**Battle C lose**
 
 - DRAGON FRUIT (bold): Dim the lights, hoodie. You're not shining yet.
 
@@ -359,15 +543,39 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - DJ (neutral): November nights end early. Stay till the lights come on.
 
-**Intro**
+**Battle A intro**
 
 - WATERMELON (bold): WELCOME TO THE ROOFTOP! Hey, small hoodie! Where's your crew?
 - BERRY (neutral): ...
+- WATERMELON (neutral): Table for one, then. Dance for your supper. Nice and slow.
+
+**Battle A win**
+
+- WATERMELON (bold): Delicious! But you dance like you're waiting for someone.
+
+**Battle A lose**
+
+- WATERMELON (neutral): Hold it longer, little one. Good things take time.
+
+**Battle B intro**
+
 - WATERMELON (neutral): Big feelings need big words. Or big dancing. Try either.
 - BERRY (bold): I'm bad at saying things. But I want my crew back.
 - WATERMELON (bold): THAT'S IT! Now dance it out!
 
-**Win**
+**Battle B win**
+
+- WATERMELON (bold): Bigger! Louder! One more, and mean every beat!
+
+**Battle B lose**
+
+- WATERMELON (neutral): You said the hard part already. Dance the easy part. Again.
+
+**Battle C intro**
+
+- WATERMELON (bold): Last dance of the night! Big heart, bigger beat!
+
+**Battle C win**
 
 - WATERMELON (bold): Beautiful! I'm joining you. Big heart, bigger beat!
 - RASPBERRY (neutral): We heard. All of it. Move over, hoodie.
@@ -376,7 +584,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - RASPBERRY (neutral): I know. I was there. I should've said something too.
 - LEMON (bold): Five dancers! Mathematically, we qualify!
 
-**Lose**
+**Battle C lose**
 
 - WATERMELON (neutral): Take a breath, little one. I'm patient. And very round.
 
@@ -386,21 +594,44 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - WORKER (neutral): Tunnel's closed. Captain's orders. Unless you can dance.
 
-**Intro**
+**Battle A intro**
 
 - COCONUT (neutral): Halt.
-- COCONUT (neutral): Captain's step.
 - RASPBERRY (bold): We know, shell-head. Let us through.
+
+**Battle A win**
+
+- COCONUT (neutral): Gate one. Pass.
+
+**Battle A lose**
+
+- COCONUT (neutral): No.
+
+**Battle B intro**
+
+- COCONUT (neutral): Captain's step.
+- PEAR (neutral): Man, he really doesn't do small talk.
+
+**Battle B win**
+
+- COCONUT (neutral): Again. Further.
+
+**Battle B lose**
+
+- COCONUT (neutral): Not passing. Not yet.
+
+**Battle C intro**
+
 - COCONUT (neutral): Dance. Then pass.
 
-**Win**
+**Battle C win**
 
 - COCONUT (neutral): Pass.
 - COCONUT (bold): Captain doesn't laugh anymore.
 - RASPBERRY (neutral): He used to laugh at everything. Remember?
 - BERRY (neutral): ...
 
-**Lose**
+**Battle C lose**
 
 - COCONUT (neutral): No. Again.
 
@@ -410,20 +641,47 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - VENDOR (neutral): Hot cider! Warm up before the Grand Stage. It's freezing out there.
 
-**Intro**
+**Battle A intro**
 
 - ORANGE (bold): LADIES AND GENTLEFRUITS! Welcome to the Grand Dance!
 - ORANGE (bold): Fresh-squeezed talent! A crew of five? We love to see it!
 - ORANGE (neutral): Mic check! The hoodie's on! Folks, we want a face!
 - RASPBERRY (neutral): You don't have to, Berry.
 - BERRY (bold): Not yet. After.
+- ORANGE (bold): First qualifier! All the way from Peel Street, it's Banana!
+- BANANA (bold): Remember me? Best of three, part four!
 
-**Win**
+**Battle A win**
+
+- BANANA (neutral): Slipped again. Good luck up there, hoodie!
+
+**Battle A lose**
+
+- ORANGE (bold): Banana takes it! Slippery! Reset, folks!
+
+**Battle B intro**
+
+- ORANGE (bold): Second qualifier! From the Lantern Market, give it up for Plum!
+- PLUM (neutral): You stand differently now, young one. Show me.
+
+**Battle B win**
+
+- PLUM (neutral): Ripe at last. Go on. The big stage is waiting.
+
+**Battle B lose**
+
+- PLUM (neutral): Breathe first. The music will wait for you.
+
+**Battle C intro**
+
+- ORANGE (bold): And now, the exhibition! Me! Hold your applause. Actually, don't!
+
+**Battle C win**
 
 - ORANGE (bold): Mic drop! The hood stays up, folks. The crowd's not thrilled!
 - RASPBERRY (bold): Almost there. Blueberry's waiting at the end of the Line.
 
-**Lose**
+**Battle C lose**
 
 - ORANGE (neutral): Cue the buzzer! Reset! Quick intro, longer outro!
 
@@ -433,7 +691,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - USHER (neutral): The captain rehearses alone every night. Nobody knows why.
 
-**Intro**
+**Battle A intro**
 
 - PINEAPPLE (neutral): Mind the spikes. They mind you.
 - PINEAPPLE (bold): You dance like the captain. Except he doesn't hide.
@@ -442,11 +700,37 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - PINEAPPLE (neutral): Never by name. Always the hoodie.
 - BERRY (neutral): ...
 
-**Win**
+**Battle A win**
+
+- PINEAPPLE (bold): Cute step. Sharper next time.
+
+**Battle A lose**
+
+- PINEAPPLE (neutral): Sloppy. In this hall, every miss counts twice.
+
+**Battle B intro**
+
+- PINEAPPLE (neutral): The rehearsal room. Mirrors on every wall. He dances here alone.
+- RASPBERRY (neutral): Every night? By himself?
+- PINEAPPLE (bold): Dance. The mirrors don't lie. I do, sometimes.
+
+**Battle B win**
+
+- PINEAPPLE (neutral): Hm. You looked at yourself and didn't look away.
+
+**Battle B lose**
+
+- PINEAPPLE (bold): The mirror saw that. So did I. Again.
+
+**Battle C intro**
+
+- PINEAPPLE (bold): Main hall. No mirrors, no hood tricks. Just correct.
+
+**Battle C win**
 
 - PINEAPPLE (neutral): Spiky, but fair. Go on. He's practiced that step all week.
 
-**Lose**
+**Battle C lose**
 
 - PINEAPPLE (bold): Ouch? That's what spikes are for. Again.
 
@@ -456,13 +740,37 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 
 - STAGEHAND (neutral): Fifteen minutes. The captain asked if a hoodie signed up.
 
-**Intro**
+**Battle A intro**
 
 - ORANGE (bold): FIVE against FIVE! Fruit City, make some noise!
 - BLUEBERRY (bold): Look who finally came out of his room.
 - BLUEBERRY (neutral): Five against five. I carry my crew. You'd carry yours. Try.
 - RASPBERRY (bold): Stop showing off, Blueberry. We missed you.
 - BLUEBERRY (neutral): I don't miss anyone. I miss audiences.
+
+**Battle A win**
+
+- ORANGE (bold): Set one to the hoodie's crew! Fruit City, are you awake?
+
+**Battle A lose**
+
+- BLUEBERRY (neutral): One set down, hoodie. My crew's only warming up.
+
+**Battle B intro**
+
+- BLUEBERRY (bold): Set two. Pineapple and the dragon. Good luck with that.
+
+**Battle B win**
+
+- BLUEBERRY (neutral): ...Okay. Two sets. Fine. It's just us now.
+
+**Battle B lose**
+
+- ORANGE (bold): Set two to the champion's crew! Reset and go again!
+
+**Battle C intro**
+
+- ORANGE (bold): The final set! The hoodie against the champion! Double points!
 
 **Round lines (enemy order is fixed)**
 
@@ -473,7 +781,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - BLUEBERRY (neutral): Last round. Just us. Like old times.
 - BERRY (neutral): ...
 
-**Win**
+**Battle C win**
 
 - BLUEBERRY (neutral): ...You didn't hide. Not once.
 - BERRY (bold): I should have said yes. I'm saying it now. Yes.
@@ -484,7 +792,7 @@ Format: `SPEAKER (neutral|bold): text`. One speaker per line, 90 characters or f
 - BLUEBERRY (bold): Same garden. Bring the muffins.
 - COACH (bold): Beats are like dough, kid. Told you they'd rise.
 
-**Lose**
+**Battle C lose**
 
 - BLUEBERRY (bold): Say something, hoodie. Anything. No? Again.
 

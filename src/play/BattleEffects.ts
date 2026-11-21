@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { Battle, PlannedHit } from '../core/battle';
 import type { Chart } from '../core/chart';
 import { COLORS, CSS } from '../core/config';
-import { WINDOWS, type Engine, type JudgeEvent, type Judgement, type PlayNote } from '../core/engine';
+import type { Engine, JudgeEvent, Judgement, PlayNote, Windows } from '../core/engine';
 import type { SfxName } from '../core/sfx';
 import {
   ABILITIES,
@@ -78,12 +78,15 @@ export class BattleEffects {
   private readonly boosted = new Set<number>();
   private meltdownIndex = 0;
   private time = -Infinity;
+  /** The windows the song started with (Easy's are wider), restored when Steady ends. */
+  private readonly baseWindows: Windows;
 
   constructor(scene: Phaser.Scene, setup: EffectsSetup) {
     this.setup = setup;
     this.scene = scene;
     const { chart, rules, engine, field } = setup;
     this.rules = rules;
+    this.baseWindows = engine.mods.windows;
     this.beat = 60 / chart.bpm;
     this.abilityLength = abilitySeconds(chart.bpm);
     engine.mods.missDamage = missDamage(rules.gimmick);
@@ -259,7 +262,7 @@ export class BattleEffects {
 
   private end(time: number): void {
     const { engine } = this.setup;
-    engine.mods.windows = WINDOWS;
+    engine.mods.windows = this.baseWindows;
     engine.mods.shield = 0;
     if (this.eurekaLeft > 0) this.startScramble(time);
     this.eurekaLeft = 0;
