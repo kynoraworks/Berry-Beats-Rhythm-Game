@@ -123,7 +123,7 @@ Stop 1 is special: Berry's room (Coach tutorial, no battle), Raspberry's confron
 
 Every stop has three battles. A teaches the stop's gimmick gently on a short song of its own (about a minute, in the stop song's style, a little slower), B twists it on a second short song close to the stop's tempo, and C is the stop's rival battle on its main song. B opens once A is won and C once B is; winning C clears the stop (the next stop opens and any ally joins). Battle A opens with the stop's first meeting; battle C ends with the stop's win lines. On the train, each stop shows three ticket pips and the three battles of the chosen stop.
 
-Three shapes, so the stops do not all feel the same: an audition for an ally (1, 3, 5, 8), gates before a boss (4, 7, 9, 11, with Grape's one grape, two grapes, whole bunch), best of three with a local (2, 6), and a remix at Orange Plaza (10), where the qualifiers are rematches with Banana and Plum. At the Grand Stage the three battles are the crew battle's three sets.
+Three shapes, so the stops do not all feel the same: an audition for an ally (1, 3, 5, 8), gates before a boss (4, 7, 9, 11, with Grape's one grape, two grapes, whole bunch), best of three with a local (2, 6), and a remix at Orange Plaza (10), where the qualifiers are rematches with Banana and Plum. At the Grand Stage the three battles are the crew battle's three sets: sets one and two each have a song of their own with both of their rounds on it, set three is Berry against Blueberry on the Grand Stage song.
 
 | Stop | Battle | Name | Opponent |
 |---|---|---|---|

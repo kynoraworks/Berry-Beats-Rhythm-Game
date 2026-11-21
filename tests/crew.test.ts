@@ -130,7 +130,7 @@ function load(id: string): Chart {
 }
 
 /** Song lengths in seconds (ffprobe). */
-const DURATION: Record<string, number> = { vine_crossing: 80.0, the_tunnel: 92.1, pineapple_hall: 83.79, the_club: 87.5, grand_stage: 78.04 };
+const DURATION: Record<string, number> = { grand_stage_a: 75.05, grand_stage_b: 75.05, grand_stage: 78.04 };
 
 describe('crew battle segments', () => {
   const segments = CREW_ROUNDS.map((round, i) => {
@@ -149,7 +149,7 @@ describe('crew battle segments', () => {
     }
   });
 
-  it('runs about 37 seconds (the last about 50) and ends inside its song, 3 to 4 minutes in all', () => {
+  it('runs 33 to 42 seconds (the last about 50) and ends inside its song, 3 to 4 minutes in all', () => {
     let total = 0;
     for (const [i, { full, span }] of segments.entries()) {
       const seconds = span.end - span.start;
@@ -169,6 +169,12 @@ describe('crew battle segments', () => {
 
   it('starts on a four-bar phrase line', () => {
     for (const { round } of segments) expect(round.startBar % 4).toBe(0);
+  });
+
+  it('dances sets one and two on their own songs, two rounds each that do not overlap', () => {
+    expect(CREW_ROUNDS.map((round) => round.chartId)).toEqual(['stop12a', 'stop12a', 'stop12b', 'stop12b', 'stop12']);
+    for (const [first, second] of [[0, 1], [2, 3]]) expect(CREW_ROUNDS[first].endBar).toBeLessThanOrEqual(CREW_ROUNDS[second].startBar);
+    expect(segments.map(({ full }) => full.song)).toEqual(['grand_stage_a', 'grand_stage_a', 'grand_stage_b', 'grand_stage_b', 'grand_stage']);
   });
 });
 

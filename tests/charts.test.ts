@@ -30,7 +30,7 @@ const SONGS: Record<string, { duration: number; bpm: number; offset: number }> =
   orange_plaza: { duration: 82.05, bpm: 156, offset: 0.02 },
   pineapple_hall: { duration: 83.79, bpm: 160, offset: 0.029 },
   grand_stage: { duration: 78.04, bpm: 150, offset: 0.031 },
-  // The short songs of battles A and B (tools/sublevel_songs.py), stops 1 to 6 so far.
+  // The short songs of battles A and B (tools/sublevel_songs.py).
   berry_town_a: { duration: 60.03, bpm: 114, offset: 0.031 },
   berry_town_b: { duration: 60.03, bpm: 118, offset: 0.027 },
   peel_street_a: { duration: 60.03, bpm: 120, offset: 0.026 },
@@ -43,6 +43,18 @@ const SONGS: Record<string, { duration: number; bpm: number; offset: number }> =
   citrus_labs_b: { duration: 60.03, bpm: 138, offset: 0.028 },
   lantern_market_a: { duration: 60.03, bpm: 114, offset: 0.032 },
   lantern_market_b: { duration: 60.03, bpm: 118, offset: 0.026 },
+  the_club_a: { duration: 60.03, bpm: 138, offset: 0.026 },
+  the_club_b: { duration: 60.03, bpm: 142, offset: 0.026 },
+  rooftop_a: { duration: 60.03, bpm: 124, offset: 0.032 },
+  rooftop_b: { duration: 60.03, bpm: 128, offset: 0.027 },
+  the_tunnel_a: { duration: 60.03, bpm: 145, offset: 0.027 },
+  the_tunnel_b: { duration: 60.03, bpm: 150, offset: 0.027 },
+  orange_plaza_a: { duration: 60.03, bpm: 150, offset: 0.026 },
+  orange_plaza_b: { duration: 60.03, bpm: 154, offset: 0.027 },
+  pineapple_hall_a: { duration: 60.03, bpm: 154, offset: 0.027 },
+  pineapple_hall_b: { duration: 60.03, bpm: 158, offset: 0.409 },
+  grand_stage_a: { duration: 75.05, bpm: 144, offset: 0.026 },
+  grand_stage_b: { duration: 75.05, bpm: 148, offset: 0.026 },
 };
 
 /** Nicole Yazmin's six songs, each with exactly one Beat Maps chart. */
@@ -97,18 +109,18 @@ const idOf = (file: string) => file.replace(/\.(easy|hard)$/, '');
 const DIFFICULTY_FILES = ['', '.easy', '.hard'] as const;
 
 /**
- * Each stop's battles A and B: their own short song where it has been made, else
- * (TEMPORARY, until the songs are generated) the stop song; Orange Plaza's are
- * rematches with Banana and Plum. Stop 12's are sets of the crew battle, with no chart.
+ * Each stop's battles A and B, on their own short songs. Orange Plaza's are
+ * rematches with Banana and Plum; the Grand Stage's are the crew battle's first
+ * two sets, named after their first enemy (Grape, then Pineapple).
  */
-const SUB_SONGS = new Set([1, 2, 3, 4, 5, 6]);
-const SUBS = STOPS.slice(0, 11).flatMap((stop, i) =>
+const SUB_RIVALS: Record<string, string> = { stop10a: 'banana', stop10b: 'plum', stop12a: 'grape', stop12b: 'pineapple' };
+const SUBS = STOPS.flatMap((stop) =>
   (['a', 'b'] as const).map((key) => ({
     id: `${stop.id}${key}`,
     stop,
     key,
-    song: SUB_SONGS.has(i + 1) ? `${stop.song}_${key}` : stop.song,
-    rival: stop.id === 'stop10' ? (key === 'a' ? 'banana' : 'plum') : stop.rival,
+    song: `${stop.song}_${key}`,
+    rival: SUB_RIVALS[`${stop.id}${key}`] ?? stop.rival,
   })),
 );
 
@@ -232,18 +244,17 @@ describe("Nicole Yazmin's soundtrack", () => {
 });
 
 describe('three battles per stop', () => {
-  it('has battles A and B for stops 1 to 11, on their songs and against their opponents', () => {
+  it('has battles A and B for every stop, on their own songs and against their opponents', () => {
     for (const sub of SUBS) {
       const chart = charts.get(sub.id);
       expect(chart, sub.id).toBeDefined();
       expect(chart!.song).toBe(sub.song);
       expect(chart!.rivalCharacter).toBe(sub.rival);
     }
-    expect(charts.has('stop12a')).toBe(false);
   });
 
   it('climbs from A to B to C at every stop (Normal)', () => {
-    for (const stop of STOPS.slice(0, 11)) {
+    for (const stop of STOPS) {
       const [a, b, c] = [`${stop.id}a`, `${stop.id}b`, stop.id].map((id) => effort(charts.get(id)!));
       expect(a, `${stop.id} A < B`).toBeLessThan(b);
       expect(b, `${stop.id} B < C`).toBeLessThan(c);

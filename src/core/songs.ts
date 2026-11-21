@@ -41,7 +41,7 @@ export const SONGS: SongDef[] = [
   { key: 'orange_plaza', title: 'Orange Plaza Festival', artist: GENERATED, url: 'assets/audio/orange_plaza.mp3', bpm: 156, offset: 0.02, lead: 'assets/audio/stems/orange_plaza_lead.mp3' },
   { key: 'pineapple_hall', title: 'Pineapple Hall', artist: GENERATED, url: 'assets/audio/pineapple_hall.mp3', bpm: 160, offset: 0.029, lead: 'assets/audio/stems/pineapple_hall_lead.mp3' },
   { key: 'grand_stage', title: 'Grand Stage Finale', artist: GENERATED, url: 'assets/audio/grand_stage.mp3', bpm: 150, offset: 0.031, lead: 'assets/audio/stems/grand_stage_lead.mp3' },
-  // The short songs of battles A and B (about a minute each), for the stops that have them so far.
+  // The short songs of battles A and B (about a minute each; the Grand Stage's two sets, 75 s).
   { key: 'berry_town_a', title: 'Bedroom Warm-Up', artist: GENERATED, url: 'assets/audio/berry_town_a.mp3', bpm: 114, offset: 0.031, lead: 'assets/audio/stems/berry_town_a_lead.mp3' },
   { key: 'berry_town_b', title: 'Muffin Break', artist: GENERATED, url: 'assets/audio/berry_town_b.mp3', bpm: 118, offset: 0.027, lead: 'assets/audio/stems/berry_town_b_lead.mp3' },
   { key: 'peel_street_a', title: 'Ticket Check Funk', artist: GENERATED, url: 'assets/audio/peel_street_a.mp3', bpm: 120, offset: 0.026, lead: 'assets/audio/stems/peel_street_a_lead.mp3' },
@@ -54,6 +54,18 @@ export const SONGS: SongDef[] = [
   { key: 'citrus_labs_b', title: 'Trial Two', artist: GENERATED, url: 'assets/audio/citrus_labs_b.mp3', bpm: 138, offset: 0.028, lead: 'assets/audio/stems/citrus_labs_b_lead.mp3' },
   { key: 'lantern_market_a', title: 'First Lantern', artist: GENERATED, url: 'assets/audio/lantern_market_a.mp3', bpm: 114, offset: 0.032, lead: 'assets/audio/stems/lantern_market_a_lead.mp3' },
   { key: 'lantern_market_b', title: 'Best of Three', artist: GENERATED, url: 'assets/audio/lantern_market_b.mp3', bpm: 118, offset: 0.026, lead: 'assets/audio/stems/lantern_market_b_lead.mp3' },
+  { key: 'the_club_a', title: 'Velvet Rope', artist: GENERATED, url: 'assets/audio/the_club_a.mp3', bpm: 138, offset: 0.026, lead: 'assets/audio/stems/the_club_a_lead.mp3' },
+  { key: 'the_club_b', title: 'Floor for One', artist: GENERATED, url: 'assets/audio/the_club_b.mp3', bpm: 142, offset: 0.026, lead: 'assets/audio/stems/the_club_b_lead.mp3' },
+  { key: 'rooftop_a', title: 'Table for One', artist: GENERATED, url: 'assets/audio/rooftop_a.mp3', bpm: 124, offset: 0.032, lead: 'assets/audio/stems/rooftop_a_lead.mp3' },
+  { key: 'rooftop_b', title: 'Big Feelings', artist: GENERATED, url: 'assets/audio/rooftop_b.mp3', bpm: 128, offset: 0.027, lead: 'assets/audio/stems/rooftop_b_lead.mp3' },
+  { key: 'the_tunnel_a', title: 'First Gate', artist: GENERATED, url: 'assets/audio/the_tunnel_a.mp3', bpm: 145, offset: 0.027, lead: 'assets/audio/stems/the_tunnel_a_lead.mp3' },
+  { key: 'the_tunnel_b', title: 'Second Gate', artist: GENERATED, url: 'assets/audio/the_tunnel_b.mp3', bpm: 150, offset: 0.027, lead: 'assets/audio/stems/the_tunnel_b_lead.mp3' },
+  { key: 'orange_plaza_a', title: 'Qualifier Fanfare', artist: GENERATED, url: 'assets/audio/orange_plaza_a.mp3', bpm: 150, offset: 0.026, lead: 'assets/audio/stems/orange_plaza_a_lead.mp3' },
+  { key: 'orange_plaza_b', title: 'Lantern Qualifier', artist: GENERATED, url: 'assets/audio/orange_plaza_b.mp3', bpm: 154, offset: 0.027, lead: 'assets/audio/stems/orange_plaza_b_lead.mp3' },
+  { key: 'pineapple_hall_a', title: 'Etiquette', artist: GENERATED, url: 'assets/audio/pineapple_hall_a.mp3', bpm: 154, offset: 0.027, lead: 'assets/audio/stems/pineapple_hall_a_lead.mp3' },
+  { key: 'pineapple_hall_b', title: 'Hall of Mirrors', artist: GENERATED, url: 'assets/audio/pineapple_hall_b.mp3', bpm: 158, offset: 0.409, lead: 'assets/audio/stems/pineapple_hall_b_lead.mp3' },
+  { key: 'grand_stage_a', title: 'Set One Anthem', artist: GENERATED, url: 'assets/audio/grand_stage_a.mp3', bpm: 144, offset: 0.026, lead: 'assets/audio/stems/grand_stage_a_lead.mp3' },
+  { key: 'grand_stage_b', title: 'Set Two Anthem', artist: GENERATED, url: 'assets/audio/grand_stage_b.mp3', bpm: 148, offset: 0.026, lead: 'assets/audio/stems/grand_stage_b_lead.mp3' },
 ];
 
 /**

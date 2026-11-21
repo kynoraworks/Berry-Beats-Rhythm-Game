@@ -173,12 +173,11 @@ describe('three battles per stop', () => {
     }
   });
 
-  it('has its own short songs for stops 1 to 6 and borrows the boss song elsewhere for now', () => {
+  it('dances battles A and B to short songs of their own at every stop', () => {
     for (const stop of STOPS) {
       for (const battle of stop.battles.slice(0, 2)) {
-        if (stop.number <= 6) expect(battle.song).toBe(`${stop.song}_${battle.key}`);
-        else expect(battle.song).toBe(stop.song);
-        expect(battle.ownSong).toBe(stop.number <= 6);
+        expect(battle.song).toBe(`${stop.song}_${battle.key}`);
+        expect(battle.ownSong).toBe(true);
       }
     }
   });
