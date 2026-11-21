@@ -16,9 +16,9 @@ export const DIFFICULTY_LABELS: Record<Difficulty, string> = { easy: 'Easy', nor
 
 /** One line about each, for the menus. */
 export const DIFFICULTY_BLURBS: Record<Difficulty, string> = {
-  easy: 'Fewer notes and chords, no sixteenths, gentler holds, a little more timing slack',
-  normal: 'The charts as written',
-  hard: 'More sixteenths, chords and holds, and sharper rivals',
+  easy: 'Fewer notes, no sixteenths, gentler holds, more timing slack',
+  normal: 'Story battles as written',
+  hard: 'More sixteenths, chords and holds, sharper rivals',
 };
 
 export function isDifficulty(value: unknown): value is Difficulty {

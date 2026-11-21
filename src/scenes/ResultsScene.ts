@@ -12,7 +12,10 @@ import { FocusGroup, UiButton, addBody, addBox, addIcon, addText, addUiButton, f
 import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
+import { DIFFICULTY_LABELS, scoreKey } from '../core/difficulty';
+import { segmentAt } from '../story/flow';
 import { isStopOpen } from '../story/progress';
+import { nextBattleRef, playSegment } from '../story/run';
 import { STOPS, stopById } from '../story/stops';
 import { planResults, roundScore, type BannerTone, type ButtonId } from './resultsPlan';
 
@@ -97,7 +100,8 @@ export class ResultsScene extends Phaser.Scene {
     const fromStory = play.story !== undefined || play.returnTo.scene === SceneKeys.LevelSelect;
     const borrowsStoryId = levelForChart(play.chart.id) !== undefined && !fromStory;
     if (!failed && !play.practice && !play.autoplay && stats.score > 0 && !borrowsStoryId) {
-      newBest = submitScore(play.chart.id, {
+      // Each difficulty keeps its own best (Normal under the plain chart id, as before).
+      newBest = submitScore(scoreKey(play.chart.id, play.difficulty), {
         score: stats.score,
         accuracy: percent,
         rank,
@@ -107,9 +111,12 @@ export class ResultsScene extends Phaser.Scene {
       });
     }
 
-    // Winning a story battle offers the next stop, once it is open.
+    // Winning battle A or B offers the stop's next battle; winning C, the next stop once it is open.
     const stop = stopById(play.story?.stop);
-    const nextIndex = stop && !failed && battle?.won !== false ? STOPS.indexOf(stop) + 1 : -1;
+    const won = stop !== undefined && !failed && battle?.won !== false;
+    const nextBattle = won && play.story ? nextBattleRef(play.story) : null;
+    const nextBattleDef = nextBattle ? segmentAt(nextBattle)?.segment : undefined;
+    const nextIndex = won && !nextBattle ? STOPS.indexOf(stop) + 1 : -1;
     const next = nextIndex > 0 && nextIndex < STOPS.length && isStopOpen(nextIndex) ? STOPS[nextIndex] : undefined;
     const plan = planResults({
       failed,
@@ -117,7 +124,8 @@ export class ResultsScene extends Phaser.Scene {
       practice: play.practice === true,
       autoplay: play.autoplay === true,
       returnScene: play.returnTo.scene,
-      hasNext: next !== undefined,
+      hasNext: next !== undefined || nextBattle !== null,
+      nextLabel: nextBattleDef?.kind === 'battle' ? `Battle ${nextBattleDef.battle.letter}` : undefined,
       meanErrorMs,
       flairUsed,
       abilityName,
@@ -134,7 +142,10 @@ export class ResultsScene extends Phaser.Scene {
     const banner = addText(this, GAME_W / 2, BANNER_Y, plan.banner.text, 88, { color: TONE_COLOR[plan.banner.tone] });
     if (banner.width > 700) banner.setFontSize(64);
     const rounds = battle && !failed ? roundScore(battle.playerRounds, battle.rivalRounds) : '';
-    addBody(this, GAME_W / 2, BANNER_Y + 62, rounds ? `${play.chart.title}, rounds ${rounds}` : play.chart.title, 26, { color: CSS.lilac });
+    // A story battle says which of the stop's three it was, and on which difficulty.
+    const storyBattle = segmentAt(play.story)?.segment;
+    const title = storyBattle?.kind === 'battle' ? `${storyBattle.battle.letter}: ${storyBattle.battle.name} (${DIFFICULTY_LABELS[play.difficulty ?? 'normal']})` : play.chart.title;
+    addBody(this, GAME_W / 2, BANNER_Y + 62, rounds ? `${title}, rounds ${rounds}` : title, 26, { color: CSS.lilac });
 
     // The dancers face each other; the winner stands larger, in the light.
     const playerWon = !failed && (battle?.won ?? true);
@@ -190,7 +201,11 @@ export class ResultsScene extends Phaser.Scene {
       },
       back: () => this.leave(play.returnTo.scene, play.returnTo.data),
       next: () => {
-        if (next) this.leave(SceneKeys.LevelSelect, { levelId: next.id });
+        if (nextBattle) {
+          // Straight on to the stop's next battle, with its own opening lines.
+          music.stop(250);
+          playSegment(this, nextBattle, { autoplay: play.autoplay }).catch(() => this.leave(play.returnTo.scene, play.returnTo.data));
+        } else if (next) this.leave(SceneKeys.LevelSelect, { levelId: next.id });
       },
     };
     const width = plan.buttons.length > 2 ? 280 : 300;

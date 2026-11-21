@@ -3,7 +3,8 @@ import { CAST } from '../story/cast';
 import { STOPS, TUTORIAL } from '../story/stops';
 
 /**
- * The charts the story plays: the Coach's lesson and one battle per stop. The
+ * The charts the story plays: the Coach's lesson and three battles per stop (Normal
+ * difficulty; the Easy and Hard files sit next to them, see core/difficulty.ts). The
  * story itself (order, dialogue, progress) lives in src/story; this is the flat
  * list that menus and tests use to find a story chart.
  */
@@ -21,15 +22,21 @@ export interface StoryChart {
 
 export const LEVELS: readonly StoryChart[] = [
   { id: TUTORIAL.id, name: 'Tutorial', blurb: 'The Coach teaches the beat', chartUrl: TUTORIAL.chartUrl, song: TUTORIAL.song, stage: TUTORIAL.stage, rivalName: 'Coach' },
-  ...STOPS.map((stop) => ({
-    id: stop.chartId,
-    name: `Stop ${stop.number}: ${stop.station}`,
-    blurb: `vs ${CAST[stop.fruit].name}`,
-    chartUrl: stop.chartUrl,
-    song: stop.song,
-    stage: stop.stage,
-    rivalName: CAST[stop.fruit].name,
-  })),
+  // Each stop's three battles. Stop 12's first two are sets of the crew battle, danced on
+  // other stops' charts, so only its last has a chart of its own.
+  ...STOPS.flatMap((stop) =>
+    stop.battles
+      .filter((battle) => stop.role !== 'final' || battle.index === 2)
+      .map((battle) => ({
+        id: battle.id,
+        name: battle.index === 2 ? `Stop ${stop.number}: ${stop.station}` : `Stop ${stop.number}${battle.letter}: ${battle.name}`,
+        blurb: `vs ${CAST[battle.opponent].name}`,
+        chartUrl: battle.chartUrl,
+        song: battle.song,
+        stage: stop.stage,
+        rivalName: CAST[battle.opponent].name,
+      })),
+  ),
 ];
 
 /** The story chart with this id, if any. */

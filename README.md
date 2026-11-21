@@ -39,17 +39,17 @@ The site is installable as a web app from the browser menu and works offline aft
 
 ### Sync and options
 
-Keys, volume, scroll speed, audio offset and a reduce-motion switch are under Options. **Camera** sets how much the battle camera moves: Full (zoom bumps on the beat, leaning in on whoever is dancing, punches on big moments, a shake on a miss), Light (small bar bumps only) or Off. Only the stage moves; the lanes, notes and HUD never zoom. Reduce motion turns it off. If notes feel early or late on your setup (Bluetooth headphones especially), use "measure offset" there. The results screen also tells you if you were consistently early or late and can apply the correction in one tap.
+Keys, volume, scroll speed, difficulty, audio offset and a reduce-motion switch are under Options. **Difficulty** (Easy, Normal or Hard, also switched on the train with `D`) picks the story battles' beat maps: Easy has fewer notes and chords, no sixteenths, shorter holds and slightly wider timing windows; Hard adds sixteenths, chords and holds and sharpens the rivals. The story is the same on all three, and best scores are kept for each. **Camera** sets how much the battle camera moves: Full (zoom bumps on the beat, leaning in on whoever is dancing, punches on big moments, a shake on a miss), Light (small bar bumps only) or Off. Only the stage moves; the lanes, notes and HUD never zoom. Reduce motion turns it off. If notes feel early or late on your setup (Bluetooth headphones especially), use "measure offset" there. The results screen also tells you if you were consistently early or late and can apply the correction in one tap.
 
 ### Story mode
 
 It is November in Berry Town. Berry, a quiet Blackberry in a purple hoodie, has hidden in his room since the summer his best friend Blueberry left for Fruit City. When the Coach hands him a ticket to the Grand Dance at the end of the Line, Raspberry drags him onto the train. The full story, cast and every line of dialogue are in [`docs/STORY_BIBLE.md`](docs/STORY_BIBLE.md).
 
 - **The Line:** 12 stops, each opened by winning the one before. The train is the hub: pick a stop on the route map and ride. Allies who join sit on the bench with Berry.
-- **A stop:** step off at the station, talk to the local who knows the way out, walk the street, look around, then face the stop's fruit in a dance battle. You must win to move on; a loss shows a line from the rival and you go again.
+- **A stop:** step off at the station, talk to the local who knows the way out, walk the street, look around, then face the stop's fruit. Every stop has three battles: A and B on short songs of their own (a gentle take on the stop's gimmick, then a twist on it) and C, the rival battle on the stop's main song. B opens once A is won and C once B is; winning C opens the next stop. Pick the battle on the train (`Up` / `Down`, or tap a ticket); the map shows each stop's three ticket pips. You must win to move on; a loss shows a line from the rival and you go again.
 - **Gimmicks:** every fruit fights in its own way, from Banana's sliding notes to Dragon Fruit's flashes and Pineapple's double-cost misses.
 - **Flair and your backup:** hits fill the Flair meter. When it is full, press `Space` (or tap the meter) to fire your backup's ability for 8 beats. Choose the backup on the train or in the pause menu.
-- **The Grand Stage:** the last stop is a 5v5 crew battle. Order your four allies against Blueberry's crew, then Berry dances the deciding round.
+- **The Grand Stage:** the last stop is a 5v5 crew battle in three sets with checkpoints (rounds 1 and 2, rounds 3 and 4, then round 5). Order your four allies against Blueberry's crew, then Berry dances the deciding round.
 
 | Stop | Fruit | Gimmick | Joins your crew with |
 | --- | --- | --- | --- |
@@ -159,7 +159,8 @@ Handy URLs while developing: `?scene=Menu` jumps to a scene, `?scene=Play&level=
 
 - **Dialogue** lives in `src/story/script.ts` and must match `docs/STORY_BIBLE.md` word for word: `tests/story.test.ts` parses the bible and fails on any difference, on lines over 90 characters, unknown speakers, or expressions other than neutral and bold. Edit the bible first, then the script.
 - **Station and street lines** that are not in the bible are in `src/story/places.ts`; `tests/places.test.ts` holds them to the same rules.
-- **A stop** is an entry in `src/story/stops.ts` (station, fruit, role, song, stage, time of day, gimmick) plus a chart in `public/charts` and its places in `src/story/places.ts`.
+- **A stop** is an entry in `src/story/stops.ts` (station, fruit, role, song, stage, time of day, gimmick, and the names and opponents of its three battles) plus charts in `public/charts` (`stopNN.json` for battle C, `stopNNa.json` and `stopNNb.json` for A and B, each with `.easy.json` and `.hard.json` next to it) and its places in `src/story/places.ts`. Progress is saved per battle in `berrybeats.story.v1` (`won`); a stop in `cleared`, as older saves have it, counts all three of its battles as won.
+- **Battles A and B of stops 7 to 12 are temporary:** until their songs are generated they dance to the start of the boss song (`AWAITING_SONGS` in `src/story/stops.ts`, `SUB_TRACKS` in `tools/analyze_audio.py`), and the Grand Stage's first two sets use the enemies' own stop songs.
 - **Art** is optional at runtime: anything missing is drawn as a stand-in. To add or replace a picture, put the PNG in `public/assets/img` and list it in `src/core/assets.ts`; `tests/assets.test.ts` checks the list against the folder. Sizes and layout for stations and streets are in `docs/EXPLORE_ART.md`.
 
 ### Regenerating assets and charts
@@ -177,10 +178,13 @@ The stop songs are sped up from the generated originals (kept in `archive/music/
 
 ```bash
 python3 tools/stretch_songs.py                 # archive originals -> public/assets/audio, at the new tempos
+python3 tools/sublevel_songs.py                # archive/music/sublevels/raw -> public/assets/audio (battles A and B)
 python3 tools/hit_layer_stems.py STEMS_DIR      # STEMS_DIR/<song>/{vocals,other,drums}.flac -> lead stems
 ```
 
-Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat (the stop songs are searched near the tempo they play at), places notes on detected onsets following a section plan per chart, and validates the result. It writes the tutorial, the twelve stops and the six soundtrack charts. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
+The short songs of battles A and B were generated at the tempo they play at (a little under the stop song's for A, close to it for B), so they are not stretched: `tools/sublevel_songs.py` only matches their loudness to the stop songs (about -13.3 LUFS) and fades the last second. The raw generations and the exact prompts are in `archive/music/sublevels` (`prompts.json`).
+
+Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat (the stop songs are searched near the tempo they play at), places notes on detected onsets following a section plan per chart, and validates the result. It writes the tutorial, the three battles of each stop on Easy, Normal and Hard, and the six soundtrack charts. Battles A and B follow battle C's plan, cut to their song and lightened; Easy and Hard are made from each Normal plan by fixed rules (`DIFFICULTY VARIANTS` in the script). The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
 
 ```bash
 pip install numpy scipy
@@ -224,6 +228,7 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 
 Listen to the tracks: [Berry Beats Tracks](https://drive.google.com/drive/folders/1M5X1kcofPPYjnJhVeCuum3J1FNX8nzcd?usp=sharing)
 
+- The short songs of battles A and B (`public/assets/audio/<stop song>_a.mp3` and `_b.mp3`, stops 1 to 6 so far) were generated with ElevenLabs Music v2.5 through Higgsfield in November 2026, one request per song, from the prompts in `archive/music/sublevels/prompts.json`; their lead stems were split with htdemucs through Higgsfield. **Their usage rights have not been verified either.**
 - The twelve stop songs (`public/assets/audio/berry_town.mp3` to `grand_stage.mp3`, credited in game as "Berry Beats (generated)") were generated with an AI music model (ElevenLabs Music through Higgsfield) from text prompts, in November 2026, then time-stretched to faster tempos with Rubber Band (`tools/stretch_songs.py`; the generated originals are in `archive/music/stops-original`). Their hit layer stems (`public/assets/audio/stems`) were split from them with htdemucs through Higgsfield. They also play on the title, menu, map and pause screens. **Their usage rights have not been verified**: check the generator's terms for your use before shipping them commercially. They are not built from `archive/`, so `tools/prepare_assets.py` leaves them alone.
 
 ## More pictures

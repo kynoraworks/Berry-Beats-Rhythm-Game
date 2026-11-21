@@ -41,6 +41,19 @@ export const SONGS: SongDef[] = [
   { key: 'orange_plaza', title: 'Orange Plaza Festival', artist: GENERATED, url: 'assets/audio/orange_plaza.mp3', bpm: 156, offset: 0.02, lead: 'assets/audio/stems/orange_plaza_lead.mp3' },
   { key: 'pineapple_hall', title: 'Pineapple Hall', artist: GENERATED, url: 'assets/audio/pineapple_hall.mp3', bpm: 160, offset: 0.029, lead: 'assets/audio/stems/pineapple_hall_lead.mp3' },
   { key: 'grand_stage', title: 'Grand Stage Finale', artist: GENERATED, url: 'assets/audio/grand_stage.mp3', bpm: 150, offset: 0.031, lead: 'assets/audio/stems/grand_stage_lead.mp3' },
+  // The short songs of battles A and B (about a minute each), for the stops that have them so far.
+  { key: 'berry_town_a', title: 'Bedroom Warm-Up', artist: GENERATED, url: 'assets/audio/berry_town_a.mp3', bpm: 114, offset: 0.031, lead: 'assets/audio/stems/berry_town_a_lead.mp3' },
+  { key: 'berry_town_b', title: 'Muffin Break', artist: GENERATED, url: 'assets/audio/berry_town_b.mp3', bpm: 118, offset: 0.027, lead: 'assets/audio/stems/berry_town_b_lead.mp3' },
+  { key: 'peel_street_a', title: 'Ticket Check Funk', artist: GENERATED, url: 'assets/audio/peel_street_a.mp3', bpm: 120, offset: 0.026, lead: 'assets/audio/stems/peel_street_a_lead.mp3' },
+  { key: 'peel_street_b', title: 'Mind the Peel', artist: GENERATED, url: 'assets/audio/peel_street_b.mp3', bpm: 124, offset: 0.026, lead: 'assets/audio/stems/peel_street_b_lead.mp3' },
+  { key: 'graffiti_corner_a', title: 'Cypher Breaks', artist: GENERATED, url: 'assets/audio/graffiti_corner_a.mp3', bpm: 126, offset: 0.029, lead: 'assets/audio/stems/graffiti_corner_a_lead.mp3' },
+  { key: 'graffiti_corner_b', title: 'Finish Strong', artist: GENERATED, url: 'assets/audio/graffiti_corner_b.mp3', bpm: 130, offset: 0.027, lead: 'assets/audio/stems/graffiti_corner_b_lead.mp3' },
+  { key: 'vine_crossing_a', title: 'One Grape Stomp', artist: GENERATED, url: 'assets/audio/vine_crossing_a.mp3', bpm: 124, offset: 0.027, lead: 'assets/audio/stems/vine_crossing_a_lead.mp3' },
+  { key: 'vine_crossing_b', title: 'Two Grape Chant', artist: GENERATED, url: 'assets/audio/vine_crossing_b.mp3', bpm: 128, offset: 0.026, lead: 'assets/audio/stems/vine_crossing_b_lead.mp3' },
+  { key: 'citrus_labs_a', title: 'Calibration Glitch', artist: GENERATED, url: 'assets/audio/citrus_labs_a.mp3', bpm: 134, offset: 0.026, lead: 'assets/audio/stems/citrus_labs_a_lead.mp3' },
+  { key: 'citrus_labs_b', title: 'Trial Two', artist: GENERATED, url: 'assets/audio/citrus_labs_b.mp3', bpm: 138, offset: 0.028, lead: 'assets/audio/stems/citrus_labs_b_lead.mp3' },
+  { key: 'lantern_market_a', title: 'First Lantern', artist: GENERATED, url: 'assets/audio/lantern_market_a.mp3', bpm: 114, offset: 0.032, lead: 'assets/audio/stems/lantern_market_a_lead.mp3' },
+  { key: 'lantern_market_b', title: 'Best of Three', artist: GENERATED, url: 'assets/audio/lantern_market_b.mp3', bpm: 118, offset: 0.026, lead: 'assets/audio/stems/lantern_market_b_lead.mp3' },
 ];
 
 /**

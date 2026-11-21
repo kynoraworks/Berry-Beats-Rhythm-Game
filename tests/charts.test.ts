@@ -30,6 +30,19 @@ const SONGS: Record<string, { duration: number; bpm: number; offset: number }> =
   orange_plaza: { duration: 82.05, bpm: 156, offset: 0.02 },
   pineapple_hall: { duration: 83.79, bpm: 160, offset: 0.029 },
   grand_stage: { duration: 78.04, bpm: 150, offset: 0.031 },
+  // The short songs of battles A and B (tools/sublevel_songs.py), stops 1 to 6 so far.
+  berry_town_a: { duration: 60.03, bpm: 114, offset: 0.031 },
+  berry_town_b: { duration: 60.03, bpm: 118, offset: 0.027 },
+  peel_street_a: { duration: 60.03, bpm: 120, offset: 0.026 },
+  peel_street_b: { duration: 60.03, bpm: 124, offset: 0.026 },
+  graffiti_corner_a: { duration: 60.03, bpm: 126, offset: 0.029 },
+  graffiti_corner_b: { duration: 60.03, bpm: 130, offset: 0.027 },
+  vine_crossing_a: { duration: 60.03, bpm: 124, offset: 0.027 },
+  vine_crossing_b: { duration: 60.03, bpm: 128, offset: 0.026 },
+  citrus_labs_a: { duration: 60.08, bpm: 134, offset: 0.026 },
+  citrus_labs_b: { duration: 60.03, bpm: 138, offset: 0.028 },
+  lantern_market_a: { duration: 60.03, bpm: 114, offset: 0.032 },
+  lantern_market_b: { duration: 60.03, bpm: 118, offset: 0.026 },
 };
 
 /** Nicole Yazmin's six songs, each with exactly one Beat Maps chart. */
@@ -77,7 +90,27 @@ function load(file: string): ChartFile {
 const files = readdirSync(DIR)
   .filter((f) => f.endsWith('.json') && !f.startsWith('_'))
   .sort();
+// Keyed by file name: stop01, stop01.easy, stop01.hard, stop01a, ...
 const charts = new Map(files.map((f) => [f.replace(/\.json$/, ''), load(f)]));
+/** The chart id a file carries: its name without the difficulty (core/difficulty.ts). */
+const idOf = (file: string) => file.replace(/\.(easy|hard)$/, '');
+const DIFFICULTY_FILES = ['', '.easy', '.hard'] as const;
+
+/**
+ * Each stop's battles A and B: their own short song where it has been made, else
+ * (TEMPORARY, until the songs are generated) the stop song; Orange Plaza's are
+ * rematches with Banana and Plum. Stop 12's are sets of the crew battle, with no chart.
+ */
+const SUB_SONGS = new Set([1, 2, 3, 4, 5, 6]);
+const SUBS = STOPS.slice(0, 11).flatMap((stop, i) =>
+  (['a', 'b'] as const).map((key) => ({
+    id: `${stop.id}${key}`,
+    stop,
+    key,
+    song: SUB_SONGS.has(i + 1) ? `${stop.song}_${key}` : stop.song,
+    rival: stop.id === 'stop10' ? (key === 'a' ? 'banana' : 'plum') : stop.rival,
+  })),
+);
 
 const seconds = (chart: ChartFile, beat: number): number => chart.offset + (beat * 60) / chart.bpm;
 
@@ -136,7 +169,7 @@ describe('every shipped chart', () => {
 
       it('is a well-formed format 1 chart for a known song', () => {
         expect(chart.format).toBe(1);
-        expect(chart.id).toBe(id);
+        expect(chart.id).toBe(idOf(id));
         expect(typeof chart.title).toBe('string');
         expect(SONGS[chart.song]).toBeDefined();
         expect(chart.bpm).toBe(SONGS[chart.song].bpm);
@@ -195,6 +228,78 @@ describe("Nicole Yazmin's soundtrack", () => {
   it('gives each song a different beat map', () => {
     const shapes = [...charts.values()].filter((c) => c.id.startsWith('ost_')).map((c) => JSON.stringify(c.notes));
     expect(new Set(shapes).size).toBe(6);
+  });
+});
+
+describe('three battles per stop', () => {
+  it('has battles A and B for stops 1 to 11, on their songs and against their opponents', () => {
+    for (const sub of SUBS) {
+      const chart = charts.get(sub.id);
+      expect(chart, sub.id).toBeDefined();
+      expect(chart!.song).toBe(sub.song);
+      expect(chart!.rivalCharacter).toBe(sub.rival);
+    }
+    expect(charts.has('stop12a')).toBe(false);
+  });
+
+  it('climbs from A to B to C at every stop (Normal)', () => {
+    for (const stop of STOPS.slice(0, 11)) {
+      const [a, b, c] = [`${stop.id}a`, `${stop.id}b`, stop.id].map((id) => effort(charts.get(id)!));
+      expect(a, `${stop.id} A < B`).toBeLessThan(b);
+      expect(b, `${stop.id} B < C`).toBeLessThan(c);
+    }
+  });
+
+  for (const sub of SUBS) {
+    it(`${sub.id}: no lane three times in a row at eighth-note speed, and rounds both sides play in`, () => {
+      const chart = charts.get(sub.id)!;
+      expect(longestLaneRun(chart.notes)).toBeLessThanOrEqual(2);
+      expect(longestLaneRun(chart.rival ?? [])).toBeLessThanOrEqual(2);
+      const mine = new Set(chart.notes.map((n) => Math.floor(n.b / 4)));
+      const hers = new Set((chart.rival ?? []).map((n) => Math.floor(n.b / 4)));
+      expect(mine.size).toBeGreaterThanOrEqual(10);
+      expect(hers.size).toBeGreaterThanOrEqual(6);
+    });
+  }
+});
+
+describe('Easy, Normal and Hard', () => {
+  const story = [...STOPS.map((s) => s.id), ...SUBS.map((s) => s.id)];
+
+  it('every story battle has all three, with the same id, song and opponent', () => {
+    for (const id of story) {
+      for (const suffix of DIFFICULTY_FILES) {
+        const chart = charts.get(`${id}${suffix}`);
+        expect(chart, `${id}${suffix}`).toBeDefined();
+        expect(chart!.id).toBe(id);
+        expect(chart!.song).toBe(charts.get(id)!.song);
+        expect(chart!.rivalCharacter).toBe(charts.get(id)!.rivalCharacter);
+      }
+    }
+  });
+
+  it('Easy is lighter and Hard is heavier than Normal, on every battle', () => {
+    for (const id of story) {
+      const [easy, normal, hard] = ['.easy', '', '.hard'].map((suffix) => charts.get(`${id}${suffix}`)!);
+      expect(easy.notes.length, id).toBeLessThan(normal.notes.length);
+      expect(hard.notes.length, id).toBeGreaterThan(normal.notes.length);
+      expect(effort(easy), id).toBeLessThan(effort(normal));
+      expect(effort(hard), id).toBeGreaterThan(effort(normal));
+    }
+  });
+
+  it('Easy has no sixteenths, holds of at most two beats, and fewer chords', () => {
+    const doubles = (notes: Note[]) => chords(notes).filter(([, lanes]) => lanes.length === 2).length;
+    for (const id of story) {
+      const easy = charts.get(`${id}.easy`)!;
+      for (const n of easy.notes) {
+        expect(Math.abs(n.b * 2 - Math.round(n.b * 2)), `${id}.easy at ${n.b}`).toBeLessThan(1e-6);
+        expect(n.d ?? 0).toBeLessThanOrEqual(2);
+      }
+      expect(doubles(easy.notes)).toBeLessThanOrEqual(doubles(charts.get(id)!.notes));
+      expect(longestLaneRun(easy.notes)).toBeLessThanOrEqual(2);
+      expect(longestLaneRun(charts.get(`${id}.hard`)!.notes)).toBeLessThanOrEqual(2);
+    }
   });
 });
 

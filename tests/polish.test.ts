@@ -27,6 +27,15 @@ describe('the story rival levels', () => {
     expect(rivalLevelFor({ id: 'crew1-stop04', difficulty: 2 })).toBe(2);
   });
 
+  it('dance a little below the boss in battles A and B, and move with the difficulty', () => {
+    const stop = STOPS[6];
+    expect(rivalLevelFor({ id: 'stop07a' })).toBeCloseTo(stop.rivalLevel - 0.4);
+    expect(rivalLevelFor({ id: 'stop07b' })).toBeCloseTo(stop.rivalLevel - 0.2);
+    expect(rivalLevelFor({ id: 'stop07' }, 'easy')).toBeCloseTo(stop.rivalLevel - 0.5);
+    expect(rivalLevelFor({ id: 'stop07' }, 'hard')).toBeCloseTo(stop.rivalLevel + 0.4);
+    expect(rivalLevelFor({ id: 'stop02a' }, 'easy')).toBe(1);
+  });
+
   it('stay gentle, since every stop must be won', () => {
     for (const stop of STOPS.slice(0, 11)) expect(stop.rivalLevel).toBeLessThanOrEqual(3.1);
   });
@@ -37,12 +46,16 @@ describe('riding back to stop 1', () => {
 
   it('plays the whole opening the first time', () => {
     expect(rideStraightToBattle(home, false)).toBe(false);
-    expect(firstSegment(home, false)).toBe(0);
+    expect(firstSegment(home, 0, false)).toBe(0);
   });
 
   it('goes straight to Raspberry once she has been beaten', () => {
     expect(rideStraightToBattle(home, true)).toBe(true);
-    expect(segmentsFor(home)[firstSegment(home, true)].kind).toBe('battle');
+    for (const battle of [0, 1, 2]) {
+      const segment = segmentsFor(home)[firstSegment(home, battle, true)];
+      expect(segment.kind).toBe('battle');
+      if (segment.kind === 'battle') expect(segment.battle.index).toBe(battle);
+    }
   });
 
   it('is only a thing for the stop with a lesson', () => {

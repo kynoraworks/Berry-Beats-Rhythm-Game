@@ -2,17 +2,52 @@ import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FRUITS } from '../src/core/chart';
 import { CAST, HOOD_DOWN_FRAME, portraitFrame, speakerName, speakerToken } from '../src/story/cast';
-import { firstSegment, segmentAt, segmentsFor } from '../src/story/flow';
-import { crew, getProgress, isCleared, isStopOpen, markCleared, markTalked, nextStopIndex, resetStory, useStoryStorage } from '../src/story/progress';
+import { battleSegment, firstSegment, segmentAt, segmentsFor } from '../src/story/flow';
+import {
+  battlesWon,
+  chooseBattle,
+  chosenBattle,
+  crew,
+  getProgress,
+  isBattleOpen,
+  isBattleWon,
+  isCleared,
+  isStopOpen,
+  isStopStarted,
+  markBattleWon,
+  markCleared,
+  markTalked,
+  nextBattleIndex,
+  nextStopIndex,
+  resetStory,
+  useStoryStorage,
+} from '../src/story/progress';
 import { SCRIPT } from '../src/story/script';
-import { STOPS, stopById, stopForChart } from '../src/story/stops';
+import { BATTLES, STOPS, battleForChart, stopById, stopForChart } from '../src/story/stops';
 import { MAX_LINE_LENGTH, type Line, type StopScript } from '../src/story/types';
 
-const SECTIONS = ['station', 'tutorial', 'intro', 'rounds', 'win', 'lose'] as const;
+/** Every dialogue section of a stop, keyed as the test reads the bible: battles as "a.intro" and so on. */
+const SECTIONS = ['station', 'tutorial', 'a.intro', 'a.win', 'a.lose', 'b.intro', 'b.win', 'b.lose', 'c.intro', 'rounds', 'c.win', 'c.lose'] as const;
 type Section = (typeof SECTIONS)[number];
 
+function section(script: StopScript, key: Section): Line[] | undefined {
+  if (key === 'station' || key === 'tutorial' || key === 'rounds') return script[key];
+  const [battle, part] = key.split('.') as ['a' | 'b' | 'c', 'intro' | 'win' | 'lose'];
+  return script.battles['abc'.indexOf(battle)][part];
+}
+
 function allLines(): { stop: number; section: Section; line: Line }[] {
-  return SCRIPT.flatMap((script) => SECTIONS.flatMap((section) => (script[section] ?? []).map((line) => ({ stop: script.stop, section, line }))));
+  return SCRIPT.flatMap((script) => SECTIONS.flatMap((key) => (section(script, key) ?? []).map((line) => ({ stop: script.stop, section: key, line }))));
+}
+
+/** The bible's section labels: "Station NPC", "Tutorial (...)", "Battle A intro", "Round lines (...)". */
+function sectionFor(label: string): Section | null {
+  const battle = /^Battle ([ABC]) (intro|win|lose)\b/.exec(label);
+  if (battle) return `${battle[1].toLowerCase()}.${battle[2]}` as Section;
+  if (label.startsWith('Station')) return 'station';
+  if (label.startsWith('Tutorial')) return 'tutorial';
+  if (label.startsWith('Round')) return 'rounds';
+  return null;
 }
 
 /** The bible's "Final dialogue" section, as `TOKEN (mood): text` strings per stop and section. */
@@ -34,8 +69,7 @@ function bibleDialogue(): Map<string, string[]> {
     }
     const label = /^\*\*(.+)\*\*$/.exec(raw.trim());
     if (label && stop) {
-      const name = label[1].toLowerCase();
-      part = SECTIONS.find((s) => name.startsWith(s === 'station' ? 'station' : s === 'rounds' ? 'round' : s)) ?? null;
+      part = sectionFor(label[1]);
       if (!part) throw new Error(`Unknown dialogue section "${label[1]}" at stop ${stop}`);
       continue;
     }
@@ -75,9 +109,9 @@ describe('story dialogue', () => {
     const bible = bibleDialogue();
     const ours = new Map<string, string[]>();
     for (const script of SCRIPT) {
-      for (const section of SECTIONS) {
-        const lines = (script as StopScript)[section];
-        if (lines) ours.set(`${script.stop}:${section}`, lines.map(asBible));
+      for (const key of SECTIONS) {
+        const lines = section(script, key);
+        if (lines && lines.length > 0) ours.set(`${script.stop}:${key}`, lines.map(asBible));
       }
     }
     expect([...ours.keys()].sort()).toEqual([...bible.keys()].sort());
@@ -87,12 +121,72 @@ describe('story dialogue', () => {
   it('gives each stop exactly the sections the bible gives it', () => {
     for (const script of SCRIPT) {
       expect(script.station.length).toBe(1);
-      expect(script.intro.length).toBeGreaterThan(0);
-      expect(script.win.length).toBeGreaterThan(0);
-      expect(script.lose.length).toBeGreaterThan(0);
+      expect(script.battles).toHaveLength(3);
+      for (const battle of script.battles) {
+        // Every battle has an opening, win lines and one line of retry banter of its own.
+        expect(battle.intro.length, `stop ${script.stop}`).toBeGreaterThan(0);
+        expect(battle.win.length, `stop ${script.stop}`).toBeGreaterThan(0);
+        expect(battle.lose.length, `stop ${script.stop}`).toBe(1);
+      }
+      expect(new Set(script.battles.map((b) => b.lose[0].text)).size).toBe(3);
       expect(script.tutorial !== undefined).toBe(script.stop === 1);
       expect(script.rounds !== undefined).toBe(script.stop === 12);
     }
+  });
+
+  it('uses no em or en dashes', () => {
+    for (const { line } of allLines()) expect(line.text).not.toMatch(/[\u2013\u2014]/);
+  });
+});
+
+/** The bible's "Three battles per stop" table: stop, battle letter, name, opponent. */
+function bibleBattles(): string[][] {
+  const markdown = readFileSync('docs/STORY_BIBLE.md', 'utf8');
+  const start = markdown.indexOf('**Three battles per stop**');
+  expect(start).toBeGreaterThan(0);
+  const rows = markdown.slice(start).split('\n').filter((line) => /^\| \d+ \| [ABC] \|/.test(line));
+  return rows.map((row) => row.split('|').slice(1, 5).map((cell) => cell.trim()));
+}
+
+describe('three battles per stop', () => {
+  it('gives every stop battles A, B and C, named and matched as in the bible', () => {
+    const rows = bibleBattles();
+    expect(rows).toHaveLength(36);
+    expect(BATTLES).toHaveLength(36);
+    BATTLES.forEach((battle, i) => {
+      const stop = stopById(battle.stop)!;
+      const opponent = stop.role === 'final' && battle.index < 2 ? rows[i][3] : CAST[battle.opponent].name;
+      expect(rows[i]).toEqual([String(stop.number), battle.letter, battle.name, opponent]);
+    });
+  });
+
+  it('keeps C as the stop\'s own chart and song, and A and B as charts of their own', () => {
+    for (const stop of STOPS) {
+      const [a, b, c] = stop.battles;
+      expect(c.id).toBe(stop.chartId);
+      expect(c.song).toBe(stop.song);
+      expect([a.id, b.id]).toEqual([`${stop.id}a`, `${stop.id}b`]);
+      expect(a.rivalLevel).toBeLessThan(c.rivalLevel);
+      expect(b.rivalLevel).toBeLessThan(c.rivalLevel);
+      expect(battleForChart(a.id)).toBe(a);
+      expect(stopForChart(b.id)).toBe(stop);
+    }
+  });
+
+  it('has its own short songs for stops 1 to 6 and borrows the boss song elsewhere for now', () => {
+    for (const stop of STOPS) {
+      for (const battle of stop.battles.slice(0, 2)) {
+        if (stop.number <= 6) expect(battle.song).toBe(`${stop.song}_${battle.key}`);
+        else expect(battle.song).toBe(stop.song);
+        expect(battle.ownSong).toBe(stop.number <= 6);
+      }
+    }
+  });
+
+  it('puts Banana and Plum in Orange Plaza\'s qualifiers, with their own gimmicks', () => {
+    const [a, b, c] = STOPS[9].battles;
+    expect([a.opponent, b.opponent, c.opponent]).toEqual(['banana', 'plum', 'orange']);
+    expect([a.gimmick, b.gimmick, c.gimmick]).toEqual(['slide', 'rests', 'bursts']);
   });
 });
 
@@ -181,44 +275,52 @@ describe('stops', () => {
 });
 
 describe('story flow', () => {
-  it('opens stop 1 with the lesson, then Raspberry in the same room', () => {
-    const [lesson, battle, extra] = segmentsFor(STOPS[0]);
+  it('opens stop 1 with the lesson, then Raspberry three times in the same room', () => {
+    const [lesson, a, b, c, extra] = segmentsFor(STOPS[0]);
     expect(extra).toBeUndefined();
     expect(lesson.kind).toBe('lesson');
     expect(lesson.chartId).toBe('tutorial');
     expect(lesson.stage).toBe('room');
     expect(lesson.before).toEqual(STOPS[0].script.tutorial);
-    expect(battle.kind).toBe('battle');
-    expect(battle.chartId).toBe('stop01');
-    expect(battle.stage).toBe('room');
-    expect(battle.before).toEqual(STOPS[0].script.intro);
-    if (battle.kind === 'battle') expect(battle.win).toEqual(STOPS[0].script.win);
+    const battles = [a, b, c];
+    battles.forEach((battle, i) => {
+      expect(battle.kind).toBe('battle');
+      expect(battle.stage).toBe('room');
+      expect(battle.before).toEqual(STOPS[0].script.battles[i].intro);
+    });
+    expect(battles.map((battle) => battle.chartId)).toEqual(['stop01a', 'stop01b', 'stop01']);
+    if (c.kind === 'battle') expect(c.win).toEqual(STOPS[0].script.battles[2].win);
   });
 
-  it('plays every other stop as one battle that opens with its intro (the station line is said at the station)', () => {
+  it('plays every other stop as battles A, B and C, each opening with its own lines', () => {
     for (const stop of STOPS.slice(1)) {
       const segments = segmentsFor(stop);
-      expect(segments).toHaveLength(1);
-      const [battle] = segments;
-      expect(battle.kind).toBe('battle');
-      expect(battle.before).toEqual(stop.script.intro);
-      if (battle.kind === 'battle') {
-        expect(battle.lose).toEqual(stop.script.lose);
-        expect(battle.hoodDown).toBe(stop.number === 12);
-      }
+      expect(segments).toHaveLength(3);
+      segments.forEach((segment, i) => {
+        expect(segment.kind).toBe('battle');
+        expect(segment.before).toEqual(stop.script.battles[i].intro);
+        if (segment.kind === 'battle') {
+          expect(segment.battle.index).toBe(i);
+          expect(segment.lose).toEqual(stop.script.battles[i].lose);
+          expect(segment.hoodDown).toBe(stop.number === 12 && i === 2);
+        }
+      });
     }
   });
 
-  it('skips the lesson when a cleared stop 1 is played again', () => {
-    expect(firstSegment(STOPS[0], false)).toBe(0);
-    expect(firstSegment(STOPS[0], true)).toBe(1);
-    expect(firstSegment(STOPS[4], true)).toBe(0);
+  it('skips the lesson once stop 1 has been started, and finds each battle', () => {
+    expect(firstSegment(STOPS[0], 0, false)).toBe(0);
+    expect(firstSegment(STOPS[0], 0, true)).toBe(1);
+    expect(firstSegment(STOPS[0], 2, true)).toBe(3);
+    expect(firstSegment(STOPS[4], 0, true)).toBe(0);
+    expect(firstSegment(STOPS[4], 1, false)).toBe(1);
+    expect(battleSegment(STOPS[4], 2)).toBe(2);
   });
 
   it('looks segments up by reference', () => {
-    expect(segmentAt({ stop: 'stop01', segment: 1 })?.last).toBe(true);
-    expect(segmentAt({ stop: 'stop01', segment: 0 })?.last).toBe(false);
-    expect(segmentAt({ stop: 'stop01', segment: 2 })).toBeNull();
+    expect(segmentAt({ stop: 'stop01', segment: 3 })?.last).toBe(true);
+    expect(segmentAt({ stop: 'stop01', segment: 1 })?.last).toBe(false);
+    expect(segmentAt({ stop: 'stop01', segment: 4 })).toBeNull();
     expect(segmentAt(undefined)).toBeNull();
   });
 });
@@ -240,11 +342,61 @@ describe('story progress', () => {
     expect(isStopOpen(1)).toBe(false);
     expect(nextStopIndex()).toBe(0);
     expect(markCleared(STOPS[0])).toBe(true);
+    expect(STOPS[0].battles.every((battle) => isBattleWon(battle))).toBe(true);
     expect(markCleared(STOPS[0])).toBe(false);
     expect(isCleared('stop01')).toBe(true);
     expect(isStopOpen(1)).toBe(true);
     expect(isStopOpen(2)).toBe(false);
     expect(nextStopIndex()).toBe(1);
+  });
+
+  it('opens B once A is won and C once B is; C clears the stop and its ally joins', () => {
+    const [a, b, c] = STOPS[0].battles;
+    expect([isBattleOpen(a), isBattleOpen(b), isBattleOpen(c)]).toEqual([true, false, false]);
+    expect(nextBattleIndex(STOPS[0])).toBe(0);
+    expect(markBattleWon(a)).toBe(true);
+    expect(markBattleWon(a)).toBe(false);
+    expect([isBattleOpen(b), isBattleOpen(c)]).toEqual([true, false]);
+    expect(isStopStarted(STOPS[0])).toBe(true);
+    expect(isCleared('stop01')).toBe(false);
+    expect(isStopOpen(1)).toBe(false);
+    markBattleWon(b);
+    expect(isBattleOpen(c)).toBe(true);
+    expect(nextBattleIndex(STOPS[0])).toBe(2);
+    expect(crew()).toEqual([]);
+    expect(markBattleWon(c)).toBe(true);
+    expect(isCleared('stop01')).toBe(true);
+    expect(battlesWon(STOPS[0])).toBe(3);
+    expect(crew()).toEqual(['raspberry']);
+    expect(isStopOpen(1)).toBe(true);
+    // A battle in a stop that is not open yet is locked whatever came before.
+    expect(isBattleOpen(STOPS[2].battles[0])).toBe(false);
+  });
+
+  it('keeps a save from before there were three battles: its finished stops stay finished', () => {
+    data['berrybeats.story.v1'] = JSON.stringify({ cleared: ['stop01', 'stop02'], allies: ['raspberry'], talked: [], inspected: [], seen: ['boarded'] });
+    for (const stop of STOPS.slice(0, 2)) {
+      expect(stop.battles.every((battle) => isBattleWon(battle) && isBattleOpen(battle))).toBe(true);
+      expect(battlesWon(stop)).toBe(3);
+    }
+    expect(isStopOpen(2)).toBe(true);
+    expect(nextStopIndex()).toBe(2);
+    expect(STOPS[2].battles.map((battle) => isBattleOpen(battle))).toEqual([true, false, false]);
+    expect(crew()).toEqual(['raspberry']);
+  });
+
+  it('remembers the battle picked on the train while it is open', () => {
+    const stop = STOPS[0];
+    expect(chosenBattle(stop)).toBe(0);
+    chooseBattle(stop, 2);
+    expect(chosenBattle(stop)).toBe(0);
+    markBattleWon(stop.battles[0]);
+    expect(chosenBattle(stop)).toBe(1);
+    markCleared(stop);
+    chooseBattle(stop, 0);
+    expect(chosenBattle(stop)).toBe(0);
+    resetStory();
+    expect(chosenBattle(stop)).toBe(0);
   });
 
   it('records the crew as allies join', () => {
@@ -258,15 +410,15 @@ describe('story progress', () => {
     markTalked('stop02:npc');
     expect(getProgress().talked).toEqual(['stop02:npc']);
     resetStory();
-    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [], inspected: [], seen: [] });
+    expect(getProgress()).toEqual({ cleared: [], won: [], allies: [], talked: [], inspected: [], seen: [] });
     expect(isStopOpen(1)).toBe(false);
   });
 
   it('survives storage that is broken or holds junk', () => {
     data['berrybeats.story.v1'] = '{not json';
-    expect(getProgress()).toEqual({ cleared: [], allies: [], talked: [], inspected: [], seen: [] });
+    expect(getProgress()).toEqual({ cleared: [], won: [], allies: [], talked: [], inspected: [], seen: [] });
     data['berrybeats.story.v1'] = JSON.stringify({ cleared: ['stop01', 4], allies: 'pear' });
-    expect(getProgress()).toEqual({ cleared: ['stop01'], allies: [], talked: [], inspected: [], seen: [] });
+    expect(getProgress()).toEqual({ cleared: ['stop01'], won: [], allies: [], talked: [], inspected: [], seen: [] });
     useStoryStorage({
       getItem: () => {
         throw new Error('blocked');

@@ -5,7 +5,8 @@ import { loadDoorArt } from '../explore/doors';
 import { parseChart } from '../core/chart';
 import { optionalImages, optionalSheets } from '../core/assets';
 import { LEVELS, loadLevelChart } from '../core/levels';
-import { stopById, stopForChart } from '../story/stops';
+import { battleForChart, stopById, stopForChart } from '../story/stops';
+import { battleSegment } from '../story/flow';
 import type { ExploreData } from '../story/places';
 import { addText } from '../core/ui';
 import type { PlayData } from '../core/flow';
@@ -140,7 +141,7 @@ export class PreloadScene extends Phaser.Scene {
           autoplay: params.get('autoplay') === '1',
           autoMiss: parseMissFlag(params.get('miss')),
           startAt: Number(params.get('at')) || undefined,
-          story: stop && params.get('story') === '1' ? { stop: stop.id, segment: stop.number === 1 ? 1 : 0 } : undefined,
+          story: stop && params.get('story') === '1' ? { stop: stop.id, segment: battleSegment(stop, battleForChart(level.id)?.index ?? 2) } : undefined,
         };
         this.scene.start(SceneKeys.Play, data);
         return;

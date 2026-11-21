@@ -6,7 +6,8 @@ import { loadStoryChart } from '../core/levels';
 import { onSwipe } from '../core/mobile';
 import { music } from '../core/music';
 import { getBest } from '../core/saves';
-import { getSettings } from '../core/settings';
+import { getSettings, updateSettings } from '../core/settings';
+import { DIFFICULTIES, DIFFICULTY_LABELS, chartUrlFor, scoreKey } from '../core/difficulty';
 import { playSfx } from '../core/sfx';
 import { stopPitch } from '../core/pitches';
 import { UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
@@ -17,10 +18,24 @@ import { CAST, portraitFrame } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { arrivalPlace, crewAt, lookHotspots, type ExploreData } from '../story/places';
 import { characterSheet } from '../story/placeholders';
-import { crewOnBoard, hasInspected, hasSeen, isCleared, isStopOpen, isStoryComplete, nextStopIndex } from '../story/progress';
+import {
+  chooseBattle,
+  chosenBattle,
+  crewOnBoard,
+  hasInspected,
+  hasSeen,
+  isBattleOpen,
+  isBattleWon,
+  isCleared,
+  isStopOpen,
+  isStopStarted,
+  isStoryComplete,
+  nextStopIndex,
+} from '../story/progress';
 import { firstSegment, rideStraightToBattle } from '../story/flow';
 import { playSegment } from '../story/run';
-import { ROLE_LABELS, STOPS, stopTeaser, type StopDef } from '../story/stops';
+import { CREW_ROUNDS, CREW_SETS } from '../story/crewBattle';
+import { ROLE_LABELS, STOPS, stopTeaser, type BattleDef, type StopDef } from '../story/stops';
 import type { FruitId, TimeOfDay } from '../story/types';
 
 interface LevelSelectData {
@@ -51,6 +66,12 @@ const MAP = { x: 24, y: 104, w: GAME_W - 48, h: 128 } as const;
 const NODE = 64;
 const NODE_Y = MAP.y + 54;
 const CARD = { x: 24, y: 244, w: GAME_W - 48, h: 148 } as const;
+/** The three battle tickets of the chosen stop and the difficulty switch, under the card. */
+const TICKETS = { x: 24, y: 400, w: 300, h: 48, gap: 12 } as const;
+/** The tickets sit in front of the crew on the bench, whose heads reach up to them. */
+const TICKET_DEPTH = 5;
+/** Ticket pips on each map node: one per battle, lit once won. */
+const PIP = { size: 10, gap: 14 } as const;
 const MAX_DIFFICULTY = 5;
 
 /** The line on the map changes colour with the time of day the stops are reached at. */
@@ -88,15 +109,29 @@ interface MapNode {
   face: Phaser.GameObjects.Image;
   number: Phaser.GameObjects.Text;
   badge: Phaser.GameObjects.Image;
+  /** One per battle, A to C. */
+  pips: Phaser.GameObjects.Rectangle[];
+}
+
+interface Ticket {
+  box: Phaser.GameObjects.NineSlice;
+  letter: Phaser.GameObjects.Text;
+  name: Phaser.GameObjects.Text;
+  icon: Phaser.GameObjects.Image;
 }
 
 export class LevelSelectScene extends Phaser.Scene {
   private index = 0;
+  /** The battle picked at the chosen stop: 0 A, 1 B, 2 C. */
+  private sub: 0 | 1 | 2 = 0;
   private busy = false;
   /** Changes every time the scene starts, so late promises from an earlier visit are ignored. */
   private run = 0;
-  /** Loaded chart per stop, or null if loading failed, or undefined while loading. */
-  private charts: (Chart | null | undefined)[] = [];
+  /** Loaded charts by file, or null if loading failed. Missing while loading. */
+  private charts = new Map<string, Chart | null>();
+  private loading = new Set<string>();
+  private tickets: Ticket[] = [];
+  private difficultyButton!: UiButton;
   private nodes: MapNode[] = [];
   private cursor!: Phaser.GameObjects.Text;
   private current!: Phaser.GameObjects.Rectangle;
@@ -128,9 +163,12 @@ export class LevelSelectScene extends Phaser.Scene {
     const requested = STOPS.findIndex((stop) => stop.id === data?.levelId);
     this.index = requested >= 0 ? requested : Math.min(lastIndex ?? nextStopIndex(), STOPS.length - 1);
     lastIndex = this.index;
+    this.sub = chosenBattle(STOPS[this.index]);
     this.busy = false;
     this.run++;
-    this.charts = [];
+    this.charts = new Map();
+    this.loading = new Set();
+    this.tickets = [];
     this.nodes = [];
     this.pips = [];
     this.card = [];
@@ -160,22 +198,24 @@ export class LevelSelectScene extends Phaser.Scene {
       goTo(this, SceneKeys.Menu);
     };
     addHeader(this, 'The Line', toMenu);
-    addHints(this, 'Left / Right: choose a stop     Enter: ride     B: backup     Esc: back', 'Tap a stop on the map, then Ride');
+    addHints(this, 'Left / Right: stop   Up / Down: battle   D: difficulty   Enter: ride   B: backup   Esc: back', 'Tap a stop, pick a battle, then Ride');
 
     this.buildMap();
     this.buildCard();
+    this.buildTickets();
     this.statusText = addBody(this, GAME_W / 2, GAME_H - 80, '', 24, { stroke: true, bold: true });
     this.doors = new Doors(this, 500, COLORS.purple);
     this.doors.open();
 
     onSwipe(this, { left: () => this.select(this.index + 1), right: () => this.select(this.index - 1) });
-    this.loadCharts();
     this.noteNewlyOpened();
     this.refresh();
 
     menuKeys(this, {
       left: () => this.select(this.index - 1),
       right: () => this.select(this.index + 1),
+      up: () => this.pickBattle(this.sub - 1),
+      down: () => this.pickBattle(this.sub + 1),
       confirm: () => this.ride(),
       back: () => {
         if (this.busy) return;
@@ -184,6 +224,7 @@ export class LevelSelectScene extends Phaser.Scene {
       },
     });
     this.input.keyboard?.on('keydown-B', () => this.changeBackup());
+    this.input.keyboard?.on('keydown-D', () => this.cycleDifficulty());
   }
 
   // -------------------------------------------------------------------------
@@ -228,12 +269,16 @@ export class LevelSelectScene extends Phaser.Scene {
       const face = this.add.image(x, NODE_Y, Tex.portraits, this.portraitFor(stop.fruit)).setDisplaySize(NODE, NODE);
       const number = addText(this, x, NODE_Y + NODE / 2 + 20, String(stop.number), 20, { color: CSS.cream });
       const badge = addIcon(this, x + NODE / 2, NODE_Y - NODE / 2, 'icon_check', 3);
+      // Three ticket pips on the bottom edge of the frame: battles A, B and C.
+      const pips = [0, 1, 2].map((p) =>
+        this.add.rectangle(x + (p - 1) * PIP.gap, NODE_Y + NODE / 2 + 4, PIP.size, PIP.size, COLORS.ink).setStrokeStyle(2, COLORS.ink),
+      );
       const hit = this.add.zone(x, NODE_Y + 8, NODE + 24, NODE + 40).setInteractive({ useHandCursor: true });
       hit.on(Phaser.Input.Events.POINTER_UP, () => {
         if (this.index === i) this.ride();
         else this.select(i);
       });
-      this.nodes.push({ frame, face, number, badge });
+      this.nodes.push({ frame, face, number, badge, pips });
     });
     this.cursor = addText(this, nodeX(this.index), MAP.y + 10, 'v', 24, { color: CSS.yellow });
   }
@@ -274,20 +319,64 @@ export class LevelSelectScene extends Phaser.Scene {
     this.card = [box, this.countText, this.nameText, this.blurbText, this.rivalTag, this.rivalText, ...this.pips, this.infoText, this.bestText, this.exploredText];
   }
 
-  private loadCharts(): void {
-    const run = this.run;
-    STOPS.forEach((stop, i) => {
-      loadStoryChart(stop.chartUrl).then(
-        (chart) => this.onChart(run, i, chart),
-        () => this.onChart(run, i, null),
-      );
-    });
+  // -------------------------------------------------------------------------
+  // The battle tickets and the difficulty
+  // -------------------------------------------------------------------------
+
+  /** A ticket per battle (A, B, C) of the chosen stop, and the difficulty switch on the right. */
+  private buildTickets(): void {
+    const { x, y, w, h, gap } = TICKETS;
+    for (let i = 0; i < 3; i++) {
+      const left = x + i * (w + gap);
+      const box = addBox(this, left, y, w, h, 'panel').setDepth(TICKET_DEPTH);
+      const letter = addText(this, left + 30, y + h / 2, ['A', 'B', 'C'][i], 28, { color: CSS.yellow }).setDepth(TICKET_DEPTH);
+      const name = addBody(this, left + 58, y + h / 2, '', 20, { origin: [0, 0.5], bold: true }).setDepth(TICKET_DEPTH);
+      const icon = addIcon(this, left + w - 26, y + h / 2, 'icon_lock', 3).setDepth(TICKET_DEPTH);
+      const zone = this.add.zone(left + w / 2, y + h / 2, w, h).setInteractive({ useHandCursor: true }).setDepth(TICKET_DEPTH);
+      zone.on(Phaser.Input.Events.POINTER_UP, () => this.pickBattle(i));
+      this.tickets.push({ box, letter, name, icon });
+      this.card.push(box, letter, name, icon);
+    }
+    const right = CARD.x + CARD.w - 144;
+    this.difficultyButton = addUiButton(this, right, y + h / 2, '', () => this.cycleDifficulty(), { width: 240, height: h, size: 20, sfx: null });
+    this.difficultyButton.container.setDepth(TICKET_DEPTH);
   }
 
-  private onChart(run: number, index: number, chart: Chart | null): void {
+  /** Easy, Normal or Hard: kept in the settings, so Options shows the same choice. */
+  private cycleDifficulty(): void {
+    if (this.busy || isLeaving(this)) return;
+    const current = DIFFICULTIES.indexOf(getSettings().difficulty);
+    updateSettings({ difficulty: DIFFICULTIES[(current + 1) % DIFFICULTIES.length] });
+    playSfx(this.game, 'backupCycle');
+    this.refresh();
+  }
+
+  private pickBattle(index: number): void {
+    if (this.busy || isLeaving(this) || index < 0 || index > 2 || index === this.sub) return;
+    this.sub = index as 0 | 1 | 2;
+    playSfx(this.game, 'move');
+    this.statusText.setText('');
+    this.refresh();
+  }
+
+  /** The chart a battle plays on the chosen difficulty: loaded once, then kept. Undefined while loading. */
+  private chartFor(battle: BattleDef): Chart | null | undefined {
+    const url = chartUrlFor(battle.chartUrl, getSettings().difficulty);
+    if (this.charts.has(url)) return this.charts.get(url);
+    if (this.loading.has(url)) return undefined;
+    this.loading.add(url);
+    const run = this.run;
+    loadStoryChart(url).then(
+      (chart) => this.onChart(run, url, chart),
+      () => this.onChart(run, url, null),
+    );
+    return undefined;
+  }
+
+  private onChart(run: number, url: string, chart: Chart | null): void {
     if (run !== this.run || !this.scene.isActive()) return;
-    this.charts[index] = chart;
-    if (index === this.index) this.refresh();
+    this.charts.set(url, chart);
+    this.refresh();
   }
 
   /** Announce a stop that opened since the player last looked. */
@@ -318,6 +407,10 @@ export class LevelSelectScene extends Phaser.Scene {
       else node.face.setTint(0x2a2440).setTintMode(Phaser.TintModes.FILL).setAlpha(0.9);
       node.badge.setVisible(cleared);
       node.number.setColor(i === this.index ? CSS.yellow : available ? CSS.cream : CSS.grey);
+      STOPS[i].battles.forEach((battle, p) => {
+        const won = isBattleWon(battle);
+        node.pips[p].setVisible(available).setFillStyle(won ? COLORS.yellow : 0x3a3458).setStrokeStyle(2, won ? COLORS.ink : 0x6a5a86);
+      });
     });
     // The story is done: the last stop gets a star and the map says so.
     const complete = isStoryComplete();
@@ -330,39 +423,67 @@ export class LevelSelectScene extends Phaser.Scene {
     this.current.setVisible(next < STOPS.length).setX(nodeX(Math.min(next, STOPS.length - 1)));
     this.cursor.setX(nodeX(this.index));
 
-    const fruit = CAST[stop.fruit];
-    this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}`);
+    const battle = stop.battles[this.sub];
+    const fruit = CAST[battle.opponent];
+    this.countText.setText(`Stop ${stop.number} of ${STOPS.length}   ${ROLE_LABELS[stop.role]}   Battle ${battle.letter} of 3`);
     this.nameText.setText(open ? stop.station : '? ? ?').setFontSize(48).setAlpha(open ? 1 : 0.6);
     for (let size = 44; this.nameText.width > 500 && size >= 28; size -= 4) this.nameText.setFontSize(size);
     const teaser = stop.role === 'final' && isStoryComplete() ? 'The crew won. Dance it again?' : stopTeaser(stop);
     this.blurbText.setText(open ? teaser : `Win at ${STOPS[this.index - 1].station} to ride on`);
     this.rivalTag.setTint(open ? fruit.tag : 0x3a3458);
-    this.rivalText.setText(open ? `vs ${fruit.name}` : 'vs ? ? ?').setColor(open && fruit.darkTag ? CSS.ink : CSS.cream);
+    // Stop 12's first two battles are sets of the crew battle: two of Blueberry's crew each.
+    const crewSet = stop.role === 'final' && battle.index < 2 ? CREW_SETS[battle.index].map((round) => CAST[CREW_ROUNDS[round].enemy].name) : null;
+    const versus = crewSet ? crewSet.join(', ') : fruit.name;
+    this.rivalText.setText(open ? `vs ${versus}` : 'vs ? ? ?').setColor(open && fruit.darkTag ? CSS.ink : CSS.cream);
+    for (let size = 22; this.rivalText.width > 220 && size > 14; size -= 2) this.rivalText.setFontSize(size);
 
-    const chart = this.charts[this.index];
+    const battleOpen = open && isBattleOpen(battle);
+    const chart = crewSet || !open ? null : this.chartFor(battle);
     const difficulty = chart ? Math.min(MAX_DIFFICULTY, Math.max(1, chart.difficulty ?? 1)) : 0;
-    // Difficulty is counted in the stop's own fruit (the same icon as on the battle bar).
-    const icon = rivalIcon(this, stop.fruit);
+    // Difficulty is counted in the opponent's own fruit (the same icon as on the battle bar).
+    const icon = rivalIcon(this, battle.opponent);
     this.pips.forEach((pip, i) =>
       pip
         .setTexture(icon.key, icon.frame)
+        .setVisible(!crewSet)
         .setAlpha(i < difficulty && open ? 1 : 0.35)
         .setTint(i < difficulty ? 0xffffff : 0x6a5a86),
     );
-    this.infoText.setText(!open ? '' : chart ? `${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM` : chart === null ? 'This stop is not ready yet' : 'Loading...');
+    const rounds = crewSet ? (CREW_SETS[battle.index].length > 1 ? `Rounds ${CREW_SETS[battle.index].map((r) => r + 1).join(' and ')}` : 'Round 5') : '';
+    this.infoText.setText(
+      !open ? '' : crewSet ? `${rounds} of the crew battle` : chart ? `${chart.notes.length} notes, ${Math.round(chart.bpm)} BPM` : chart === null ? 'This battle is not ready yet' : 'Loading...',
+    );
 
-    const best = getBest(stop.chartId);
+    const best = getBest(scoreKey(battle.id, getSettings().difficulty));
     if (best) this.bestText.setText(`Best ${formatScore(best.score)} ${best.rank}`).setColor(CSS.yellow);
-    else this.bestText.setText(isCleared(stop.id) ? 'Cleared' : open ? 'Not won yet' : '').setColor(CSS.cream);
+    else this.bestText.setText(isBattleWon(battle) ? 'Won' : battleOpen ? 'Not won yet' : open ? 'Locked' : '').setColor(CSS.cream);
+    this.refreshTickets(stop, open);
     const spots = lookHotspots(stop);
     const found = spots.filter((spot) => hasInspected(spot.key)).length;
     this.exploredText.setText(open && spots.length > 0 ? `Looked at ${found} of ${spots.length}` : '');
 
-    this.rideButton.setVisible(open);
-    this.lockedButton.setVisible(!open);
-    if (open) this.lockedZone.disableInteractive();
+    this.rideButton.setVisible(battleOpen);
+    this.lockedButton.setVisible(!battleOpen);
+    if (battleOpen) this.lockedZone.disableInteractive();
     else this.lockedZone.setInteractive();
     this.refreshBackup(stop, open);
+  }
+
+  /** The chosen stop's three battles: won ones ticked, locked ones padlocked, the picked one lit. */
+  private refreshTickets(stop: StopDef, open: boolean): void {
+    stop.battles.forEach((battle, i) => {
+      const ticket = this.tickets[i];
+      if (!ticket) return;
+      const won = isBattleWon(battle);
+      const available = open && isBattleOpen(battle);
+      ticket.box.setFrame(i === this.sub ? 'panel_focus' : 'panel');
+      ticket.name.setText(open ? battle.name : '? ? ?').setColor(available ? CSS.cream : CSS.grey);
+      for (let size = 20; ticket.name.width > TICKETS.w - 100 && size > 14; size -= 2) ticket.name.setFontSize(size);
+      ticket.letter.setColor(i === this.sub ? CSS.yellow : available ? CSS.cream : CSS.grey);
+      ticket.icon.setVisible(won || !available).setFrame(won ? 'icon_check' : 'icon_lock');
+    });
+    const level = getSettings().difficulty;
+    this.difficultyButton.setLabel(`Difficulty: ${DIFFICULTY_LABELS[level]}`);
   }
 
   /** The backup choice for this stop, from the crew who are with Berry there. */
@@ -389,6 +510,7 @@ export class LevelSelectScene extends Phaser.Scene {
     playSfx(this.game, 'mapPin', stopPitch(index));
     this.index = index;
     lastIndex = index;
+    this.sub = chosenBattle(STOPS[index]);
     this.statusText.setText('');
     this.refresh();
   }
@@ -405,8 +527,14 @@ export class LevelSelectScene extends Phaser.Scene {
       this.statusText.setText(`Win at ${STOPS[this.index - 1].station} first`).setColor(CSS.miss);
       return;
     }
-    this.busy = true;
     const stop = STOPS[this.index];
+    if (!isBattleOpen(stop.battles[this.sub])) {
+      playSfx(this.game, 'locked');
+      this.statusText.setText(`Win battle ${stop.battles[this.sub - 1]?.letter ?? 'A'} first`).setColor(CSS.miss);
+      return;
+    }
+    chooseBattle(stop, this.sub);
+    this.busy = true;
     playSfx(this.game, 'confirm');
     music.stop(800);
     this.statusText.setText('');
@@ -416,14 +544,15 @@ export class LevelSelectScene extends Phaser.Scene {
     this.tweens.addCounter({ from: 1, to: 0.05, duration: quick ? 1 : 900, ease: 'Quad.easeOut', onUpdate: (tween) => void (anim.timeScale = tween.getValue() ?? 1) });
     if (!quick) this.time.delayedCall(850, () => this.cameras.main.shake(180, 0.004));
     const sub = stop.number === 1 ? 'Home' : `Stop ${stop.number}`;
-    // A cleared stop 1 is a rematch with Raspberry: the room, the neighbour and the lesson are behind him.
-    const rematch = rideStraightToBattle(stop, isCleared(stop.id));
+    // Back at stop 1 after a win there, it is a rematch with Raspberry: the room, the neighbour and the lesson are behind him.
+    const started = isStopStarted(stop);
+    const rematch = rideStraightToBattle(stop, started);
     const arrive = () => {
       if (!rematch) {
         this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id));
         return;
       }
-      playSegment(this, { stop: stop.id, segment: firstSegment(stop, true) }).catch(() => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)));
+      playSegment(this, { stop: stop.id, segment: firstSegment(stop, this.sub, started) }).catch(() => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)));
     };
     this.time.delayedCall(quick ? 50 : 1000, () => this.doors.close(stop.station, sub, () => this.time.delayedCall(300, arrive)));
   }

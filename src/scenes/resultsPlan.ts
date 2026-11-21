@@ -20,8 +20,10 @@ export interface ResultsFacts {
   autoplay: boolean;
   /** Where "back" goes: the scene the song was started from. */
   returnScene: string;
-  /** The story's next stop is open, so the screen can offer it. */
+  /** The story's next battle or stop is open, so the screen can offer it. */
   hasNext: boolean;
+  /** What the next button says ("Next stop" unless given, e.g. "Battle B"). */
+  nextLabel?: string;
   meanErrorMs?: number;
   flairUsed?: number;
   abilityName?: string;
@@ -77,9 +79,9 @@ export function planResults(facts: ResultsFacts): ResultsPlan {
     { id: 'retry', label: 'Retry' },
     { id: 'back', label: backLabel(facts.returnScene, facts.practice), icon: 'icon_back' },
   ];
-  // Only a won story battle moves on, and only once the next stop is open.
+  // Only a won story battle moves on: to the stop's next battle, or to the next stop once it is open.
   const next = facts.hasNext && !failed && battle?.won !== false;
-  if (next) buttons.push({ id: 'next', label: 'Next stop', icon: 'icon_next' });
+  if (next) buttons.push({ id: 'next', label: facts.nextLabel ?? 'Next stop', icon: 'icon_next' });
 
   // After a fail or a loss the natural next step is another go; after a clear it is to move on.
   const lost = failed || battle?.won === false;

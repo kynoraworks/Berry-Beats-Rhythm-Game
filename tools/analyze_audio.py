@@ -55,6 +55,17 @@ STOP_TRACKS = {
     "citrus_labs": 140, "lantern_market": 120, "the_club": 144, "rooftop": 130,
     "the_tunnel": 152, "orange_plaza": 156, "pineapple_hall": 160, "grand_stage": 150,
 }
+# The short songs of each stop's battles A and B (generated at these tempos, about a
+# minute each, see archive/music/sublevels and tools/sublevel_songs.py), by stop number.
+# Stops not listed here do not have theirs yet (TEMPORARY): their A and B charts are
+# built on the start of the boss song instead (see SUBLEVELS below).
+SUB_TRACKS = {
+    1: (114, 118), 2: (120, 124), 3: (126, 130), 4: (124, 128), 5: (134, 138), 6: (114, 118),
+}
+STOP_SONGS = list(STOP_TRACKS)
+for _stop, (_a, _b) in SUB_TRACKS.items():
+    STOP_TRACKS[f"{STOP_SONGS[_stop - 1]}_a"] = _a
+    STOP_TRACKS[f"{STOP_SONGS[_stop - 1]}_b"] = _b
 TRACKS = OST_TRACKS + list(STOP_TRACKS)
 ARTIST = {name: "Nicole Yazmin" for name in OST_TRACKS} | {name: "Berry Beats (generated)" for name in STOP_TRACKS}
 # These two were exported as loops that start exactly on beat 1 at sample 0
@@ -507,6 +518,13 @@ class Plan:
     # Split the lanes by each note's rank in pitch (ties scattered) rather than by value,
     # so songs where many onsets read as the same pitch still use all four lanes evenly.
     rank_lanes: bool = False
+    # "" for Normal, else "easy" or "hard": the chart keeps its id and is written to
+    # <id>.<variant>.json (see DIFFICULTY VARIANTS below).
+    variant: str = ""
+
+    @property
+    def file_id(self) -> str:
+        return f"{self.chart_id}.{self.variant}" if self.variant else self.chart_id
 
 
 PLANS = [
@@ -744,6 +762,150 @@ PLANS += [
         rank_lanes=True,
     ),
 ]
+
+# ---------------------------------------------------------------------------
+# Battles A and B of each stop (docs/STORY_BIBLE.md, "Three battles per stop")
+# ---------------------------------------------------------------------------
+# Battle C is the stop chart above. A and B are shorter charts in the same shape: the
+# opening of C's plan, cut to fit, then C's last section as their own finish, with the
+# density lowered (a lot for A, a little for B), so the stop's gimmick is taught in A,
+# pushed in B and danced in full in C. Bars of the short songs: about 60 s at their tempo.
+
+SUB_SECONDS = 60.0
+# TEMPORARY: bars of the boss song that A and B dance while their own songs are missing.
+FALLBACK_BARS = {"a": 24, "b": 32}
+# How much lighter than C each is: notes and rival notes taken off per bar, the share of
+# C's doubles kept, and whether sixteenth sections (grid 1) are kept.
+SUB_LIGHTER = {
+    "a": dict(notes=2, rival=1, doubles=0.5, sixteenths=False, bursts=1, runs=9, nps=1, level=1),
+    "b": dict(notes=1, rival=0, doubles=0.75, sixteenths=True, bursts=0, runs=1, nps=0, level=0),
+}
+# Per-chart changes on top: Grape's first battle is one grape, with no pairs at all.
+SUB_OVERRIDES = {"stop04a": dict(doubles=0.0)}
+
+
+def lighten(sec: Section, rules: dict) -> Section:
+    if sec.mode == "rest":
+        return sec
+    out = Section(**{**sec.__dict__})
+    out.notes = max(2, sec.notes - rules["notes"])
+    if sec.rival_notes is not None:
+        out.rival_notes = max(2, sec.rival_notes - rules["rival"])
+    out.doubles = round(sec.doubles * rules["doubles"], 2)
+    out.rival_doubles = round(sec.rival_doubles * rules["doubles"], 2)
+    if not rules["sixteenths"] and sec.grid == 1:
+        out.grid = 2
+    out.bursts = max(0, sec.bursts - rules["bursts"])
+    out.runs = max(0, sec.runs - rules["runs"])
+    return out
+
+
+def sub_plan(boss: Plan, key: str, song: str, bars: int) -> Plan:
+    rules = {**SUB_LIGHTER[key], **SUB_OVERRIDES.get(f"{boss.chart_id}{key}", {})}
+    finish = 8 if bars >= 24 else 4
+    body_end = bars - finish
+    sections = []
+    for sec in boss.sections:
+        if sec.start >= body_end:
+            continue
+        sections.append(lighten(Section(**{**sec.__dict__, "end": min(sec.end, body_end)}), rules))
+    last = boss.sections[-1]
+    # The finish: C's last section, from the end of the body to the end of the song (the
+    # charter ignores bars past it).
+    sections.append(lighten(Section(**{**last.__dict__, "start": body_end, "end": bars + 2}), rules))
+    return Plan(
+        f"{boss.chart_id}{key}", song, f"{boss.title}{key.upper()}", boss.rival, max(1, boss.difficulty - rules["level"]),
+        max_nps=max(3, boss.max_nps - rules["nps"]), solo_holds=boss.solo_holds, sections=sections,
+        balance_lanes=boss.balance_lanes, hold_spacing=boss.hold_spacing, lane_gap=boss.lane_gap,
+        no_doubles=boss.no_doubles, rank_lanes=boss.rank_lanes,
+    )
+
+
+# Who dances battles A and B where it is not the stop's own fruit: Orange Plaza's
+# qualifiers are rematches with Banana and Plum, in the shape of their own stops' charts.
+SUB_RIVALS = {"stop10a": "stop02", "stop10b": "stop06"}
+
+SUBLEVELS: list[Plan] = []
+for _plan in [p for p in PLANS if p.chart_id.startswith("stop")]:
+    _stop = int(_plan.chart_id[4:])
+    for _key in "ab":
+        _shape = next((p for p in PLANS if p.chart_id == SUB_RIVALS.get(f"{_plan.chart_id}{_key}")), _plan)
+        if _stop in SUB_TRACKS:
+            _song = f"{_plan.song}_{_key}"
+            _bars = int(SUB_SECONDS / (240 / STOP_TRACKS[_song]))
+        else:
+            _song = _plan.song
+            _bars = FALLBACK_BARS[_key]
+        _sub = sub_plan(_shape, _key, _song, _bars)
+        _sub.chart_id, _sub.title = f"{_plan.chart_id}{_key}", f"{_plan.title}{_key.upper()}"
+        SUBLEVELS.append(_sub)
+# Stop 12's battles A and B are sets of the crew battle, danced on the enemies' own stop
+# charts (src/story/crewBattle.ts), so they have no charts of their own.
+SUBLEVELS = [p for p in SUBLEVELS if not p.chart_id.startswith("stop12")]
+PLANS += SUBLEVELS
+
+
+# ---------------------------------------------------------------------------
+# DIFFICULTY VARIANTS: Easy and Hard of every story battle
+# ---------------------------------------------------------------------------
+# Normal is the plan as written. Easy keeps the shape and thins it: fewer notes per bar,
+# no sixteenths (bursts, runs and grid 1 go), about a third of the chords, holds no
+# longer than two beats, and a lower notes-per-second cap. Hard adds to it: two more
+# notes per bar, sixteenths where the song has them, more chords and an extra hold.
+
+def easy_section(sec: Section) -> Section:
+    if sec.mode == "rest":
+        return sec
+    out = Section(**{**sec.__dict__})
+    out.notes = max(2, round(sec.notes * 0.65))
+    if sec.rival_notes is not None:
+        out.rival_notes = max(2, round(sec.rival_notes * 0.75))
+    out.grid = max(2, sec.grid)
+    out.bursts = 0
+    out.runs = 0
+    out.doubles = round(sec.doubles * 0.3, 2)
+    out.rival_doubles = round(sec.rival_doubles * 0.5, 2)
+    out.max_hold = min(sec.max_hold, 2.0)
+    if sec.hold_min is not None:
+        out.hold_min = min(sec.hold_min, 1.0)
+    return out
+
+
+def hard_section(sec: Section, no_doubles: bool) -> Section:
+    if sec.mode == "rest":
+        return sec
+    out = Section(**{**sec.__dict__})
+    out.notes = sec.notes + 2
+    if sec.rival_notes is not None:
+        out.rival_notes = sec.rival_notes + 1
+    out.bursts = sec.bursts + 1
+    if sec.grid <= 2 and sec.notes >= 5:
+        out.runs = sec.runs + 1
+    if not no_doubles:
+        out.doubles = sec.doubles + 0.5
+    out.holds = sec.holds + 1
+    return out
+
+
+def variant(plan: Plan, which: str) -> Plan:
+    if which == "easy":
+        sections = [easy_section(s) for s in plan.sections]
+        level, nps = max(1, plan.difficulty - 1), max(3, plan.max_nps - 3)
+    else:
+        sections = [hard_section(s, plan.no_doubles) for s in plan.sections]
+        level, nps = min(5, plan.difficulty + 1), plan.max_nps + 2
+    # Dr. Lemon's charts balance lanes on their own notes; with Hard's extra sixteenths that
+    # stacks runs in one lane, so his Hard splits lanes by pitch rank like the other stops.
+    hard_lemon = which == "hard" and plan.balance_lanes
+    return Plan(
+        plan.chart_id, plan.song, plan.title, plan.rival, level, max_nps=nps, solo_holds=plan.solo_holds, sections=sections,
+        balance_lanes=plan.balance_lanes and not hard_lemon, hold_spacing=plan.hold_spacing, lane_gap=plan.lane_gap,
+        no_doubles=plan.no_doubles, rank_lanes=plan.rank_lanes or hard_lemon, variant=which,
+    )
+
+
+PLANS += [variant(p, which) for p in [p for p in PLANS if p.chart_id.startswith("stop")] for which in ("easy", "hard")]
+
 
 # Nicole Yazmin's original soundtrack, one beat map per song for the Beat Maps menu.
 # Each is the chart a story stop used before the stops got their own songs.
@@ -1436,7 +1598,7 @@ def main() -> int:
     report = {"tempo": {n: {"bpm": t.bpm, "offset": t.offset, "duration": round(tracks[n].duration, 3)} for n, t in tempos.items()}, "charts": {}}
     failed = False
     for plan in PLANS:
-        if args.only and plan.chart_id not in args.only:
+        if args.only and plan.chart_id not in args.only and plan.file_id not in args.only:
             continue
         track = tracks[plan.song]
         grid = Grid(track, tempos[plan.song], lead)
@@ -1448,8 +1610,8 @@ def main() -> int:
             problems.append(f"sync lag {lag:.0f} ms")
         stats["sync_lag_ms"] = lag
         stats["duration"] = round(track.duration, 3)
-        report["charts"][plan.chart_id] = stats
-        print(f"\n{plan.chart_id}: {plan.title} ({plan.song}, {track.duration:.2f} s, {grid.bars} bars)")
+        report["charts"][plan.file_id] = stats
+        print(f"\n{plan.file_id}: {plan.title} ({plan.song}, {track.duration:.2f} s, {grid.bars} bars)")
         for side, label in (("notes", "player"), ("rival", "rival ")):
             s = stats.get(side)
             if not s:
@@ -1466,14 +1628,14 @@ def main() -> int:
         for p in problems:
             print(f"    ! {p}")
         failed |= bool(problems)
-        if plan.chart_id in args.show or "all" in args.show:
+        if plan.file_id in args.show or "all" in args.show:
             show(chart, grid.bars)
         if not args.no_write:
             CHART_DIR.mkdir(parents=True, exist_ok=True)
-            (CHART_DIR / f"{plan.chart_id}.json").write_text(json.dumps(chart, separators=(",", ":")) + "\n")
+            (CHART_DIR / f"{plan.file_id}.json").write_text(json.dumps(chart, separators=(",", ":")) + "\n")
         if args.clicks:
             args.clicks.mkdir(parents=True, exist_ok=True)
-            write_clicks(chart, track, args.clicks / f"{plan.chart_id}-clicks.wav")
+            write_clicks(chart, track, args.clicks / f"{plan.file_id}-clicks.wav")
     if args.stats:
         args.stats.write_text(json.dumps(report, indent=2))
     return 1 if failed else 0

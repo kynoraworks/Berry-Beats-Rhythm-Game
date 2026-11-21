@@ -1,6 +1,6 @@
 # Berry Beats: Story Bible and Build Prompt
 
-Last updated 2026-11-20.
+Last updated 2026-11-21 (three battles per stop, difficulty).
 
 ## Premise and tone
 
@@ -114,10 +114,57 @@ Rules for every line: one speaker, expression is neutral (default, quiet, vulner
 
 - The train arrives at a station: one screen, themed to the fruit, with NPCs to talk to. The clue NPC must be talked to once before the exit opens.
 - Walk outside to the district street: one wide screen, walk left and right, 3 or 4 clickable spots. The level's fruit waits at the end.
-- Intro dialogue, then the battle, then win lines. A loss shows one retry line and restarts the battle.
+- Three battles, A, B and C, each with its own intro, win lines and one retry line. A loss shows the retry line and restarts that battle. Each win ends on the results, which offer the next battle.
 - Back on the train. The route map shows the next stop.
 
-Stop 1 is special: Berry's room (Coach tutorial, no battle), Raspberry's confrontation and battle, the ticket, then the station. Stop 12 is the 5v5 at the Grand Stage.
+Stop 1 is special: Berry's room (Coach tutorial, no battle), Raspberry's confrontation and three battles in the room, the ticket, then the station. Stop 12 is the 5v5 at the Grand Stage, danced in three sets.
+
+**Three battles per stop**
+
+Every stop has three battles. A teaches the stop's gimmick gently on a short song of its own (about a minute, in the stop song's style, a little slower), B twists it on a second short song close to the stop's tempo, and C is the stop's rival battle on its main song. B opens once A is won and C once B is; winning C clears the stop (the next stop opens and any ally joins). Battle A opens with the stop's first meeting; battle C ends with the stop's win lines. On the train, each stop shows three ticket pips and the three battles of the chosen stop.
+
+Three shapes, so the stops do not all feel the same: an audition for an ally (1, 3, 5, 8), gates before a boss (4, 7, 9, 11, with Grape's one grape, two grapes, whole bunch), best of three with a local (2, 6), and a remix at Orange Plaza (10), where the qualifiers are rematches with Banana and Plum. At the Grand Stage the three battles are the crew battle's three sets.
+
+| Stop | Battle | Name | Opponent |
+|---|---|---|---|
+| 1 | A | Round one | Raspberry |
+| 1 | B | Round two | Raspberry |
+| 1 | C | Round three | Raspberry |
+| 2 | A | Ticket check | Banana |
+| 2 | B | Mind the peel | Banana |
+| 2 | C | The stamp | Banana |
+| 3 | A | The cypher | Pear |
+| 3 | B | Finish strong | Pear |
+| 3 | C | The back half | Pear |
+| 4 | A | One grape | Grape |
+| 4 | B | Two grapes | Grape |
+| 4 | C | The whole bunch | Grape |
+| 5 | A | Calibration | Dr. Lemon |
+| 5 | B | Trial two | Dr. Lemon |
+| 5 | C | Full meltdown | Dr. Lemon |
+| 6 | A | First lantern | Plum |
+| 6 | B | Best of three | Plum |
+| 6 | C | Last lantern | Plum |
+| 7 | A | The door | Dragon Fruit |
+| 7 | B | Soloists only | Dragon Fruit |
+| 7 | C | The main floor | Dragon Fruit |
+| 8 | A | Table for one | Watermelon |
+| 8 | B | Big feelings | Watermelon |
+| 8 | C | Last dance | Watermelon |
+| 9 | A | First gate | Coconut |
+| 9 | B | Second gate | Coconut |
+| 9 | C | Third gate | Coconut |
+| 10 | A | Qualifier: Banana | Banana |
+| 10 | B | Qualifier: Plum | Plum |
+| 10 | C | The exhibition | Orange |
+| 11 | A | Etiquette | Pineapple |
+| 11 | B | The mirror room | Pineapple |
+| 11 | C | The main hall | Pineapple |
+| 12 | A | Set one | Grape, Coconut |
+| 12 | B | Set two | Pineapple, Dragon Fruit |
+| 12 | C | Set three | Blueberry |
+
+**Difficulty.** Easy, Normal or Hard, picked on the train or in Options. It changes the beat maps (Easy: fewer notes and chords, no sixteenths, gentler holds, slightly wider timing; Hard: more sixteenths, chords and holds), and how well the rival dances, never the dialogue or what happens. Best scores are kept per difficulty.
 
 **Battle rules.** Keep the existing four-lane tug-of-war. You must win to progress. Win and lose never branch the plot: lose lines are retry banter only.
 
@@ -145,7 +192,7 @@ Stop 1 is special: Berry's room (Coach tutorial, no battle), Raspberry's confron
 - Five rounds on one shared tug-of-war bar. Rounds 1 to 4 are worth 1 point, round 5 is worth 2.
 - Win with more than 3 of the 6 points. A 3-3 tie goes to whoever won round 5.
 - Each fruit plays its own gimmick on its round. Allies can fire their ability once per round.
-- A loss retries from the lineup screen.
+- Three sets with checkpoints: set one is rounds 1 and 2, set two rounds 3 and 4, set three round 5. A set is won on its own points; a split set goes to whoever danced better across it. A lost set retries from the lineup screen, keeping the sets before it. The order of the allies is set before set one.
 
 ## Arc: one line per stop
 

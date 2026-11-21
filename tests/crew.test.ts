@@ -6,13 +6,17 @@ import { Engine, START_HEALTH, type Judgement } from '../src/core/engine';
 import {
   CREW_ALLIES,
   CREW_ROUNDS,
+  CREW_SETS,
   DEFAULT_ORDER,
   ROUND_POINTS,
   TOTAL_POINTS,
   counterTip,
   crewLineup,
   outcome,
+  roundsBefore,
   roundSpan,
+  setOfRound,
+  setOutcome,
   sanitizeOrder,
   sliceChart,
   swapOrder,
@@ -22,6 +26,40 @@ import {
 import { SCRIPT } from '../src/story/script';
 
 const win = (won: boolean): RoundResult => ({ playerAccuracy: won ? 80 : 60, rivalAccuracy: won ? 60 : 80, playerScore: 0, won });
+
+describe('crew battle sets', () => {
+  it('splits the five rounds into three sets: 1 and 2, 3 and 4, then 5', () => {
+    expect(CREW_SETS).toEqual([[0, 1], [2, 3], [4]]);
+    expect([0, 1, 2, 3, 4].map(setOfRound)).toEqual([0, 0, 1, 1, 2]);
+  });
+
+  it('wins a set on its own points, a split set on accuracy across it', () => {
+    expect(setOutcome([win(true)], 0)).toBe('open');
+    expect(setOutcome([win(true), win(true)], 0)).toBe('won');
+    expect(setOutcome([win(false), win(false)], 0)).toBe('lost');
+    const close = (won: boolean, player: number, rival: number): RoundResult => ({ playerAccuracy: player, rivalAccuracy: rival, playerScore: 1, won });
+    expect(setOutcome([close(true, 90, 70), close(false, 70, 75)], 0)).toBe('won');
+    expect(setOutcome([close(true, 71, 70), close(false, 60, 75)], 0)).toBe('lost');
+    expect(setOutcome([win(true), win(true), win(false), win(true), win(true)], 2)).toBe('won');
+    expect(setOutcome([win(true), win(true), win(true), win(true), win(false)], 2)).toBe('lost');
+  });
+
+  it('three won sets always win the battle on the 6-point rules', () => {
+    // Each set of two won with one round each and Berry's round won: 4 points of 6.
+    const results = [win(false), win(true), win(true), win(false), win(true)];
+    expect(setOutcome(results, 0)).not.toBe('open');
+    expect(outcome(results)).toBe('won');
+  });
+
+  it('keeps the rounds before a set from the checkpoint, or counts them won without one', () => {
+    expect(roundsBefore(0, null)).toEqual([]);
+    expect(roundsBefore(2, { order: [...DEFAULT_ORDER], results: [win(true), win(false), win(true), win(true)] }).map((r) => r.won)).toEqual([true, false, true, true]);
+    expect(roundsBefore(1, null)).toEqual([
+      { playerAccuracy: 0, rivalAccuracy: 0, playerScore: 0, won: true },
+      { playerAccuracy: 0, rivalAccuracy: 0, playerScore: 0, won: true },
+    ]);
+  });
+});
 
 describe('crew battle points', () => {
   it('scores rounds 1 to 4 as one point and the last as two', () => {

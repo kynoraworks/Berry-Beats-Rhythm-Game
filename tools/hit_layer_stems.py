@@ -9,7 +9,8 @@ mix; shut, the lead drops to (1 - depth) of its level. See src/core/hitLayer.ts.
 
 So the lead must line up with the shipped mix to the sample. It is separated
 from that very file:
-  1. tools/stretch_songs.py writes public/assets/audio/<song>.mp3.
+  1. tools/stretch_songs.py (or, for the short songs of battles A and B,
+     tools/sublevel_songs.py) writes public/assets/audio/<song>.mp3.
   2. Each mix is split into four stems (vocals, drums, bass, other) with
      htdemucs (Higgsfield's separate_stems, mode "four"). The stem files go in
      one folder per song: <stems>/<song>/{vocals,other,drums}.flac.
@@ -43,11 +44,14 @@ SONGS = [
     "berry_town", "peel_street", "graffiti_corner", "vine_crossing", "citrus_labs", "lantern_market",
     "the_club", "rooftop", "the_tunnel", "orange_plaza", "pineapple_hall", "grand_stage",
 ]
+# The short songs of battles A and B (tools/sublevel_songs.py), for the stops that have them so far.
+SONGS += [f"{song}_{battle}" for song in SONGS[:6] for battle in "ab"]
 # Stems that make up each song's lead. Most songs carry their tune in "other"
 # (keys, synths, horns) plus any voice. The Tunnel is drums and bass with only a
 # faint pad, so there the bass line is the tune and goes in the layer too. Bass
-# is what is left of the mix once vocals, other and drums are taken out.
-LEAD_STEMS = {"the_tunnel": ("vocals", "other", "bass")}
+# is what is left of the mix once vocals, other and drums are taken out. Peel Street's
+# first short song is built on its slap bass, which carries the hook there.
+LEAD_STEMS = {"the_tunnel": ("vocals", "other", "bass"), "peel_street_a": ("vocals", "other", "bass")}
 # Must match LAYER_DEPTH in src/core/hitLayer.ts: how much of the lead a shut gate takes out.
 DEPTH = 0.8
 

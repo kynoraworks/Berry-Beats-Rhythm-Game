@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, CSS, LANE_COLORS, LANE_NAMES, SceneKeys, Tex } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music } from '../core/music';
+import { DIFFICULTIES, DIFFICULTY_BLURBS, DIFFICULTY_LABELS } from '../core/difficulty';
 import { CAMERA_MOTIONS, getSettings, keyLabel, resetSettings, updateSettings, type CameraMotion, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { SCHEME_INFO, TOUCH_SCHEMES, zonesFor, type TouchScheme } from '../core/touchSchemes';
@@ -27,11 +28,13 @@ interface Row {
   confirm?(): void;
 }
 
-const LEFT: Bounds = { x: 40, y: 112, w: 624, h: 448 };
+const LEFT: Bounds = { x: 40, y: 112, w: 624, h: 456 };
 const RIGHT: Bounds = { x: 680, y: 112, w: 560, h: 588 };
-const DESC: Bounds = { x: 40, y: 568, w: 624, h: 68 };
+const DESC: Bounds = { x: 40, y: 576, w: 624, h: 60 };
 const ROW_H = 48;
 const ROW_DY = 52;
+/** The left panel's rows sit a little closer, to make room for Difficulty. */
+const LEFT_DY = 46;
 const KEY_DY = 54;
 const SLOT_W = 112;
 const SLOT_H = 48;
@@ -104,7 +107,7 @@ export class OptionsScene extends Phaser.Scene {
     this.frame = new FocusFrame(this);
     this.hintText = addBody(this, DESC.x + DESC.w / 2, DESC.y + DESC.h / 2, '', 22, { color: CSS.lilac, wrapWidth: DESC.w - 48 });
 
-    const leftY = (i: number) => LEFT.y + 88 + i * ROW_DY;
+    const leftY = (i: number) => LEFT.y + 88 + i * LEFT_DY;
     addSectionTitle(this, LEFT.x + 32, LEFT.y + 36, LEFT.w - 64, 'Sound');
     this.addSlider(LEFT, leftY(0), 'Music volume', 'How loud the songs and the menu music are.', (s) => percent(s.musicVolume), (s) => s.musicVolume, (s, d) => ({
       musicVolume: step(s.musicVolume, d, 0.05, 0, 1),
@@ -115,17 +118,18 @@ export class OptionsScene extends Phaser.Scene {
     this.addToggle(LEFT, leftY(2), 'Hit sounds', 'Play a sound each time you hit a note.', 'hitSounds');
     this.addToggle(LEFT, leftY(3), 'Announcer', 'The MC calls out rounds, hype and wins. The crowd follows Sound volume.', 'announcer');
 
-    addSectionTitle(this, LEFT.x + 32, leftY(3) + 56, LEFT.w - 64, 'Timing');
+    addSectionTitle(this, LEFT.x + 32, leftY(3) + 48, LEFT.w - 64, 'Difficulty and timing');
+    this.addDifficultyRow(leftY(3) + 94);
     this.addSlider(
       LEFT,
-      leftY(3) + 108,
+      leftY(3) + 140,
       'Audio offset',
       'Raise it if your hits keep landing late, lower it if they land early.',
       (s) => `${s.audioOffsetMs > 0 ? '+' : ''}${Math.round(s.audioOffsetMs)} ms`,
       (s) => (s.audioOffsetMs + 500) / 1000,
       (s, d) => ({ audioOffsetMs: step(s.audioOffsetMs, d, 5, -500, 500) }),
     );
-    this.addAction(LEFT, leftY(3) + 160, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
+    this.addAction(LEFT, leftY(3) + 186, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
 
     const rightY = (i: number) => RIGHT.y + 88 + i * ROW_DY;
     addSectionTitle(this, RIGHT.x + 32, RIGHT.y + 36, RIGHT.w - 64, 'Gameplay');
@@ -287,6 +291,38 @@ export class OptionsScene extends Phaser.Scene {
     addStepArrow(this, at.arrowRight, y, 1, press(1), () => this.setFocus(index, false));
     const hint = 'Battle camera: Full bumps on the beat and leans in on turns, Light only bumps a little. Reduce motion turns it off.';
     this.rows.push({ hint, bounds, refresh, adjust, confirm: () => adjust(1) });
+  }
+
+  /** Easy, Normal or Hard for the story battles; the train's switch changes the same setting. */
+  private addDifficultyRow(y: number): void {
+    const index = this.rows.length;
+    const bounds = this.rowBounds(LEFT, y);
+    const at = controls(LEFT);
+    this.addHitZone(bounds, index);
+    addText(this, at.label, y, 'Difficulty', 32, { origin: [0, 0.5], stroke: false });
+    const value = addText(this, at.control, y, '', 24, { color: CSS.yellow, stroke: false });
+    const refresh = () => value.setText(DIFFICULTY_LABELS[getSettings().difficulty]);
+    const hint = () => `${DIFFICULTY_BLURBS[getSettings().difficulty]}. Each keeps its own best scores.`;
+    const row: Row = { hint: hint(), bounds, refresh, adjust: () => undefined };
+    const adjust = (dir: number) => {
+      const list = DIFFICULTIES;
+      const next = list[(list.indexOf(getSettings().difficulty) + dir + list.length) % list.length];
+      updateSettings({ difficulty: next });
+      playSfx(this.game, 'sliderTick', next === 'hard' ? 1.3 : next === 'normal' ? 1 : 0.8);
+      refresh();
+      row.hint = hint();
+      if (this.focus === index) this.say(row.hint);
+    };
+    row.adjust = adjust;
+    row.confirm = () => adjust(1);
+    const press = (dir: -1 | 1) => () => {
+      if (!this.idle()) return;
+      this.setFocus(index, false);
+      adjust(dir);
+    };
+    addStepArrow(this, at.arrowLeft, y, -1, press(-1), () => this.setFocus(index, false));
+    addStepArrow(this, at.arrowRight, y, 1, press(1), () => this.setFocus(index, false));
+    this.rows.push(row);
   }
 
   /** A labelled row with a small button on the right. */
