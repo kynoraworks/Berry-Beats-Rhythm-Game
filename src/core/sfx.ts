@@ -544,7 +544,14 @@ const RECIPES: Record<SfxName, Layer[]> = {
  * turntable, the impacts, the crowd roar and the menu's tape deck (a tape
  * lifted, a tape seating as the door shuts, the motor spinning up).
  */
-const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
+interface Sample {
+  file: string;
+  gain: number;
+  /** Seconds to play before a short fade: cuts a long tail (an echo, a crowd dying away) under the music. */
+  length?: number;
+}
+
+const SAMPLES: Partial<Record<SfxName, Sample>> = {
   tapeLift: { file: 'assets/audio/sfx/tape_lift.mp3', gain: 0.14 },
   tapeInsert: { file: 'assets/audio/sfx/tape_insert.mp3', gain: 0.4 },
   tapeMotor: { file: 'assets/audio/sfx/tape_motor.mp3', gain: 0.12 },
@@ -561,12 +568,12 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
   djBrake: { file: 'assets/audio/sfx/dj_brake.mp3', gain: 0.55 },
   needleDrop: { file: 'assets/audio/sfx/needle_drop.mp3', gain: 0.4 },
   boom: { file: 'assets/audio/sfx/boom.mp3', gain: 0.75 },
-  slam: { file: 'assets/audio/sfx/slam.mp3', gain: 0.8 },
+  slam: { file: 'assets/audio/sfx/slam.mp3', gain: 0.8, length: 1.2 },
   subDrop: { file: 'assets/audio/sfx/sub_drop.mp3', gain: 0.75 },
-  crowdRoar: { file: 'assets/audio/sfx/crowd_roar.mp3', gain: 0.55 },
+  crowdRoar: { file: 'assets/audio/sfx/crowd_roar.mp3', gain: 0.55, length: 1.3 },
   victory: { file: 'assets/audio/sfx/stinger_victory.mp3', gain: 0.5 },
   defeat: { file: 'assets/audio/sfx/stinger_lose.mp3', gain: 0.5 },
-  crowdCheer: { file: 'assets/audio/sfx/crowd_cheer.mp3', gain: 0.5 },
+  crowdCheer: { file: 'assets/audio/sfx/crowd_cheer.mp3', gain: 0.5, length: 1.15 },
   crowdOhh: { file: 'assets/audio/sfx/crowd_ohh.mp3', gain: 0.45 },
   crowdAww: { file: 'assets/audio/sfx/crowd_aww.mp3', gain: 0.28 },
   crowdBed: { file: 'assets/audio/sfx/crowd_bed.mp3', gain: 1 },
@@ -576,9 +583,10 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
   mcRound4: { file: 'assets/audio/sfx/mc_round4.mp3', gain: 0.55 },
   mcFinal: { file: 'assets/audio/sfx/mc_final.mp3', gain: 0.55 },
   mcHype: { file: 'assets/audio/sfx/mc_hype.mp3', gain: 0.55 },
-  mcFlawless: { file: 'assets/audio/sfx/mc_flawless.mp3', gain: 0.55 },
+  // The word is over by about 1 s; the rest is the hall ringing.
+  mcFlawless: { file: 'assets/audio/sfx/mc_flawless.mp3', gain: 0.55, length: 1.15 },
   mcCombo: { file: 'assets/audio/sfx/mc_combo.mp3', gain: 0.55 },
-  mcCrowdWild: { file: 'assets/audio/sfx/mc_crowdwild.mp3', gain: 0.55 },
+  mcCrowdWild: { file: 'assets/audio/sfx/mc_crowdwild.mp3', gain: 0.55, length: 2.95 },
   mcWinner: { file: 'assets/audio/sfx/mc_winner.mp3', gain: 0.55 },
   mcOhNo: { file: 'assets/audio/sfx/mc_ohno.mp3', gain: 0.55 },
   mcLetsDance: { file: 'assets/audio/sfx/mc_letsdance.mp3', gain: 0.55 },
@@ -597,7 +605,7 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
 };
 
 /** A sound's recorded sample and its level, if it has one (for offline renders). */
-export function sampleSpec(name: SfxName): { file: string; gain: number } | undefined {
+export function sampleSpec(name: SfxName): Sample | undefined {
   return SAMPLES[name];
 }
 
@@ -611,7 +619,7 @@ const pending = new Set<SfxName>();
 /** Start fetching the recorded samples. Safe to call more than once. */
 export function preloadSamples(game: Phaser.Game): void {
   const ctx = getAudioContext(game);
-  for (const [name, sample] of Object.entries(SAMPLES) as [SfxName, { file: string; gain: number }][]) {
+  for (const [name, sample] of Object.entries(SAMPLES) as [SfxName, Sample][]) {
     if (decoded.has(name) || pending.has(name)) continue;
     pending.add(name);
     fetch(sample.file)
@@ -655,57 +663,174 @@ export function sampleBuffer(name: SfxName): AudioBuffer | null {
 /** How long a sound lasts: its sample once loaded, else its synthesised layers. */
 export function sfxDuration(name: SfxName): number {
   const buffer = decoded.get(name);
-  if (buffer && SAMPLES[name]) return buffer.duration;
+  const sample = SAMPLES[name];
+  if (buffer && sample) return Math.min(buffer.duration, sample.length ?? Infinity);
   return RECIPES[name].reduce((end, layer) => Math.max(end, (layer.delay ?? 0) + layer.dur), 0);
 }
 
-/** Where a sound goes: straight out, or through the hype limiter. */
-export type Bus = 'main' | 'hype';
+/**
+ * The mix. The battle song is the main thing: everything else sits under it.
+ *
+ *   song (Conductor) ─────────────────────────────────────────┐
+ *   main: menu, hit and miss sounds ──────────────────────────┤
+ *   hype: stingers, scratches, record moves ─┐                ├─ master ceiling ─ out
+ *   crowd: reactions and the bed (high-passed)├─ glue ─ limit ┘
+ *   voice: the MC (softened bite) ────────────┘
+ *
+ * The song is never turned down for a hype moment (only for a spinback, which
+ * replaces it, and a miss's brief dip); instead the hype buses are set well
+ * below it, and the crowd and stingers duck under the MC (see busDuck). Every
+ * compressor here has its automatic makeup gain taken back off (see
+ * compressor), so a ceiling never makes anything louder.
+ */
+export type Bus = 'main' | 'hype' | 'crowd' | 'voice';
 
-const hypeBuses = new WeakMap<BaseAudioContext, AudioNode>();
+/** Each hype bus's level, before the Sound volume: well under the song. */
+export const BUS_LEVELS: Record<Exclude<Bus, 'main'>, number> = {
+  hype: 0.5,
+  crowd: 0.42,
+  voice: 0.8,
+};
+
+/**
+ * Per-sound caps on top of a sound's own level, for the battle sounds that
+ * fire often (judgements, milestones) or are big (the slam, the horn), so no
+ * single event pokes through the song.
+ */
+export const LEVELS: Partial<Record<SfxName, number>> = {
+  perfect: 0.55,
+  good: 0.55,
+  hit: 0.55,
+  miss: 0.6,
+  combo: 0.55,
+  bonus: 0.45,
+  ready: 0.7,
+  slam: 0.6,
+  boom: 0.75,
+  subDrop: 0.75,
+  airhorn: 0.6,
+  countGo: 0.8,
+};
+
+/**
+ * Web Audio's DynamicsCompressorNode adds automatic makeup gain (the spec's
+ * "makeup gain": the reciprocal of the curve at full scale, raised to 0.6),
+ * so a hard-knee limiter at -10 dB quietly turns everything through it up
+ * by almost 6 dB. This is the gain that takes it back off, for a hard knee.
+ */
+export function makeupCompensation(threshold: number, ratio: number): number {
+  const fullRangeDb = threshold + -threshold / ratio;
+  return 10 ** ((0.6 * fullRangeDb) / 20);
+}
+
+interface Squeeze {
+  threshold: number;
+  ratio: number;
+  attack: number;
+  release: number;
+}
+
+/** A hard-knee compressor with its makeup gain cancelled: below the threshold it passes at unity. Returns its input; it feeds `out`. */
+function compressor(ctx: BaseAudioContext, settings: Squeeze, out: AudioNode): AudioNode {
+  const node = ctx.createDynamicsCompressor();
+  node.threshold.value = settings.threshold;
+  node.knee.value = 0;
+  node.ratio.value = settings.ratio;
+  node.attack.value = settings.attack;
+  node.release.value = settings.release;
+  const trim = ctx.createGain();
+  trim.gain.value = makeupCompensation(settings.threshold, settings.ratio);
+  node.connect(trim).connect(out);
+  return node;
+}
+
+/** The master ceiling: just under full scale, for the song and everything else together. */
+const CEILING: Squeeze = { threshold: -2, ratio: 20, attack: 0.002, release: 0.12 };
+/** The hype buses together: a gentle glue, then a limiter well under the ceiling, so a pile-up stays a pile-up of quiet things. */
+const GLUE: Squeeze = { threshold: -24, ratio: 2, attack: 0.006, release: 0.2 };
+const HYPE_LIMIT: Squeeze = { threshold: -10, ratio: 20, attack: 0.001, release: 0.15 };
+
 const masterBuses = new WeakMap<BaseAudioContext, AudioNode>();
+const hypeGroups = new WeakMap<BaseAudioContext, AudioNode>();
+const buses = new WeakMap<BaseAudioContext, Map<Bus, { input: AudioNode; duck: GainNode }>>();
 
 /**
  * A transparent safety ceiling just under full scale for the battle song and
- * the hype bus together, so a boom landing on a loud bar never clips.
+ * every sound bus together, so a boom landing on a loud bar never clips.
  */
 export function masterInput(ctx: BaseAudioContext): AudioNode {
   let input = masterBuses.get(ctx);
   if (!input) {
-    const ceiling = ctx.createDynamicsCompressor();
-    ceiling.threshold.value = -1.5;
-    ceiling.knee.value = 0;
-    ceiling.ratio.value = 20;
-    ceiling.attack.value = 0.002;
-    ceiling.release.value = 0.12;
-    ceiling.connect(ctx.destination);
-    masterBuses.set(ctx, ceiling);
-    input = ceiling;
+    input = compressor(ctx, CEILING, ctx.destination);
+    masterBuses.set(ctx, input);
   }
   return input;
 }
 
-/**
- * The battle hype shares a limiter, so a pile-up of booms, horns, the crowd
- * and the MC can be loud without clipping. Hit and menu sounds skip it, so
- * they never pump.
- */
-export function busInput(ctx: BaseAudioContext, bus: Bus): AudioNode {
-  if (bus === 'main') return ctx.destination;
-  let input = hypeBuses.get(ctx);
+function hypeGroup(ctx: BaseAudioContext): AudioNode {
+  let input = hypeGroups.get(ctx);
   if (!input) {
-    const limiter = ctx.createDynamicsCompressor();
-    // Low enough that the hype plus the (ducked) song stays under full scale.
-    limiter.threshold.value = -10;
-    limiter.knee.value = 0;
-    limiter.ratio.value = 20;
-    limiter.attack.value = 0.001;
-    limiter.release.value = 0.15;
-    limiter.connect(masterInput(ctx));
-    hypeBuses.set(ctx, limiter);
-    input = limiter;
+    input = compressor(ctx, GLUE, compressor(ctx, HYPE_LIMIT, masterInput(ctx)));
+    hypeGroups.set(ctx, input);
   }
   return input;
+}
+
+function filter(ctx: BaseAudioContext, type: BiquadFilterType, frequency: number, q = 0.7, gain = 0): BiquadFilterNode {
+  const node = ctx.createBiquadFilter();
+  node.type = type;
+  node.frequency.value = frequency;
+  node.Q.value = q;
+  node.gain.value = gain;
+  return node;
+}
+
+function makeBus(ctx: BaseAudioContext, bus: Exclude<Bus, 'main'>): { input: AudioNode; duck: GainNode } {
+  const level = ctx.createGain();
+  level.gain.value = BUS_LEVELS[bus];
+  const duck = ctx.createGain();
+  level.connect(duck);
+  let tail: AudioNode = duck;
+  if (bus === 'crowd') {
+    // Out of the kick and bass, and the fizz off the top: the crowd sits behind the beat.
+    tail = tail.connect(filter(ctx, 'highpass', 380)).connect(filter(ctx, 'lowpass', 7000));
+  } else if (bus === 'voice') {
+    // The MC's PA bite (a +5 dB lift at 2.8 kHz, see tools/build_sfx.py) taken partly back, and no boom.
+    tail = tail.connect(filter(ctx, 'highpass', 160)).connect(filter(ctx, 'peaking', 2800, 0.9, -4));
+  }
+  tail.connect(hypeGroup(ctx));
+  return { input: level, duck };
+}
+
+function busOf(ctx: BaseAudioContext, bus: Exclude<Bus, 'main'>): { input: AudioNode; duck: GainNode } {
+  let map = buses.get(ctx);
+  if (!map) {
+    map = new Map();
+    buses.set(ctx, map);
+  }
+  let entry = map.get(bus);
+  if (!entry) {
+    entry = makeBus(ctx, bus);
+    map.set(bus, entry);
+  }
+  return entry;
+}
+
+/** Where a sound on `bus` should connect. Main (menus, hits) goes straight to the ceiling, uncompressed, so it never pumps. */
+export function busInput(ctx: BaseAudioContext, bus: Bus): AudioNode {
+  return bus === 'main' ? masterInput(ctx) : busOf(ctx, bus).input;
+}
+
+/** A hype bus's duck level (1 is untouched): the crowd and stingers dip under the MC. */
+export function busDuck(ctx: BaseAudioContext, bus: Exclude<Bus, 'main'>): AudioParam {
+  return busOf(ctx, bus).duck.gain;
+}
+
+/** Which hype bus a battle sound belongs on: the MC on voice, the crowd on crowd, the rest (stingers, the DJ) on hype. */
+export function hypeBus(name: SfxName): Exclude<Bus, 'main'> {
+  if (name.startsWith('mc')) return 'voice';
+  if (name.startsWith('crowd')) return 'crowd';
+  return 'hype';
 }
 
 /** Wrap scheduled sources as a Voice that disconnects `out` once they all end. */
@@ -776,7 +901,7 @@ export function allowRepeat(name: SfxName, now: number, last: Map<SfxName, numbe
  * fast-repeating sound inside its gap).
  */
 export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, bus: Bus = 'main', rate = 1): Voice | null {
-  const volume = getSettings().sfxVolume * gain;
+  const volume = getSettings().sfxVolume * gain * (LEVELS[name] ?? 1);
   if (volume <= 0) return null;
   const ctx = getAudioContext(game);
   if (ctx.state !== 'running') return null;
@@ -793,9 +918,18 @@ export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.playbackRate.value = rate;
-    out.gain.value = sample.gain * volume;
+    const level = sample.gain * volume;
+    out.gain.value = level;
     source.connect(out);
     source.start(at);
+    if (sample.length !== undefined && sample.length * rate < buffer.duration) {
+      // Cut the tail: hold, then fade out by the sample's length.
+      const end = at + sample.length / rate;
+      out.gain.setValueAtTime(level, at);
+      out.gain.setValueAtTime(level, end - TAIL_FADE);
+      out.gain.linearRampToValueAtTime(0.0001, end);
+      source.stop(end + 0.02);
+    }
     sources.push(source);
   } else {
     if (RECIPES[name].length === 0) {
@@ -806,6 +940,9 @@ export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, 
   }
   return voiceOf(ctx, out, sources, sfxDuration(name) / (buffer && sample ? rate : 1));
 }
+
+/** The fade at the end of a sample cut short by its length. */
+const TAIL_FADE = 0.18;
 
 /** How loud the menu's tape hiss sits, before the Sound volume: well under the menu music. */
 export const DECK_HISS_GAIN = 0.0045;
@@ -853,8 +990,8 @@ export function isRecordMove(name: SfxName): name is RecordMove {
 const SPINBACK = 0.62;
 const CATCH = 0.06;
 const BRAKE = 1.0;
-/** A scrub sits over the (ducked) song, so it is pushed a little past the song's own level. */
-const SCRUB_GAIN = 1.6;
+/** A scrub sits over the (briefly dipped) song, a touch past the other record moves. */
+const SCRUB_GAIN = 1.2;
 /** A scrub: back, forward, back, all within about a third of a second. */
 const SCRUB = 0.34;
 /** The scrub's strokes: start (s), length (s), direction, and the record speed at each end. */
@@ -863,8 +1000,12 @@ const SCRUB_STROKES: readonly { at: number; dur: number; back: boolean; from: nu
   { at: 0.085, dur: 0.065, back: false, from: 0.3, to: 1.9 },
   { at: 0.16, dur: 0.17, back: true, from: 2.1, to: 0.12 },
 ];
-/** Song audio is mastered hot: a record move sits a little under the hype samples. */
-const RECORD_GAIN = 0.6;
+/**
+ * A record move is the song itself, so it plays near the song's level: it
+ * makes up for the hype bus's level (BUS_LEVELS.hype), landing a few dB
+ * under the song at the default volumes.
+ */
+const RECORD_GAIN = 1.0;
 
 export function recordMoveDuration(move: RecordMove): number {
   return move === 'djRewind' ? SPINBACK : move === 'djScrub' ? SCRUB : BRAKE;

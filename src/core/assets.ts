@@ -54,6 +54,8 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   // Everyone else's walk: 6 frames walking right in the same layout, keyed '<id>_walk' (the Coach is 'instructor_walk'). See tools/build_walks.py.
   ...WALKERS.map((id) => ({ key: `${id}_walk`, file: `${id}_walk.png`, frameWidth: 64, frameHeight: 64 })),
   ...MOVERS.map((id) => ({ key: `${id}_moves`, file: `${id}_moves.png`, frameWidth: 64, frameHeight: 64 })),
+  // Hype Berry: the pack Berry swaps into while hype mode is on (36 frames, see HYPE_BERRY in src/play/characters.ts).
+  { key: 'berry_hype', file: 'berry_hype.png', frameWidth: 64, frameHeight: 64 },
   // The people baked into the scenery: one column per piece, at rest and nodding. See tools/build_life.py.
   ...LIFE_THEMES.map((theme) => ({ key: `life_${theme}`, file: `life_${theme}.png`, frameWidth: LIFE_SHEETS[theme].cellW, frameHeight: LIFE_SHEETS[theme].cellH })),
 ];
@@ -74,6 +76,7 @@ export const PRESENT_SHEETS: readonly string[] = [
   'berry_walk',
   ...WALKERS.map((id) => `${id}_walk`),
   ...MOVERS_DRAWN.map((id) => `${id}_moves`),
+  'berry_hype',
   ...LIFE_THEMES.map((theme) => `life_${theme}`),
 ];
 

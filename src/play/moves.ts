@@ -253,6 +253,161 @@ export const MOVE_FEELS: Record<string, MoveFeel> = {
   banana: feel('lite', 1, { finisherSmall: 'slide', finisherBig: 'slide', recovery: 'slide', shuffle: 'slide' }),
 };
 
+// ---------------------------------------------------------------------------
+// Misses
+// ---------------------------------------------------------------------------
+
+/** Misses in a row (no hit between) before the dancer stumbles. A lone miss only flashes. */
+export const STUMBLE_STREAK = 2;
+
+/** What a miss does to the dancer: a brief red flash while the dance goes on, or the stumble. */
+export type MissReaction = 'flash' | 'stumble';
+
+/**
+ * Counts misses in a row. One slip should not wreck the dance, so a single
+ * miss only flashes the dancer; the stumble (and the knock back) plays from
+ * the second miss in a row. Any hit starts the count again.
+ */
+export class MissStreak {
+  private count = 0;
+
+  /** Misses since the last hit. */
+  get length(): number {
+    return this.count;
+  }
+
+  hit(): void {
+    this.count = 0;
+  }
+
+  miss(): MissReaction {
+    this.count++;
+    return this.count >= STUMBLE_STREAK ? 'stumble' : 'flash';
+  }
+
+  reset(): void {
+    this.count = 0;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Extended moves sheets: signature moves, smoother lane hits and duo poses
+// ---------------------------------------------------------------------------
+
+/** First frame of the extension rows in a moves sheet (rows 3 and up, 9 frames a row). */
+export const EXT_BASE = 18;
+
+/**
+ * Poses for dancing together (see src/play/duo.ts). Each is one frame of the
+ * moves sheet, drawn facing the partner: Berry's face right (the rival stands
+ * on his right), the rivals' face left.
+ */
+export interface DuoFrames {
+  /** Winding up for a high five, and the slap itself. */
+  windup: number;
+  slap: number;
+  /** Pointing at the partner: "your turn". */
+  point: number;
+  /** The dance-off freeze. */
+  freeze: number;
+  /** Arms crossed, turned away: the back-to-back pose. */
+  cool: number;
+  cheer: number;
+  /** 1: drawn facing right, -1: facing left. */
+  facing: 1 | -1;
+}
+
+export type DuoPose = keyof Omit<DuoFrames, 'facing'>;
+
+/**
+ * What a character's extended moves sheet adds. All frames are moves sheet
+ * frames (MOVES_BASE and up); the Dancer only uses them once the sheet has
+ * `needs` frames, so a sheet that is not redrawn yet keeps the older moves.
+ */
+export interface ExtMoves {
+  /** Frames the moves sheet must hold for any of this. */
+  needs: number;
+  /** Signature moves, in turn with the older finishers: A for small phrase ends, B for big ones. */
+  signatureA: MoveSpec;
+  signatureB: MoveSpec;
+  /** Lane hits with in-betweens (hit, follow-through, recoil), replacing the plain two-frame poses. */
+  lanes?: number[][];
+  /** Another idle groove (one frame per step), danced on every other phrase so the idle never loops for long. */
+  groove?: number[];
+  /** A groove to alternate with the hold loop on every other bar of a long hold. */
+  hold?: number[];
+  /** Frames for the rise sequence when the sheet has a better one (crouch, jump). */
+  rise?: number[];
+  duo: DuoFrames;
+  /** Every how many bars the groove changes over (default 2). */
+  grooveBars?: number;
+}
+
+const X = (...frames: number[]): number[] => M(...frames.map((f) => EXT_BASE + f));
+const sig = (fx: MoveFx, ...frames: number[]): MoveSpec => ({ frames: X(...frames), fx });
+
+/** The six duo poses in the order every duo sheet is drawn in. */
+function duoAt(first: number, facing: 1 | -1): DuoFrames {
+  const f = (k: number) => MOVES_BASE + EXT_BASE + first + k;
+  return { windup: f(0), slap: f(1), point: f(2), freeze: f(3), cool: f(4), cheer: f(5), facing };
+}
+
+/** A rival's extension: two six-frame signatures (frames 18-29) and the duo poses (30-35). */
+function rivalExt(a: MoveFx, b: MoveFx, extra: Partial<ExtMoves> = {}): ExtMoves {
+  return { needs: 36, signatureA: sig(a, 0, 1, 2, 3, 4, 5), signatureB: sig(b, 6, 7, 8, 9, 10, 11), duo: duoAt(12, -1), ...extra };
+}
+
+/**
+ * Each character's extended moves, by dance sheet. The poses follow real
+ * styles that fit who they are (frame by frame in archive/generated-sprites/moves2/PROMPTS.md):
+ */
+export const EXT_MOVES: Record<string, ExtMoves> = {
+  // Berry: shy b-boy. Lane hits are popping hits with a follow-through and a hood tug, the
+  // groove switches to toprock, the popping arm wave and a drop into a chair and baby freeze.
+  blackberry: {
+    needs: 54,
+    lanes: [X(1, 2, 0), X(7, 8), X(9, 10, 11), X(4, 5, 3)],
+    rise: X(6, 7),
+    signatureA: sig('none', 12, 13, 14, 15, 16, 17),
+    signatureB: sig('ground', 24, 25, 26, 27, 28, 29),
+    groove: X(18, 19, 20, 19, 21, 22, 23, 22),
+    hold: X(12, 13, 14, 15, 16, 17),
+    duo: duoAt(30, 1),
+  },
+  // Raspberry: sporty: a cheer toe-touch jump routine, then krump chest pops and stomps.
+  raspberry: rivalExt('hop', 'bounce'),
+  // Blueberry: Berry's mirror, sharper: tutting boxes, then a spin, scissor kick and floor freeze.
+  blueberry: rivalExt('shake', 'hop'),
+  // The Pear: b-boy floor work: six-step, then windmill, airflare and a hollowback freeze.
+  pear: rivalExt('ground', 'whirl'),
+  // Dr. Lemon: the robot, then tutting that ends in a eureka.
+  lemon: rivalExt('shake', 'shake'),
+  // The Coach: an aerobics step-touch demo, then a five-six-seven-eight jazz square and pirouette.
+  instructor: rivalExt('none', 'whirl'),
+  // Banana: a slip-and-slide moonwalk glide, then the banana split jump.
+  banana: rivalExt('slide', 'hop'),
+  // The Grapes: a synchronised line dance (grapevine, heel, clap), then a ripple and a pyramid.
+  grape: rivalExt('bounce', 'bounce', { groove: X(0, 1, 2, 3, 4, 5, 4, 3) }),
+  // Plum: a graceful fan dance, then a gentle swing-out with a kick.
+  plum: rivalExt('none', 'none'),
+  // Dragon Fruit: voguing hands and poses, then waacking arm whips into a dip.
+  dragonfruit: rivalExt('none', 'whirl'),
+  // Watermelon: heavy stomps with a belly bounce, then a spatula twirl, toss and catch.
+  watermelon: rivalExt('bounce', 'hop', { groove: X(0, 1, 0, 2, 3, 4, 3, 5) }),
+  // Coconut: tunnel krump: chest pops, arm swings and stomps, then jabs into a buck pose.
+  coconut: rivalExt('ground', 'shake'),
+  // Orange: festival samba footwork, then a salsa turn with the mic.
+  orange: rivalExt('bounce', 'whirl', { groove: X(0, 1, 2, 1, 3, 4, 5, 4) }),
+  // Pineapple: a ballroom waltz box step, then a tango promenade into a dip.
+  pineapple: rivalExt('none', 'none', { groove: X(0, 1, 2, 3, 4, 5, 4, 3) }),
+};
+
+/** A character's extended moves, if their sheet has them. */
+export function extMoves(texture: string, frameCount: number): ExtMoves | null {
+  const ext = EXT_MOVES[texture];
+  return ext && frameCount >= ext.needs ? ext : null;
+}
+
 /** A character's moves: their own feel, or plain moves for their sheet's layout. */
 export function moveFeel(texture: string, kind: SheetKind): MoveFeel {
   return MOVE_FEELS[texture] ?? { table: BASE_TABLES[kind], fallback: BASE_TABLES[kind], tempo: 1 };

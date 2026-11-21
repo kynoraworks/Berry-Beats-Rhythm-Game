@@ -1,27 +1,34 @@
 import type Phaser from 'phaser';
 import type { AbilityId } from '../story/types';
 import { getSettings } from './settings';
-import { busInput, isRecordMove, sampleBuffer, startRecordMove, startSfx, type SfxName, type Voice } from './sfx';
+import { busDuck, busInput, hypeBus, isRecordMove, sampleBuffer, startRecordMove, startSfx, type SfxName, type Voice } from './sfx';
 import { getAudioContext } from './songs';
 
 /**
  * Battle hype: the MC, the DJ, the crowd and the stingers. Game code reports
  * what happened as a HypeEvent; cueFor turns it into sounds, and HypeMixer
- * keeps them from piling up: one stinger at a time, one crowd reaction at a
- * time, and the MC never talks over itself. Hit sounds do not go through
- * here, so they stay crisp whatever the mixer is doing.
+ * keeps them from piling up: one big callout at a time (a second one is
+ * dropped unless it outranks the first), one stinger at a time, one crowd
+ * reaction at a time, and the MC never talks over itself. Hit sounds do not
+ * go through here, so they stay crisp whatever the mixer is doing.
  *
- * What plays when (stinger parts share one channel; delays in seconds):
+ * The song is the main thing. It is not turned down for hype moments; the
+ * hype sits under it (see the buses in sfx.ts), and the crowd and stingers
+ * dip under the MC instead. Only a spinback (which replaces the song for a
+ * moment) and a miss's brief dip move the song.
+ *
+ * What plays when (stinger parts share one channel; delays in seconds;
+ * "callout" cues take the one callout slot):
  *
  *   combo 10        chirp scratch
- *   combo 25        baby scratch, crossfader-cut horn .36            song dips .2
- *   combo 50, 75    boom, transformer scratch, horn .7, cheer, "COMBO!"   .45
- *   combo 100+      slam, scratch flourish .2, horn .85, roar, "THE CROWD GOES WILD!"  .6
- *   round 1         needle drop, "ROUND ONE!"
- *   rounds 2+       the song spun back, needle drop .62, "ROUND TWO!" .8   song cut for the spinback
- *   round won       boom, fanfare, roar                                   .4
- *   round lost      falling sting, boom .17, "ohh"                        .2
- *   hype start      riser, baby scratch .08, sub drop .48, horn, roar, "HYPE!"  .55
+ *   combo 25        baby scratch, crossfader-cut horn .36
+ *   combo 50, 75    boom, transformer scratch, cheer, "COMBO!"            callout
+ *   combo 100+      boom, scratch flourish .15, roar, "THE CROWD GOES WILD!"  callout
+ *   round 1         needle drop, "ROUND ONE!"                             callout
+ *   rounds 2+       the song spun back, needle drop .62, "ROUND TWO!" .8   callout, song cut for the spinback
+ *   round won       boom, fanfare, roar                                   callout
+ *   round lost      falling sting, boom .17, "ohh"                        callout
+ *   hype start      riser, baby scratch .08, sub drop .48, horn, roar, "HYPE!"  callout
  *   hype end        the song spun back ("ohh" too if a miss broke it)    song cut for the spinback
  *   miss            the song scrubbed by the DJ's hand (stray misses not too often),
  *                   sometimes "ohh"; a broken streak (10+) gets "aww" every time, and
@@ -29,13 +36,14 @@ import { getAudioContext } from './songs';
  *                   "Come on, get it back!", "Ouch! The streak is over!", "Oh no!"
  *                   (MissReactor in src/play/battleLife.ts decides)      .22 to .5, brief
  *   drop            the crowd cheers as the song drops
- *   flawless        chirp, cheer, "FLAWLESS!"
- *   ability         whoosh, the ability's hit and a boom .12, cheer       .25
+ *   flawless        a soft chime, "FLAWLESS!" (the line at most every 24 s;  callout
+ *                   in between only the chime)
+ *   ability         whoosh, the ability's hit and a boom .12, cheer
  *   lets dance      needle drop, "LET'S DANCE!"
  *   countdown       a hit and a scratch on each of 3, 2, 1 with "THREE!" "TWO!" "ONE!",
  *                   a bigger hit and scratch on go with "LET'S DANCE!" (see countCue)
- *   battle won      slam, horn, roar, "WINNER!"                           .6
- *   battle lost     falling sting, boom .17, "ohh", "OH NO!"              .3
+ *   battle won      slam, horn, roar, "WINNER!"                           callout, song dips .6
+ *   battle lost     falling sting, boom .17, "ohh", "OH NO!"              callout, song dips .3
  *   fail            the song braked to a stop, boom .9, "ohh", "OH NO!"
  *   results         victory or defeat stinger, roar or "ohh"
  *   crew won        victory stinger, slam, roar, "THE CROWD GOES WILD!"
@@ -97,6 +105,15 @@ export interface Cue {
   duckLength?: number;
   /** Dip the song even if none of the cue's stingers or crowd get to play (a miss's short dip). */
   duckAlways?: boolean;
+  /**
+   * A big moment. Only one callout plays at a time: another one arriving
+   * while it lasts is dropped (only its fx parts play) unless it has a higher
+   * priority, which cuts the first one off.
+   */
+  callout?: boolean;
+  /** With `key`: after this cue plays, the same key plays only its fx parts for this many seconds. */
+  cooldown?: number;
+  key?: string;
 }
 
 const fx = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'fx', delay });
@@ -143,44 +160,48 @@ export function roundLine(round: number, total: number): SfxName {
 
 /** How long a spinback holds the song down: it comes back as the needle drops. */
 const SPINBACK_CUT = 0.62;
+/** Seconds between two "Flawless!" lines: clean phrases come every few seconds. */
+export const FLAWLESS_COOLDOWN = 24;
 
 export function cueFor(event: HypeEvent): Cue {
   switch (event.kind) {
     case 'combo': {
       const tier = comboTier(event.combo);
       if (tier <= 1) return { priority: 1, parts: [fx('combo'), sting('djChirp')] };
-      if (tier === 2) return { priority: 2, duck: 0.2, parts: [fx('combo'), sting('djBaby'), sting('djCut', 0.36)] };
+      if (tier === 2) return { priority: 2, parts: [fx('combo'), sting('djBaby'), sting('djCut', 0.36)] };
       if (tier === 3) {
         return {
           priority: 3,
-          duck: 0.45,
-          parts: [fx('combo'), sting('boom'), sting('djTransform', 0.05), sting('airhorn', 0.7), crowd('crowdCheer', 0.15), mc('mcCombo', 0.55)],
+          callout: true,
+          parts: [fx('combo'), sting('boom'), sting('djTransform', 0.05), crowd('crowdCheer', 0.15), mc('mcCombo', 0.45)],
         };
       }
+      // The biggest streak call: no horn, no slam, the MC straight in after the scratch.
       return {
         priority: 4,
-        duck: 0.6,
-        parts: [fx('combo'), sting('slam'), sting('djFlare', 0.2), sting('airhorn', 0.85), crowd('crowdRoar', 0.1), mc('mcCrowdWild', 0.75)],
+        callout: true,
+        parts: [fx('combo'), sting('boom'), sting('djFlare', 0.15), crowd('crowdRoar', 0.1), mc('mcCrowdWild', 0.45)],
       };
     }
     case 'roundIntro':
       // The first round drops the needle; later ones are a DJ fill: the song spun back, then dropped back in.
-      if (event.round === 0) return { priority: 3, parts: [sting('needleDrop'), mc(roundLine(event.round, event.total), 0.25)] };
+      if (event.round === 0) return { priority: 3, callout: true, parts: [sting('needleDrop'), mc(roundLine(event.round, event.total), 0.25)] };
       return {
         priority: 5,
+        callout: true,
         duck: 0.85,
         duckLength: SPINBACK_CUT,
         parts: [sting('djRewind'), sting('needleDrop', SPINBACK_CUT), mc(roundLine(event.round, event.total), 0.8)],
       };
     case 'roundWon':
-      return { priority: 4, duck: 0.4, parts: [sting('boom'), sting('roundWin'), crowd('crowdRoar', 0.05)] };
+      return { priority: 4, callout: true, parts: [sting('boom'), sting('roundWin'), crowd('crowdRoar', 0.05)] };
     case 'roundLost':
-      return { priority: 4, duck: 0.2, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05)] };
+      return { priority: 4, callout: true, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05)] };
     case 'hypeStart':
       // A scratch over the riser, into the drop at about half a second: the sub, the horn and the MC hit there.
       return {
         priority: 5,
-        duck: 0.55,
+        callout: true,
         parts: [fx('hype'), sting('djBaby', 0.08), sting('subDrop', 0.48), sting('airhorn', 0.52), crowd('crowdRoar', 0.45), mc('mcHype', 0.6)],
       };
     case 'hypeEnd':
@@ -191,11 +212,12 @@ export function cueFor(event: HypeEvent): Cue {
         parts: [fx('hypeOut'), sting('djRewind'), ...(event.broken ? [crowd('crowdOhh', 0.2)] : [])],
       };
     case 'flawless':
-      return { priority: 3, parts: [fx('bonus'), sting('djChirp'), crowd('crowdCheer', 0.1), mc('mcFlawless', 0.1)] };
+      // Every clean phrase earns one, so it is the lightest callout: no scratch or crowd, and the line not every time.
+      return { priority: 2, callout: true, key: 'flawless', cooldown: FLAWLESS_COOLDOWN, parts: [fx('bonus'), mc('mcFlawless', 0.05)] };
     case 'flairFull':
       return { priority: 1, parts: [fx('ready')] };
     case 'ability':
-      return { priority: 3, duck: 0.25, parts: [fx('whoosh'), sting(ABILITY_HITS[event.ability], 0.12), sting('boom', 0.12), crowd('crowdCheer', 0.2)] };
+      return { priority: 3, parts: [fx('whoosh'), sting(ABILITY_HITS[event.ability], 0.12), sting('boom', 0.12), crowd('crowdCheer', 0.2)] };
     case 'bigMiss':
       return { priority: 1, parts: [crowd('crowdOhh')] };
     case 'miss': {
@@ -209,19 +231,19 @@ export function cueFor(event: HypeEvent): Cue {
     case 'drop':
       return { priority: 1, parts: [crowd('crowdCheer')] };
     case 'letsDance':
-      return { priority: 2, parts: [sting('needleDrop'), mc('mcLetsDance', 0.25)] };
+      return { priority: 2, callout: true, parts: [sting('needleDrop'), mc('mcLetsDance', 0.25)] };
     case 'battleWon':
-      return { priority: 6, duck: 0.6, parts: [sting('slam'), sting('airhorn', 0.05), crowd('crowdRoar'), mc('mcWinner', 0.35)] };
+      return { priority: 6, callout: true, duck: 0.6, parts: [sting('slam'), sting('airhorn', 0.05), crowd('crowdRoar'), mc('mcWinner', 0.35)] };
     case 'battleLost':
-      return { priority: 6, duck: 0.3, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05), mc('mcOhNo', 0.4)] };
+      return { priority: 6, callout: true, duck: 0.3, parts: [sting('roundLose'), sting('boom', 0.17), crowd('crowdOhh', 0.05), mc('mcOhNo', 0.4)] };
     case 'fail':
-      return { priority: 7, parts: [sting('djBrake'), sting('boom', 0.9), crowd('crowdOhh', 0.4), mc('mcOhNo', 0.8)] };
+      return { priority: 7, callout: true, parts: [sting('djBrake'), sting('boom', 0.9), crowd('crowdOhh', 0.4), mc('mcOhNo', 0.8)] };
     case 'resultsWon':
-      return { priority: 6, parts: [sting('victory'), crowd('crowdRoar', 0.15)] };
+      return { priority: 6, callout: true, parts: [sting('victory'), crowd('crowdRoar', 0.15)] };
     case 'resultsLost':
-      return { priority: 6, parts: [sting('defeat'), crowd('crowdOhh', 0.1)] };
+      return { priority: 6, callout: true, parts: [sting('defeat'), crowd('crowdOhh', 0.1)] };
     case 'crewWon':
-      return { priority: 6, parts: [sting('victory'), sting('slam'), crowd('crowdRoar', 0.2), mc('mcCrowdWild', 0.7)] };
+      return { priority: 6, callout: true, parts: [sting('victory'), sting('slam'), crowd('crowdRoar', 0.2), mc('mcCrowdWild', 0.7)] };
   }
 }
 
@@ -236,11 +258,19 @@ const MC_GAP = 0.12;
 const CALL_HOLD = 0.7;
 const DUCK_ATTACK = 0.02;
 const DUCK_RELEASE = 0.45;
+/** A callout holds the slot at least this long, even if little of it played. */
+const CALLOUT_MIN = 1.2;
+/** How far the crowd and the stingers dip while the MC speaks (0.5 is -6 dB). */
+export const VOICE_DUCK = 0.5;
 
 interface Busy {
   until: number;
   priority: number;
   voices: Voice[];
+  /** When its first sound starts. */
+  from: number;
+  /** The callout it belongs to, if any. */
+  callout?: number;
 }
 
 interface Waiting {
@@ -250,6 +280,13 @@ interface Waiting {
   at: number;
   /** Dropped if it cannot start by then. */
   expires: number;
+  callout?: number;
+}
+
+interface Callout {
+  id: number;
+  priority: number;
+  until: number;
 }
 
 /**
@@ -261,6 +298,11 @@ export class HypeMixer {
   private readonly announcer: () => boolean;
   private readonly busy = new Map<Channel, Busy>();
   private waiting: Waiting | null = null;
+  /** The big callout playing now, if any. */
+  private callout: Callout | null = null;
+  private calloutCount = 0;
+  /** When each keyed cue last played in full. */
+  private readonly lastKeyed = new Map<string, number>();
   private duckFrom = 0;
   private duckUntil = -Infinity;
   private duckDepth = 0;
@@ -271,29 +313,55 @@ export class HypeMixer {
   }
 
   cue(cue: Cue, now: number): void {
+    const cooling = cue.key !== undefined && cue.cooldown !== undefined && now - (this.lastKeyed.get(cue.key) ?? -Infinity) < cue.cooldown;
+    const current = this.callout && now < this.callout.until ? this.callout : null;
+    if (cooling || (cue.callout && current && cue.priority <= current.priority)) {
+      // Cooling down, or a bigger (or equal) callout is still going: only the small sounds.
+      for (const part of cue.parts) if (part.channel === 'fx') this.play(part.sound, part.delay ?? 0);
+      return;
+    }
+    let id: number | undefined;
+    if (cue.callout) {
+      if (current) this.cutCallout(current.id);
+      id = ++this.calloutCount;
+    }
+    if (cue.key !== undefined) this.lastKeyed.set(cue.key, now);
     const byChannel = new Map<Channel, CuePart[]>();
     for (const part of cue.parts) {
       if ((part.channel === 'mc' || part.channel === 'call') && !this.announcer()) continue;
       byChannel.set(part.channel, [...(byChannel.get(part.channel) ?? []), part]);
     }
     let loudest = 0;
+    let end = now;
     for (const [channel, parts] of byChannel) {
       if (channel === 'fx') {
         for (const part of parts) this.play(part.sound, part.delay ?? 0);
         continue;
       }
       if (channel === 'mc') {
-        for (const part of parts) this.say(part.sound, cue.priority, now + (part.delay ?? 0), now);
+        for (const part of parts) end = Math.max(end, this.say(part.sound, cue.priority, now + (part.delay ?? 0), now, id));
         continue;
       }
       if (channel === 'call') {
         for (const part of parts) this.call(part.sound, now);
         continue;
       }
-      const end = this.claim(channel, parts, cue.priority, now);
-      if (end !== null) loudest = Math.max(loudest, end);
+      const until = this.claim(channel, parts, cue.priority, now, id);
+      if (until !== null) loudest = Math.max(loudest, until);
     }
+    if (id !== undefined) this.callout = { id, priority: cue.priority, until: Math.max(now + CALLOUT_MIN, loudest, end) };
     if (cue.duck && (loudest > now || cue.duckAlways)) this.duckFor(cue.duck, now, cue.duckLength !== undefined ? now + cue.duckLength : loudest);
+  }
+
+  /** True while a big callout holds the slot. */
+  calloutBusy(now: number): boolean {
+    return !!this.callout && now < this.callout.until;
+  }
+
+  /** 0..1: how loud the crowd and stingers should be right now: down under the MC while it speaks. */
+  voiceDuck(now: number): number {
+    const busy = this.busy.get('mc');
+    return busy && now >= busy.from && now < busy.until ? VOICE_DUCK : 1;
   }
 
   /** Call every frame: starts a waiting MC line once the line before it is done. */
@@ -308,7 +376,9 @@ export class HypeMixer {
     const free = !busy || now >= busy.until + MC_GAP;
     if (free && now >= waiting.at) {
       this.waiting = null;
-      this.start('mc', [{ sound: waiting.sound, channel: 'mc' }], waiting.priority, now);
+      const until = this.start('mc', [{ sound: waiting.sound, channel: 'mc' }], waiting.priority, now, waiting.callout);
+      const callout = this.callout;
+      if (until !== null && callout && callout.id === waiting.callout) callout.until = Math.max(callout.until, until);
     }
   }
 
@@ -337,44 +407,60 @@ export class HypeMixer {
     for (const busy of this.busy.values()) for (const voice of busy.voices) voice.stop();
     this.busy.clear();
     this.waiting = null;
+    this.callout = null;
     this.duckDepth = 0;
   }
 
+  /** A bigger callout takes over: the one playing stops, and its waiting MC line is forgotten. */
+  private cutCallout(id: number): void {
+    for (const [channel, busy] of this.busy) {
+      if (busy.callout !== id) continue;
+      for (const voice of busy.voices) voice.stop();
+      this.busy.delete(channel);
+    }
+    if (this.waiting?.callout === id) this.waiting = null;
+    this.callout = null;
+  }
+
   /** Stingers and crowd: a free channel or a higher priority takes it, anything else is dropped. */
-  private claim(channel: Channel, parts: CuePart[], priority: number, now: number): number | null {
+  private claim(channel: Channel, parts: CuePart[], priority: number, now: number, callout?: number): number | null {
     const busy = this.busy.get(channel);
     if (busy && now < busy.until) {
       if (priority <= busy.priority) return null;
       for (const voice of busy.voices) voice.stop();
     }
-    return this.start(channel, parts, priority, now);
+    return this.start(channel, parts, priority, now, callout);
   }
 
-  private start(channel: Channel, parts: CuePart[], priority: number, now: number): number | null {
+  private start(channel: Channel, parts: CuePart[], priority: number, now: number, callout?: number): number | null {
     const voices: Voice[] = [];
     let until = now;
+    let from = Infinity;
     for (const part of parts) {
       const delay = Math.max(0, part.delay ?? 0);
       const voice = this.play(part.sound, delay);
       if (!voice) continue;
       voices.push(voice);
+      from = Math.min(from, now + delay);
       until = Math.max(until, now + delay + voice.duration);
     }
     if (voices.length === 0) return null;
-    this.busy.set(channel, { until, priority, voices });
+    this.busy.set(channel, { until, priority, voices, from, callout });
     return until;
   }
 
-  /** The MC: speak now if free, else wait a moment behind the current line (the stronger of two waiting lines stays). */
-  private say(sound: SfxName, priority: number, at: number, now: number): void {
+  /**
+   * The MC: speak now if free, else wait a moment behind the current line (the
+   * stronger of two waiting lines stays). Returns when the line ends, as far
+   * as is known now.
+   */
+  private say(sound: SfxName, priority: number, at: number, now: number, callout?: number): number {
     const busy = this.busy.get('mc');
     const free = (!busy || at >= busy.until + MC_GAP) && !this.waiting;
-    if (free) {
-      this.start('mc', [{ sound, channel: 'mc', delay: at - now }], priority, now);
-      return;
-    }
-    if (this.waiting && this.waiting.priority > priority) return;
-    this.waiting = { sound, priority, at, expires: at + MC_WAIT };
+    if (free) return this.start('mc', [{ sound, channel: 'mc', delay: at - now }], priority, now, callout) ?? now;
+    if (this.waiting && this.waiting.priority > priority) return now;
+    this.waiting = { sound, priority, at, expires: at + MC_WAIT, callout };
+    return at;
   }
 
   /** A line on the beat: cut off the MC's current line and say it now, holding the MC only briefly. */
@@ -386,7 +472,7 @@ export class HypeMixer {
       this.busy.delete('mc');
       return;
     }
-    this.busy.set('mc', { until: now + Math.min(voice.duration, CALL_HOLD), priority: 0, voices: [voice] });
+    this.busy.set('mc', { until: now + Math.min(voice.duration, CALL_HOLD), priority: 0, voices: [voice], from: now });
   }
 
   private duckFor(depth: number, now: number, until: number): void {
@@ -399,19 +485,20 @@ export class HypeMixer {
 
 /** The crowd bed fades towards its target over about this long. */
 const BED_GLIDE = 0.6;
-const BED_QUIET = 0.12;
-const BED_LOUD = 0.55;
+/** The bed's level at no streak and at full energy, before the crowd bus (BUS_LEVELS.crowd): low, tucked behind the song. */
+const BED_QUIET = 0.35;
+const BED_LOUD = 1.2;
 
 /** The battle song and where it is, so the DJ can spin it back or brake it. */
 export type SongTap = () => { buffer: AudioBuffer; time: number } | null;
 
-/** Plays hype sounds through the hype limiter; the record moves are made from the song when there is one. */
+/** Plays hype sounds on their buses (the MC, the crowd, the rest); the record moves are made from the song when there is one. */
 function hypePlayer(game: Phaser.Game, song: SongTap = () => null): PlayFn {
   return (sound, delay) => {
     const playing = isRecordMove(sound) ? song() : null;
     // Too near the start of the song to make the move from it: the prepared sound stands in.
     if (playing && isRecordMove(sound)) return startRecordMove(game, sound, playing.buffer, playing.time + delay, delay) ?? startSfx(game, sound, delay, 1, 'hype');
-    return startSfx(game, sound, delay, 1, 'hype');
+    return startSfx(game, sound, delay, 1, hypeBus(sound));
   };
 }
 
@@ -426,6 +513,8 @@ export class HypeAudio {
   private bed: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
   private bedWanted = false;
   private energy = 0;
+  /** The crowd and stinger buses' level under the MC, as last set (unknown at first: the buses are shared, so the first update sets them). */
+  private room = Number.NaN;
 
   /** `song` lets the DJ spin back or brake the battle song itself. */
   constructor(game: Phaser.Game, song?: SongTap) {
@@ -453,7 +542,10 @@ export class HypeAudio {
 
   /** Call every frame. `streak` is the combo, `bar` the health bar 0..1. */
   update(streak: number, bar: number): void {
-    this.mixer.update(this.now);
+    const now = this.now;
+    this.mixer.update(now);
+    // The crowd and the stingers make room for the MC.
+    this.makeRoom(this.mixer.voiceDuck(now), now);
     this.energy = Math.min(1, Math.min(streak / 80, 1) * 0.6 + Math.max(0, bar - 0.3) * 0.6);
     if (this.bedWanted && !this.bed) this.startBed();
     const bed = this.bed;
@@ -477,6 +569,15 @@ export class HypeAudio {
   silence(): void {
     this.mixer.silence();
     this.setCrowd(false);
+    this.makeRoom(1, this.now);
+  }
+
+  /** Set the crowd and stinger buses' level under the MC: down fast, back up gently. */
+  private makeRoom(room: number, now: number): void {
+    if (room === this.room) return;
+    this.room = room;
+    const ctx = getAudioContext(this.game);
+    for (const bus of ['crowd', 'hype'] as const) busDuck(ctx, bus).setTargetAtTime(room, now, room < 1 ? 0.02 : 0.12);
   }
 
   private bedLevel(): number {
@@ -493,7 +594,7 @@ export class HypeAudio {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, ctx.currentTime);
     gain.gain.setTargetAtTime(this.bedLevel(), ctx.currentTime, 0.4);
-    source.connect(gain).connect(busInput(ctx, 'hype'));
+    source.connect(gain).connect(busInput(ctx, 'crowd'));
     source.start(ctx.currentTime, Math.random() * buffer.duration);
     source.onended = () => gain.disconnect();
     this.bed = { source, gain };

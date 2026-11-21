@@ -42,6 +42,7 @@ import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
 import { effectChips } from '../play/fighterCard';
 import { HypeMode } from '../play/HypeMode';
+import { DuoStage } from '../play/DuoStage';
 import { StageFx } from '../play/StageFx';
 import { BattleCamera } from '../play/BattleCamera';
 import { MissReactor, cameraLevel, phraseEnds, songShape, type SongShape } from '../play/battleLife';
@@ -171,6 +172,8 @@ export class PlayScene extends Phaser.Scene {
   private stage!: StageFx;
   private player!: Dancer;
   private rival: Dancer | null = null;
+  /** Berry and the rival dancing together in the free bars and at the end (src/play/duo.ts). */
+  private duo: DuoStage | null = null;
   private hud!: Hud;
   private speed = BASE_SCROLL_SPEED;
   private offsetSec = 0;
@@ -232,6 +235,7 @@ export class PlayScene extends Phaser.Scene {
     this.laneInput = null;
     this.rivalField = null;
     this.rival = null;
+    this.duo = null;
     this.rivalEngine = null;
     this.rivalDriver = null;
     this.rivalName = '';
@@ -351,6 +355,10 @@ export class PlayScene extends Phaser.Scene {
       this.rival = createRival(this, rivalKind, RIVAL_X, feetY(stageFloor, RIVAL_X), { seed: chart.id, calm: settings.reduceMotion });
       const rivalNotes = this.rivalEngine.notes;
       this.rival?.setSchedule(rivalNotes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
+      const beats = (notes: readonly { t: number; end: number }[]): number[] => notes.flatMap((n) => (n.end > n.t ? [secToBeat(chart, n.t), secToBeat(chart, n.end)] : [secToBeat(chart, n.t)]));
+      if (this.rival) {
+        this.duo = new DuoStage({ player: this.player, rival: this.rival, kind: rivalKind, playerBeats: beats(this.engine.notes), rivalBeats: beats(rivalNotes), secondsPerBeat: 60 / chart.bpm });
+      }
     } else {
       this.hud.setSolo();
       this.stage.setTurn('player');
@@ -791,8 +799,12 @@ export class PlayScene extends Phaser.Scene {
     const playerOnTop = !failed && (summary?.won ?? true);
     this.camera?.setTurn(playerOnTop ? 'player' : 'rival');
     this.camera?.wide(1.2);
-    this.player.finish(playerOnTop);
-    this.rival?.finish(!playerOnTop);
+    // The stop's duo closes the song, then the final poses (straight away after a fail).
+    const settle = () => {
+      this.player.finish(playerOnTop);
+      this.rival?.finish(!playerOnTop);
+    };
+    if (failed || !this.duo?.outro(playerOnTop, settle, (ms, callback) => this.time.delayedCall(ms, callback))) settle();
     this.stage.setTurn(playerOnTop ? 'player' : 'rival');
     const toResults = () => goTo(this, SceneKeys.Results, results, 400);
     let outro: readonly Line[] = [];
@@ -1048,6 +1060,7 @@ export class PlayScene extends Phaser.Scene {
         continue;
       }
       this.lastCombo = this.engine.stats.combo;
+      this.player.landed();
       if (part !== 'holdEnd') this.hitLayer?.hit('player', note.t, note.end);
       if (part !== 'holdEnd') this.perfectRun = judgement === 'perfect' ? this.perfectRun + 1 : 0;
       const burst = this.perfectRun >= PERFECT_RUN && judgement === 'perfect' && !getSettings().reduceMotion;
@@ -1090,7 +1103,8 @@ export class PlayScene extends Phaser.Scene {
     const reaction = this.missReactor.react(time, lost);
     const force = reaction.tier === 'stray' ? 0.35 : reaction.tier === 'break' ? 0.7 : 1;
     this.hud.showJudgement('miss', 0, 0, lost);
-    this.player.stumble(force, -1);
+    // A lone miss only flashes Berry red and he dances on; misses in a row knock him back (Dancer.miss).
+    this.player.miss(force, -1);
     this.camera?.shake(reaction.shake);
     this.stage.missSting(force);
     this.conductor?.muffle(reaction.muffle);
@@ -1141,7 +1155,7 @@ export class PlayScene extends Phaser.Scene {
         this.engine.adjustHealth(RIVAL_PULL[judgement]);
       }
       if (judgement === 'miss') {
-        if (part !== 'holdEnd' || note.state !== 'missed') this.rival?.stumble(0.3, 1);
+        if (part !== 'holdEnd' || note.state !== 'missed') this.rival?.miss(0.3, 1);
         continue;
       }
       if (part !== 'holdEnd' && this.rivalEnds.has(note.id)) this.camera?.punch(PHRASE_PUNCH * 0.8);
@@ -1150,6 +1164,7 @@ export class PlayScene extends Phaser.Scene {
         continue;
       }
       this.hitLayer?.hit('rival', note.t, note.end);
+      this.rival?.landed();
       field?.hitFx(note.lane, 0.5);
       field?.setPressed(note.lane, true);
       this.rival?.dance(note.lane);
@@ -1257,6 +1272,7 @@ export class PlayScene extends Phaser.Scene {
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
       this.hitLayer?.update(time);
       this.updateBattle(time);
+      this.duo?.update(beat);
       const drops = this.shape.drops;
       while (this.dropIndex < drops.length && beat >= drops[this.dropIndex]) {
         // A drop already passed (a seek, a long frame) goes by quietly.

@@ -3,6 +3,11 @@ import type { Lane } from '../src/core/config';
 import {
   BIG_GAP,
   BIG_RUN,
+  EXT_BASE,
+  EXT_MOVES,
+  MissStreak,
+  STUMBLE_STREAK,
+  extMoves,
   FINISHER_MARGIN,
   MOVES_BASE,
   MOVE_FEELS,
@@ -147,5 +152,64 @@ describe('character move tables', () => {
   it('falls back to plain moves for an unknown sheet', () => {
     const feel = moveFeel('ph_sheet_x', 'berry');
     expect(feel.table.finisherBig.frames.every((f) => f < MOVES_BASE)).toBe(true);
+  });
+});
+
+describe('misses', () => {
+  it('flashes on a lone miss and stumbles only on misses in a row', () => {
+    const streak = new MissStreak();
+    expect(streak.miss()).toBe('flash');
+    expect(streak.miss()).toBe('stumble');
+    expect(streak.miss()).toBe('stumble');
+    expect(streak.length).toBe(3);
+  });
+
+  it('starts counting again after any hit', () => {
+    const streak = new MissStreak();
+    const reactions: string[] = [];
+    // miss, hit, miss, hit, miss, miss: never two in a row until the end.
+    for (const event of ['miss', 'hit', 'miss', 'hit', 'miss', 'miss']) {
+      if (event === 'hit') streak.hit();
+      else reactions.push(streak.miss());
+    }
+    expect(reactions).toEqual(['flash', 'flash', 'flash', 'stumble']);
+    expect(STUMBLE_STREAK).toBe(2);
+  });
+});
+
+describe('extended moves sheets', () => {
+  it('only applies once the sheet holds every frame it needs', () => {
+    expect(extMoves('blackberry', 18)).toBeNull();
+    expect(extMoves('blackberry', 54)).not.toBeNull();
+    expect(extMoves('raspberry', 36)).not.toBeNull();
+    expect(extMoves('ph_sheet_x', 99)).toBeNull();
+  });
+
+  it('keeps every frame inside the sheet and gives six-frame signatures', () => {
+    for (const [texture, ext] of Object.entries(EXT_MOVES)) {
+      const frames = [
+        ...ext.signatureA.frames,
+        ...ext.signatureB.frames,
+        ...(ext.lanes ?? []).flat(),
+        ...(ext.groove ?? []),
+        ...(ext.hold ?? []),
+        ...(ext.rise ?? []),
+        ext.duo.windup, ext.duo.slap, ext.duo.point, ext.duo.freeze, ext.duo.cool, ext.duo.cheer,
+      ];
+      for (const frame of frames) {
+        expect(frame - MOVES_BASE, texture).toBeGreaterThanOrEqual(EXT_BASE);
+        expect(frame - MOVES_BASE, texture).toBeLessThan(ext.needs);
+      }
+      expect(ext.signatureA.frames.length, texture).toBe(6);
+      expect(ext.signatureB.frames.length, texture).toBe(6);
+    }
+  });
+
+  it("smooths Berry's lane hits with more than one frame each and faces his duo poses at the rival", () => {
+    const berry = EXT_MOVES.blackberry;
+    expect(berry.lanes).toHaveLength(4);
+    for (const lane of berry.lanes!) expect(lane.length).toBeGreaterThanOrEqual(2);
+    expect(berry.duo.facing).toBe(1);
+    expect(EXT_MOVES.blueberry.duo.facing).toBe(-1);
   });
 });

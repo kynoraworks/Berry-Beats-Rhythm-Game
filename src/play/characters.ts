@@ -6,7 +6,7 @@ import { LITE_SHEETS } from '../story/cast';
 import { characterSheet } from '../story/placeholders';
 import type { SheetLayout } from '../story/types';
 import { Depth } from './layout';
-import { FINISHER_DELAY, FINISHER_MIN_GAP, MOVES_BASE, detectSequence, moveFeel, moveTimings, nextAfter, planFinisher, sequenceFrame, DOUBLE_GAP, type FinisherPlan, type Hit, type MoveFeel, type MoveFx, type MoveSpec } from './moves';
+import { FINISHER_DELAY, FINISHER_MIN_GAP, MOVES_BASE, MissStreak, detectSequence, extMoves, moveFeel, moveTimings, nextAfter, planFinisher, sequenceFrame, DOUBLE_GAP, type DuoFrames, type DuoPose, type ExtMoves, type FinisherPlan, type Hit, type MissReaction, type MoveFeel, type MoveFx, type MoveKind, type MoveSpec, type MoveTable } from './moves';
 
 /** Hitting the same lane again within this time switches to the alternate move. */
 const REPEAT_WINDOW = 1.2;
@@ -139,6 +139,27 @@ const LEMON_STYLE: DanceStyle = {
   outburst: { beats: [9, 21], picks: [1, 1, 3, 4, 2] },
 };
 
+/**
+ * Hype Berry: hood down, headphones on, all the energy. Poses snap harder and
+ * the idle dance dips on every beat.
+ */
+const HYPE_STYLE: DanceStyle = {
+  ...STANDARD,
+  poseHold: 0.26,
+  poseFrameTime: 0.09,
+  pop: [1.12, 0.88],
+  popTime: 120,
+  spinFrameTime: 0.07,
+  spinFinishTime: 0.45,
+  finishers: [
+    { fx: 'whirl', time: 0.6 },
+    { fx: 'hold', time: 0.6 },
+    { fx: 'hold', time: 0.6 },
+    { fx: 'hold', time: 0.7 },
+  ],
+  bounce: 1,
+};
+
 interface FrameSet {
   /** Standing idle, used before the music starts. */
   idle: number[];
@@ -223,6 +244,57 @@ const LITE: FrameSet = {
 
 const LAYOUTS: Record<SheetLayout, FrameSet> = { berry: BERRY, lite: LITE };
 
+/** The hype pack's texture: Berry powered up while hype mode is on (tools/build_moves.py, berry_hype). */
+export const HYPE_TEXTURE = 'berry_hype';
+
+/**
+ * The hype pack, 36 frames of 64x64 (9 a row): 0-5 groove, 6-11 left and right
+ * hits (wind-up, hit, follow-through each), 12-17 up and down, 18-21 hold groove,
+ * 22-23 stumble, 24-29 a power combo (windmill in, windmill, headspin, airflare,
+ * air freeze, landing), 30-35 spin, spin kick, knee slide, victory, point and swagger.
+ */
+const HYPE_BERRY: FrameSet = {
+  idle: [0, 3],
+  groove: [0, 1, 2, 1, 3, 4, 5, 4],
+  lanes: [
+    [7, 8, 6],
+    [13, 14],
+    [15, 16],
+    [10, 11, 9],
+  ],
+  altLanes: [
+    [2, 1],
+    [12, 13, 14],
+    [16, 17],
+    [5, 4],
+  ],
+  hold: [18, 19, 20, 21],
+  stumble: [22, 23],
+  spin: [24, 25, 26, 27, 28, 29],
+  finishers: [31, 32, 34, 35],
+  victory: [33, 34],
+  defeat: [22],
+  hype: 5,
+};
+
+/** Hype Berry's moves: all from his own pack. */
+const HYPE_TABLE: MoveTable = {
+  power: { frames: [31], fx: 'hop' },
+  circle: { frames: [30, 31], fx: 'whirl' },
+  shuffle: { frames: [2, 5], fx: 'slide' },
+  rise: { frames: [12, 13], fx: 'hop' },
+  rock: { frames: [1, 4], fx: 'bounce' },
+  drop: { frames: [15, 16], fx: 'ground' },
+  finisherSmall: { frames: [30, 31, 32], fx: 'none' },
+  finisherBig: { frames: [24, 25, 26, 27, 28, 29], fx: 'ground' },
+  recovery: { frames: [22, 23], fx: 'none' },
+};
+
+const HYPE_FEEL: MoveFeel = { table: HYPE_TABLE, fallback: HYPE_TABLE, tempo: 0.85, holdAlt: [18, 21, 20, 19] };
+
+/** Hype Berry's duo poses: wind-up, slap, point at the crowd, air freeze, swagger, victory. */
+const HYPE_DUO: DuoFrames = { windup: 9, slap: 11, point: 34, freeze: 28, cool: 35, cheer: 33, facing: 1 };
+
 /** Layout of a sheet, from its texture key. Stand-ins and the older sheets use the berry layout. */
 export function layoutOf(texture: string): SheetLayout {
   return LITE_SHEETS.has(texture) ? 'lite' : 'berry';
@@ -244,7 +316,7 @@ const INSTRUCTOR: FrameSet = {
   ],
 };
 
-type Mode = 'idle' | 'pose' | 'stumble' | 'special' | 'move' | 'final';
+type Mode = 'idle' | 'pose' | 'stumble' | 'special' | 'move' | 'duo' | 'final';
 
 /** Seconds per beat until the song tells the dancer its tempo (77 BPM). */
 const DEFAULT_SPB = 60 / 77;
@@ -256,6 +328,14 @@ export interface DancerOptions {
   seed?: string;
   /** Reduced motion: no jolts, flips or shakes. */
   calm?: boolean;
+  /** Which side the partner stands on in a battle: 1 right (the player's), -1 left (the rival's). */
+  partner?: 1 | -1;
+}
+
+/** One pose of a duo moment: a duo pose or a run of frames, from `at` seconds into it. */
+export interface DuoStep {
+  at: number;
+  pose: DuoPose | 'signatureA' | 'signatureB' | 'groove';
 }
 
 /**
@@ -266,8 +346,8 @@ export interface DancerOptions {
 export class Dancer {
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly scene: Phaser.Scene;
-  private readonly frames: FrameSet;
-  private readonly style: DanceStyle;
+  private frames: FrameSet;
+  private style: DanceStyle;
   private readonly seed: string;
   private readonly calm: boolean;
   private readonly baseX: number;
@@ -301,9 +381,21 @@ export class Dancer {
   private flipLeft = 0;
   private joltLeft = 0;
   private jolt = 0;
-  private readonly baseTexture: string;
-  private readonly feel: MoveFeel | null;
+  private baseTexture: string;
+  private feel: MoveFeel | null;
   private movesTexture: string | null = null;
+  /** The extended moves (signatures, smoother lane hits, duo poses) when the moves sheet has them. */
+  private ext: ExtMoves | null = null;
+  private readonly normal: { frames: FrameSet; style: DanceStyle; texture: string; feel: MoveFeel | null; moves: string | null; ext: ExtMoves | null };
+  private hypeForm = false;
+  private readonly partner: 1 | -1;
+  private readonly misses = new MissStreak();
+  private flashTimer: Phaser.Time.TimerEvent | null = null;
+  /** Finishers played, so the signature moves take turns with the older ones. */
+  private finishersPlayed = 0;
+  /** A duo moment: frame and start time of each step. */
+  private duoSteps: { frames: number[]; at: number; end: number }[] = [];
+  private duoTween: Phaser.Tweens.Tween | null = null;
   private hits: Hit[] = [];
   private schedule: number[] = [];
   private secondsPerBeat = DEFAULT_SPB;
@@ -332,6 +424,46 @@ export class Dancer {
     this.feel = frames === INSTRUCTOR ? null : moveFeel(texture, frames === LITE ? 'lite' : 'berry');
     const moves = `${texture}_moves`;
     this.movesTexture = scene.textures.exists(moves) ? moves : null;
+    // A Phaser texture counts its whole-image frame too.
+    this.ext = this.movesTexture && this.feel ? extMoves(texture, scene.textures.get(this.movesTexture).frameTotal - 1) : null;
+    this.partner = options.partner ?? 1;
+    this.normal = { frames, style, texture, feel: this.feel, moves: this.movesTexture, ext: this.ext };
+  }
+
+  /** True while Hype Berry is dancing. */
+  get inHypeForm(): boolean {
+    return this.hypeForm;
+  }
+
+  /**
+   * Hype mode's transformation: Berry swaps into his hype pack (hood down,
+   * glowing headphones and jacket) and back when it ends, with a white flash
+   * and a pop each way. Reduced motion swaps without the flash. Only Berry has
+   * the pack; anyone else, or a game without the sheet, ignores this.
+   */
+  setHypeForm(on: boolean): void {
+    if (on === this.hypeForm || this.mode === 'final') return;
+    if (on && (this.normal.texture !== Tex.blackberry || !this.scene.textures.exists(HYPE_TEXTURE))) return;
+    this.hypeForm = on;
+    const normal = this.normal;
+    this.frames = on ? HYPE_BERRY : normal.frames;
+    this.style = on ? HYPE_STYLE : normal.style;
+    this.baseTexture = on ? HYPE_TEXTURE : normal.texture;
+    this.feel = on ? HYPE_FEEL : normal.feel;
+    this.movesTexture = on ? null : normal.moves;
+    this.ext = on ? null : normal.ext;
+    this.pending = null;
+    this.plan = null;
+    this.endDuo();
+    this.mode = 'idle';
+    this.lastStep = -Infinity;
+    this.sprite.setFlipX(false);
+    this.show(this.frames.idle[0]);
+    if (this.calm) return;
+    // The transformation: a white flash on the sprite and a stretch that settles.
+    this.sprite.setTintMode(Phaser.TintModes.FILL).setTint(0xffffff);
+    this.scene.time.delayedCall(110, () => this.sprite.setTintMode(Phaser.TintModes.MULTIPLY).clearTint());
+    this.squash(on ? 0.8 : 1.15, on ? 1.25 : 0.85, 260);
   }
 
   /**
@@ -344,9 +476,20 @@ export class Dancer {
   }
 
   /** The move to play for `kind`: from the moves sheet when it is loaded, else from the base sheet. */
-  private moveSpec(kind: keyof MoveFeel['table']): MoveSpec | null {
+  private moveSpec(kind: MoveKind): MoveSpec | null {
     if (!this.feel) return null;
+    const ext = this.ext;
+    if (ext?.rise && kind === 'rise') return { frames: ext.rise, fx: 'hop' };
     return (this.movesTexture ? this.feel.table : this.feel.fallback)[kind];
+  }
+
+  /** The move that ends a phrase: every other one is the character's signature move, when their sheet has it. */
+  private finisherSpec(kind: MoveKind): MoveSpec | null {
+    const ext = this.ext;
+    if (ext && (kind === 'finisherSmall' || kind === 'finisherBig') && this.finishersPlayed++ % 2 === 1) {
+      return kind === 'finisherSmall' ? ext.signatureA : ext.signatureB;
+    }
+    return this.moveSpec(kind);
   }
 
   /** Show a frame: base sheet frames as they are, moves sheet frames from MOVES_BASE up. */
@@ -368,7 +511,7 @@ export class Dancer {
     if (this.mode === 'special' && this.elapsed < Math.min(this.style.specialLock, this.duration)) return;
     const f = this.frames;
     const style = this.style;
-    let frames = f.lanes[lane];
+    let frames = this.ext?.lanes?.[lane] ?? f.lanes[lane];
     // A second lane landing on the same beat counts as held, so rivals get two-lane poses too.
     const previous = this.hits[this.hits.length - 1];
     if (previous && held.length === 0 && this.lastBeat - previous.beat <= DOUBLE_GAP && previous.lane !== lane) held = [previous.lane];
@@ -434,6 +577,34 @@ export class Dancer {
   }
 
   /**
+   * A missed note. One miss alone only flashes the dancer red and the dance
+   * goes on; misses in a row (see MissStreak) make them stumble. Returns what
+   * it did.
+   */
+  miss(force = 0, away: -1 | 1 = -1): MissReaction {
+    const reaction = this.misses.miss();
+    if (reaction === 'stumble') this.stumble(force, away);
+    else this.flash();
+    return reaction;
+  }
+
+  /** A note was hit: the next miss is a lone one again. */
+  landed(): void {
+    this.misses.hit();
+  }
+
+  /** A brief red flash that leaves the pose and the groove alone. */
+  flash(color = 0xff6070, ms = 130): void {
+    if (this.mode === 'final') return;
+    this.flashTimer?.remove();
+    this.sprite.setTint(color);
+    this.flashTimer = this.scene.time.delayedCall(ms, () => {
+      this.flashTimer = null;
+      if (this.mode !== 'final') this.sprite.clearTint();
+    });
+  }
+
+  /**
    * Lose balance after a missed note. `force` 0..1 knocks the dancer back
    * toward `away` (-1 left, 1 right) and squashes them: a broken streak hits
    * harder than a stray miss. Reduced motion keeps only the pose and tint.
@@ -456,7 +627,100 @@ export class Dancer {
   special(): void {
     const f = this.frames;
     if (this.mode === 'final' || !f.spin) return;
-    this.showpiece(this.specialCount++ % (1 + (f.finishers?.length ?? 0)));
+    const count = 1 + (f.finishers?.length ?? 0);
+    const ext = this.ext;
+    // With a signature move in the sheet, every third showpiece is the big signature.
+    if (ext && this.specialCount % 3 === 2) {
+      this.specialCount++;
+      this.pending = null;
+      this.startMove(ext.signatureB, 2);
+      return;
+    }
+    this.showpiece(this.specialCount++ % count);
+  }
+
+  /** True when nothing is playing that a duo moment would cut short (an idle dance or a settled pose). */
+  get free(): boolean {
+    return (this.mode === 'idle' || (this.mode === 'pose' && this.elapsed >= this.style.poseHold)) && !this.holding && !this.pending;
+  }
+
+  /** Beats until this dancer's next note after `beat` (Infinity when there are no more). */
+  beatsToNextNote(beat: number): number {
+    const next = nextAfter(this.schedule, beat);
+    return next === null ? Infinity : next - beat;
+  }
+
+  /**
+   * Dance a duo moment: each step's pose from its time (seconds) until the
+   * next, all of it lasting `duration`. `approach` steps toward the partner by
+   * that many art pixels and back at the end, so a high five meets in the
+   * middle. Poses are turned to face the partner. A note to dance cuts it short.
+   */
+  perform(steps: readonly DuoStep[], duration: number, approach = 0): void {
+    if (this.mode === 'final' || steps.length === 0) return;
+    const sorted = [...steps].sort((a, b) => a.at - b.at);
+    this.duoSteps = sorted.map((step, i) => {
+      const end = i + 1 < sorted.length ? sorted[i + 1].at : duration;
+      return { frames: this.duoFrames(step.pose), at: step.at, end };
+    });
+    this.pending = null;
+    this.plan = null;
+    this.start('duo', this.duoSteps[0].frames, 1, duration);
+    this.shownIndex = -1;
+    this.duoFacing();
+    this.scene.tweens.killTweensOf(this.sprite);
+    this.sprite.setY(this.baseY).setScale(this.baseScale);
+    this.duoTween?.stop();
+    this.duoTween = null;
+    if (approach > 0 && !this.calm) {
+      const glide = { v: this.moveOffset };
+      const to = this.partner * approach * this.baseScale;
+      const time = Math.min(220, duration * 250);
+      this.duoTween = this.scene.tweens.add({
+        targets: glide,
+        v: to,
+        duration: time,
+        hold: Math.max(0, duration * 1000 - 2 * time),
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onUpdate: () => (this.moveOffset = glide.v),
+        onComplete: () => (this.moveOffset = 0),
+      });
+    }
+  }
+
+  /** Frames for a pose of a duo moment, from the extended sheet, the hype pack, or the base sheet as a stand-in. */
+  private duoFrames(pose: DuoStep['pose']): number[] {
+    const ext = this.ext;
+    if (pose === 'signatureA' || pose === 'signatureB') {
+      if (ext) return ext[pose].frames;
+      const spec = this.moveSpec(pose === 'signatureA' ? 'finisherSmall' : 'finisherBig');
+      return spec?.frames ?? this.frames.idle;
+    }
+    if (pose === 'groove') return ext?.groove ?? this.frames.groove ?? this.frames.idle;
+    const duo = this.hypeForm ? HYPE_DUO : ext?.duo;
+    if (duo) return [duo[pose]];
+    // No duo poses drawn: the nearest base frames.
+    const lite = this.frames === LITE;
+    const stand: Record<DuoPose, number> = lite
+      ? { windup: 5, slap: 7, point: 6, freeze: 16, cool: 0, cheer: 13 }
+      : { windup: 5, slap: 7, point: 42, freeze: 41, cool: 0, cheer: 29 };
+    return [stand[pose]];
+  }
+
+  /** Duo poses face the partner; poses drawn facing the other way are mirrored. */
+  private duoFacing(): void {
+    const duo = this.hypeForm ? HYPE_DUO : this.ext?.duo;
+    this.sprite.setFlipX(!!duo && duo.facing !== this.partner);
+  }
+
+  private endDuo(): void {
+    if (this.duoTween) {
+      this.duoTween.stop();
+      this.duoTween = null;
+      this.moveOffset = 0;
+    }
+    this.duoSteps = [];
   }
 
   /**
@@ -482,6 +746,9 @@ export class Dancer {
     this.elapsed = 0;
     this.frameTime = 0.32;
     this.scene.tweens.killTweensOf(this.sprite);
+    this.endDuo();
+    this.flashTimer?.remove();
+    this.flashTimer = null;
     this.moveOffset = 0;
     this.recoil = 0;
     this.sprite.clearTint().setFlipX(false).setPosition(this.baseX, this.baseY).setScale(this.baseScale);
@@ -510,6 +777,14 @@ export class Dancer {
     this.updateHabits(dt, beat);
 
     const step = Math.floor(beat * style.stepsPerBeat);
+    if (this.mode === 'duo') {
+      if (this.elapsed < this.duration) {
+        this.showDuo();
+        this.lastStep = step;
+        return;
+      }
+      this.endDuo();
+    }
     if (this.mode !== 'idle') {
       if (this.mode === 'special') this.animateSpecial();
       if (this.mode === 'move') this.animateMove();
@@ -534,9 +809,11 @@ export class Dancer {
     const f = this.frames;
     let loop = f.idle;
     // A long hold changes its groove every other bar, so it never looks frozen.
-    const holdAlt = this.movesTexture ? this.feel?.holdAlt : undefined;
+    const holdAlt = this.ext?.hold ?? (this.movesTexture || this.hypeForm ? this.feel?.holdAlt : undefined);
+    const groove2 = this.ext?.groove;
     if (this.holding && holdAlt && Math.floor(beat / 4) % 2 === 1) loop = holdAlt;
     else if (this.holding && f.hold) loop = f.hold;
+    else if (this.grooving && groove2 && Math.floor(beat / (4 * (this.ext?.grooveBars ?? 2))) % 2 === 1) loop = groove2;
     else if (this.grooving && f.groove) loop = style.groove ?? f.groove;
     // Index from the beat itself, so the loop keeps its place through poses and pauses.
     const index = Phaser.Math.Wrap(step, 0, loop.length);
@@ -629,7 +906,7 @@ export class Dancer {
     if (!plan || beat < plan.start) return;
     this.plan = null;
     if (free && !this.holding && !this.pending && beat < plan.start + 0.5) {
-      const spec = this.moveSpec(plan.kind);
+      const spec = this.finisherSpec(plan.kind);
       if (spec) this.startMove(spec, plan.beats);
     }
     this.endRun();
@@ -703,6 +980,22 @@ export class Dancer {
     }
   }
 
+  /** The frame of the duo moment for now: each step walks its frames across its share of the time. */
+  private showDuo(): void {
+    const t = this.elapsed;
+    const steps = this.duoSteps;
+    let i = 0;
+    while (i + 1 < steps.length && t >= steps[i + 1].at) i++;
+    const step = steps[i];
+    if (!step) return;
+    const span = Math.max(0.001, step.end - step.at);
+    const k = Math.min(step.frames.length - 1, Math.floor(((t - step.at) / span) * step.frames.length));
+    this.show(step.frames[Math.max(0, k)]);
+    const index = i * 100 + k;
+    if (index !== this.shownIndex && !this.calm && this.shownIndex !== -1) this.squash(1.05, 0.94, 110);
+    this.shownIndex = index;
+  }
+
   private animateMove(): void {
     if (this.moveFx === 'whirl') this.sprite.setFlipX(Math.floor(this.elapsed / 0.12) % 2 === 1);
   }
@@ -736,6 +1029,7 @@ export class Dancer {
   }
 
   private start(mode: Mode, sequence: number[], frameTime: number, duration: number): void {
+    if (this.mode === 'duo' && mode !== 'duo') this.endDuo();
     this.mode = mode;
     this.sequence = sequence;
     this.frameTime = frameTime;
@@ -758,9 +1052,9 @@ export const BerryFrame = { victory: [29, 30], defeat: 31, fingerGuns: 42, dab: 
  * for him, in their own sheet and style.
  */
 export function createPlayer(scene: Phaser.Scene, x: number, y: number, who: FruitId | 'berry' = 'berry', options: DancerOptions = {}): Dancer {
-  if (who === 'berry') return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y);
+  if (who === 'berry') return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y, STANDARD, { calm: options.calm, partner: 1 });
   const { texture, layout } = characterSheet(scene, who);
-  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[who], { ...options, seed: `${options.seed ?? ''}:${who}` });
+  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[who], { partner: 1, ...options, seed: `${options.seed ?? ''}:${who}` });
 }
 
 const STYLES: Partial<Record<RivalKind, DanceStyle>> = { pear: PEAR_STYLE, lemon: LEMON_STYLE };
@@ -773,8 +1067,8 @@ export function createRival(scene: Phaser.Scene, kind: RivalKind, x: number, y: 
   if (kind === 'none') return null;
   if (kind === 'dancer' && !scene.textures.exists(Tex.instructor)) {
     // The original art: frames are 160x160 with the feet at y=137 and the body centred near x=84.
-    return new Dancer(scene, x, y, Tex.dancer, INSTRUCTOR, 3, 84 / 160, 137 / 160);
+    return new Dancer(scene, x, y, Tex.dancer, INSTRUCTOR, 3, 84 / 160, 137 / 160, STANDARD, { partner: -1, calm: options.calm });
   }
   const { texture, layout } = kind === 'dancer' ? { texture: Tex.instructor, layout: 'berry' as const } : characterSheet(scene, kind);
-  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[kind], { ...options, seed: `${options.seed ?? ''}:${kind}` });
+  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[kind], { partner: -1, ...options, seed: `${options.seed ?? ''}:${kind}` });
 }

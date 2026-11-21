@@ -120,9 +120,12 @@ export class HypeMode {
       hooks.cheer();
       hooks.flash(HYPE_PINK, 0.28);
       hooks.punch();
+      // Berry powers up into his hype pack for as long as hype lasts.
+      player.setHypeForm(true);
       player.special();
       return;
     }
+    player.setHypeForm(false);
     if (change === 'miss') {
       // A miss snaps straight back, quickly but on an ease, so the next notes are flat right away.
       this.tiltRate = 1 / SNAP_OUT;
