@@ -1,0 +1,14 @@
+blackberry e2635b38-d503-4bfa-a9aa-fd798e382980 200
+blueberry da286ced-23bf-4d31-8a51-1f530acdeb89 200
+raspberry 6838bd1e-7264-4f03-a82d-471c2c404bec 200
+pear 638224be-8800-42cd-a47c-ded55afb9197 200
+lemon b1cd8fae-baa1-45d3-ae16-d6016656dbb6 200
+instructor 56dca7fd-cc5e-47ea-a3f4-867d972fc87b 200
+banana 0ac611e7-3bea-451c-b97a-308273a7166c 200
+grape dec633e8-1f68-4360-8ce3-0a2cfd4215a8 200
+plum 68a8d7b6-9705-4657-81f5-235b2224b169 200
+dragonfruit 0ece6964-198d-4095-9503-30c3d81f9290 200
+watermelon ae513ada-37e6-4327-a6a0-20dc036863cc 200
+coconut 7a2b44bd-ed36-4f8e-bc8c-4c11c4244d36 200
+orange 1b325c0a-4d77-48e1-bd77-cbdaf059ef08 200
+pineapple f3da7082-4dcd-403d-88df-c4a9aadeeb06 200
