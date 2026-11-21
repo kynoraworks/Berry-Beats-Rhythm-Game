@@ -87,6 +87,57 @@ Layout every street shares:
 
 - `stage_grand_stage.png` for stop 12, laid out like the other stages (top band to row 27, platform top at row 137). Optional `stage_<slug>.png` for stops 2, 4, 6, 9, 10 and 11 override the street crop.
 
+## Stage loops (scenery that moves with the music)
+
+Every battle stage has a loop in the spirit of Friday Night Funkin' stages:
+speakers thump, lanterns sway, lights chase, a train rushes through the
+tunnel every eight bars. It is all data in `STAGE_LOOPS` in
+`src/play/stageLoops.ts`, keyed by the stage's texture key (`room`,
+`stage_club`, `stage_the_tunnel` and so on; a street-end stage uses its
+`stage_<slug>` key even though it is cut from the street at runtime).
+`src/play/StageLoop.ts` draws it and `StageFx` drives it with the song's beat
+from the conductor, so it keeps time at any BPM and stops when the game is
+paused. With Reduce motion nothing is built and the stage stays as drawn.
+
+No new art is needed: a loop **cuts its moving pieces out of the stage art**
+when the battle starts (`src/play/stageCut.ts`), so they keep the palette and
+the time-of-day grade. Each entry gives a rectangle in art pixels (256x160)
+and a mask:
+
+- `key`: everything in the rectangle that is not a colour found on its edge.
+  Draw the rectangle with a pixel or two of plain wall all round the piece; if
+  the edge crosses another object, its colours are keyed out of the piece too.
+- `{ bright: n }`: pixels brighter than luminance n, for lights and flames.
+- `{ near: 0xRRGGBB, tol }`: one colour (a floor tile, a window colour).
+- `ellipse` (speaker cones) and `rect` (posters, a boombox).
+
+and a motion, timed in beats:
+
+- `hop` (whole pixels up on each hit), `pump` (grows from its base or middle),
+  `swing` (hangs from its top and sways, drawn as rows shifted by whole
+  pixels so it stays crisp), `glow` (added light on each hit) and `twinkle`
+  (lights switching at random every few beats).
+- A hit is `{ every, offset, decay, accent }`: `every: 1` is each beat,
+  `every: 4, offset: 2` the third beat of each bar, `accent` makes a bar's
+  downbeat stronger. `split` moves each separate piece in the rectangle on its
+  own, as a `chase` (one after another) or a wave (`stagger`).
+- Pieces that hop or swing get a patch: the wall behind them rebuilt from the
+  wall beside them, so they never show twice.
+
+There are also drawn effects: `eq` (equaliser bars), `sparkle` (mirror ball
+glints), `train`, `zap` (a coil's spark on each bar), `wave` (a scope trace)
+and `sweep` (a soft pool of light crossing a wall).
+
+To add or change one, edit the stage's list, then check the cut-outs: build,
+open `?scene=Play&level=stop07&autoplay=1&at=20` (a stop's chart id plays on
+its own stage) and watch a few bars. Keep it behind the dancers and the
+notes, soft rather than flashing (no hit faster than every half beat, glows
+at most 0.6 alpha; `tests/stageLoops.test.ts` checks this), and leave
+glows off pieces that swing (the glow would stay at rest). The setting's
+people (`battleLife` in `src/explore/ambient.ts`) nod on top of the loop;
+`pump: true` on a life spot makes a speaker or boombox someone sits on pump
+with the beat too.
+
 ## Other pieces
 
 - `npc.png`, 128x64: the generic station worker in two idle frames (64x64 cells, feet on row 62), matching portrait 28 (brown hair, green scarf, beige coat). The stand-in recolours the scarf per stop; drawn art can keep one scarf colour.

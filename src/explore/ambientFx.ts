@@ -51,6 +51,8 @@ interface Resident {
   column: number;
   columns: number;
   beat: boolean;
+  /** Pumps with the beat in battles (see LifeSpot.pump): its resting left edge and its cell's width in screen pixels. */
+  pump: { x: number; width: number } | null;
   /** Milliseconds until the next change while exploring. */
   next: number;
   frame: 0 | 1;
@@ -88,12 +90,13 @@ export class Residents {
   private readonly calm: boolean;
   private readonly random: () => number;
   private readonly halfBeatMs: number;
+  private readonly scale: number;
 
   constructor(scene: Phaser.Scene, placed: readonly PlacedPiece[], options: LifeOptions) {
     this.calm = options.calm;
     this.halfBeatMs = options.halfBeatMs ?? DEFAULT_HALF_BEAT_MS;
     this.random = seeded(options.seed);
-    const scale = options.scale ?? PX;
+    const scale = (this.scale = options.scale ?? PX);
     for (const piece of placed) {
       const { spot } = piece;
       const texture = `life_${spot.theme}`;
@@ -110,7 +113,8 @@ export class Residents {
         .setFlipX(spot.flip ?? false)
         .setDepth(options.depth);
       options.addTo?.(sprite);
-      this.residents.push({ sprite, column, columns: sheet.pieces.length, beat: spot.beat ?? false, next: this.rest(spot.beat ?? false), frame: 0 });
+      const pump = spot.pump ? { x: sprite.x, width: sheet.cellW * scale } : null;
+      this.residents.push({ sprite, column, columns: sheet.pieces.length, beat: spot.beat ?? false, pump, next: this.rest(spot.beat ?? false), frame: 0 });
     }
     const lift = options.lift ?? RESIDENT_LIFT;
     if (lift > 0) {
@@ -151,6 +155,17 @@ export class Residents {
       const nod = resident.beat ? (beat + i) % 2 === 0 : (beat + i) % 4 === 0;
       this.show(resident, nod ? 1 : 0);
     });
+  }
+
+  /** Battle: speakers and boomboxes swell by `strength` (0 to about 1.5, from the beat) from their base and middle. */
+  pump(strength: number): void {
+    if (this.calm) return;
+    for (const { sprite, pump } of this.residents) {
+      if (!pump) continue;
+      const sx = this.scale * (1 + 0.035 * strength);
+      sprite.setScale(sx, this.scale * (1 + 0.05 * strength));
+      sprite.x = pump.x - (pump.width * (sx / this.scale - 1)) / 2;
+    }
   }
 
   private rest(beat: boolean): number {

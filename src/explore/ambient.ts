@@ -33,6 +33,8 @@ export interface LifeSpot {
   flip?: boolean;
   /** Nods on every beat in battles (dancers, a crowd); everyone else every few beats. */
   beat?: boolean;
+  /** A speaker or boombox (with whoever sits on it) that pumps on every beat in battles. */
+  pump?: boolean;
   /**
    * The piece is the hotspot's own subject (the giant boombox is the Boombox,
    * the cooks are the stall), so it may stand on that hotspot.
@@ -74,9 +76,9 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
     street: { spots: [s('graffiti', 'boombox_crew', 48, { beat: true, covers: 'Boombox' }), s('stack', 'tagger', 150, { covers: 'Mural' })], effects: [] },
     battle: {
       spots: [
-        s('graffiti', 'boombox_crew', 38, { beat: true }),
+        s('graffiti', 'boombox_crew', 38, { beat: true, pump: true }),
         s('stack', 'fence_sitter', 194, { beat: true }),
-        s('stack', 'speaker_stack', 236, { beat: true }),
+        s('stack', 'speaker_stack', 236, { beat: true, pump: true }),
       ],
       effects: [],
     },

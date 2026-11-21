@@ -8,6 +8,8 @@ import { LeafFall } from '../core/atmosphereFx';
 import { STOPS, stopForChart, TUTORIAL, type StopDef } from '../story/stops';
 import { battleLife, placePiece } from '../explore/ambient';
 import { AmbientEffects, Residents } from '../explore/ambientFx';
+import { StageLoop } from './StageLoop';
+import { hitStrength } from './stageLoops';
 
 const SPOT_COLOR = 0xfff0c0;
 const PULSE_DARK = 0xd2cdea;
@@ -36,6 +38,8 @@ export class StageFx {
   /** The stage's background life: extras at the back and the setting's effects, moved with the back wall. */
   private readonly backWall: Phaser.GameObjects.Container;
   private extras: Residents | null = null;
+  /** The stage's own loop: its scenery moving with the music (src/play/stageLoops.ts). */
+  private loop: StageLoop | null = null;
   private effects: AmbientEffects | null = null;
   /** The time of day's tint at the stage's corners, or white for no story stop. */
   private grade: [number, number, number, number] = [0xffffff, 0xffffff, 0xffffff, 0xffffff];
@@ -61,6 +65,8 @@ export class StageFx {
     this.leaves = this.addAtmosphere(stage);
     this.background.setTint(...this.grade);
     this.backWall = scene.add.container(0, 0).setDepth(Depth.background + 0.3);
+    // The loop goes on the wall first, so the setting's people stand in front of it.
+    this.loop = StageLoop.create(scene, key, calm, { addTo: (object) => this.backWall.add(object) });
     this.addLife(stage, key);
     this.spots = {
       player: this.makeSpot(playerX, feetY(key, playerX)),
@@ -127,6 +133,9 @@ export class StageFx {
     const beatLight = mixColor(PULSE_DARK, 0xffffff, Math.round(this.pulse * 100) / 100);
     const [tl, tr, bl, br] = this.grade;
     this.background.setTint(multiplyColor(tl, beatLight), multiplyColor(tr, beatLight), multiplyColor(bl, beatLight), multiplyColor(br, beatLight));
+    // The stage's loop and the speakers people sit on keep the song's time, in the stage's light.
+    this.loop?.update(beat, dt, this.background);
+    this.extras?.pump(hitStrength(beat, { every: 1, accent: 0.5 }));
 
     this.flashLevel = Math.max(0, this.flashLevel - dt * 1.4);
     this.flashRect.setAlpha(this.flashLevel);
