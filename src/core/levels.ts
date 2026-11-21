@@ -22,11 +22,9 @@ export interface StoryChart {
 
 export const LEVELS: readonly StoryChart[] = [
   { id: TUTORIAL.id, name: 'Tutorial', blurb: 'The Coach teaches the beat', chartUrl: TUTORIAL.chartUrl, song: TUTORIAL.song, stage: TUTORIAL.stage, rivalName: 'Coach' },
-  // Each stop's three battles. Stop 12's first two are sets of the crew battle, danced on
-  // other stops' charts, so only its last has a chart of its own.
+  // Each stop's three battles. Stop 12's are the crew battle's sets; their charts play on their own too.
   ...STOPS.flatMap((stop) =>
     stop.battles
-      .filter((battle) => stop.role !== 'final' || battle.index === 2)
       .map((battle) => ({
         id: battle.id,
         name: battle.index === 2 ? `Stop ${stop.number}: ${stop.station}` : `Stop ${stop.number}${battle.letter}: ${battle.name}`,

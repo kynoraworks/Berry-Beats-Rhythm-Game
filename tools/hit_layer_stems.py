@@ -44,14 +44,16 @@ SONGS = [
     "berry_town", "peel_street", "graffiti_corner", "vine_crossing", "citrus_labs", "lantern_market",
     "the_club", "rooftop", "the_tunnel", "orange_plaza", "pineapple_hall", "grand_stage",
 ]
-# The short songs of battles A and B (tools/sublevel_songs.py), for the stops that have them so far.
-SONGS += [f"{song}_{battle}" for song in SONGS[:6] for battle in "ab"]
+# The short songs of battles A and B of every stop (tools/sublevel_songs.py).
+SONGS += [f"{song}_{battle}" for song in list(SONGS) for battle in "ab"]
 # Stems that make up each song's lead. Most songs carry their tune in "other"
 # (keys, synths, horns) plus any voice. The Tunnel is drums and bass with only a
 # faint pad, so there the bass line is the tune and goes in the layer too. Bass
 # is what is left of the mix once vocals, other and drums are taken out. Peel Street's
-# first short song is built on its slap bass, which carries the hook there.
-LEAD_STEMS = {"the_tunnel": ("vocals", "other", "bass"), "peel_street_a": ("vocals", "other", "bass")}
+# first short song is built on its slap bass, and the Tunnel's two short songs on their
+# bass lines, so those carry the hook there too.
+_WITH_BASS = ("vocals", "other", "bass")
+LEAD_STEMS = {"the_tunnel": _WITH_BASS, "peel_street_a": _WITH_BASS, "the_tunnel_a": _WITH_BASS, "the_tunnel_b": _WITH_BASS}
 # Must match LAYER_DEPTH in src/core/hitLayer.ts: how much of the lead a shut gate takes out.
 DEPTH = 0.8
 

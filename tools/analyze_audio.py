@@ -61,6 +61,8 @@ STOP_TRACKS = {
 # built on the start of the boss song instead (see SUBLEVELS below).
 SUB_TRACKS = {
     1: (114, 118), 2: (120, 124), 3: (126, 130), 4: (124, 128), 5: (134, 138), 6: (114, 118),
+    # The Tunnel's first came out at 145 (asked for 146) and is charted at what it is.
+    7: (138, 142), 8: (124, 128), 9: (145, 150), 10: (150, 154), 11: (154, 158), 12: (144, 148),
 }
 STOP_SONGS = list(STOP_TRACKS)
 for _stop, (_a, _b) in SUB_TRACKS.items():
@@ -839,9 +841,40 @@ for _plan in [p for p in PLANS if p.chart_id.startswith("stop")]:
         _sub = sub_plan(_shape, _key, _song, _bars)
         _sub.chart_id, _sub.title = f"{_plan.chart_id}{_key}", f"{_plan.title}{_key.upper()}"
         SUBLEVELS.append(_sub)
-# Stop 12's battles A and B are sets of the crew battle, danced on the enemies' own stop
-# charts (src/story/crewBattle.ts), so they have no charts of their own.
+# Stop 12's battles A and B are the crew battle's first two sets (src/story/crewBattle.ts):
+# two rounds each, on one 75-second song per set. Each round is charted in the shape of
+# that enemy's own stop chart (the bars the crew rounds used to cut from it), moved to
+# the round's bars, so Grape still comes in pairs and Coconut stays steady.
 SUBLEVELS = [p for p in SUBLEVELS if not p.chart_id.startswith("stop12")]
+# Per set: (song, [(enemy stop chart, from bar, to bar, at bar), ...]). The rounds' bars
+# here must match CREW_ROUNDS in src/story/crewBattle.ts.
+CREW_SET_CHARTS = {
+    "stop12a": ("grand_stage_a", "grape", [("stop04", 8, 28, 4), ("stop09", 8, 28, 24)]),
+    "stop12b": ("grand_stage_b", "pineapple", [("stop11", 18, 37, 2), ("stop07", 12, 33, 24)]),
+}
+
+
+def moved(plan: Plan, start: int, end: int, at: int) -> list[Section]:
+    """The plan's sections inside bars start..end, moved to begin at bar `at`."""
+    out = []
+    for sec in plan.sections:
+        lo, hi = max(sec.start, start), min(sec.end, end)
+        if lo < hi:
+            out.append(Section(**{**sec.__dict__, "start": lo - start + at, "end": hi - start + at}))
+    return out
+
+
+for _id, (_song, _rival, _parts) in CREW_SET_CHARTS.items():
+    _sources = [next(p for p in PLANS if p.chart_id == part[0]) for part in _parts]
+    _sections = [S(0, _parts[0][3], "rival", grid=2, rival_notes=4)] if _parts[0][3] > 0 else []
+    for _src, (_cid, _from, _to, _at) in zip(_sources, _parts):
+        _sections += moved(_src, _from, _to, _at)
+    SUBLEVELS.append(
+        Plan(
+            _id, _song, f"Stop 12{_id[-1].upper()}", _rival, max(p.difficulty for p in _sources),
+            max_nps=max(p.max_nps for p in _sources), solo_holds=False, sections=_sections, rank_lanes=True,
+        )
+    )
 PLANS += SUBLEVELS
 
 

@@ -57,8 +57,8 @@ export function nextBattleRef(ref: StoryRef): StoryRef | null {
 }
 
 /**
- * Dance round `index` of the crew battle in progress: a stretch of the enemy's
- * own stop chart and song, with their gimmick and the ally's ability.
+ * Dance round `index` of the crew battle in progress: the round's stretch of
+ * its set's chart and song, with the enemy's gimmick and the ally's ability.
  */
 export async function playCrewRound(scene: Phaser.Scene, index: number, options: { autoplay?: boolean } = {}): Promise<void> {
   const session = getSession();
@@ -68,7 +68,8 @@ export async function playCrewRound(scene: Phaser.Scene, index: number, options:
   const full = await loadStoryChart(chartUrlFor(round.chartUrl, difficulty));
   if (!scene.sys.isActive()) return;
   const ally = crewLineup(session.order)[index];
-  const chart = sliceChart(full, round.startBar, round.endBar, `crew${index + 1}-${round.chartId}`, round.skill);
+  // A set's chart holds two enemies' rounds: whoever dances this one is on stage.
+  const chart = { ...sliceChart(full, round.startBar, round.endBar, `crew${index + 1}-${round.chartId}`, round.skill), rivalCharacter: round.enemy };
   const { start, end } = roundSpan(full, round);
   const data: RuledPlayData = {
     chart,

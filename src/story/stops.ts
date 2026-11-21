@@ -32,8 +32,8 @@ export interface BattleDef {
   /** The song it is danced to. */
   song: string;
   /**
-   * False while battles A and B still dance to the start of the boss song,
-   * until their own songs are generated (TEMPORARY, see AWAITING_SONGS).
+   * False if battles A and B dance to the start of the boss song because
+   * their own songs are missing (see AWAITING_SONGS).
    */
   ownSong: boolean;
   chartUrl: string;
@@ -244,13 +244,11 @@ const SEEDS: StopSeed[] = [
 const RIVAL_LEVELS = [2, 1.5, 2.2, 2.4, 2.6, 2.6, 2.8, 2.8, 3, 3, 3.1, 4];
 
 /**
- * TEMPORARY: the stops whose battles A and B do not have their own songs yet.
- * Until they are generated, A and B dance to the start of the boss song, on
- * lighter charts of it (tools/analyze_audio.py, SUBLEVELS), and stop 12's sets
- * one and two dance to stretches of each enemy's own stop song, as the crew
- * battle always did. Drop a stop from this set once its songs are in.
+ * Stops whose battles A and B do not have their own songs yet: they would
+ * dance to the start of the boss song, on lighter charts of it. Every stop has
+ * its songs now; the set stays for any stop whose songs are redone later.
  */
-export const AWAITING_SONGS: ReadonlySet<number> = new Set([7, 8, 9, 10, 11, 12]);
+export const AWAITING_SONGS: ReadonlySet<number> = new Set<number>();
 
 /** How far below the boss's skill the opponents of battles A and B dance. */
 const BATTLE_SKILL_DROP = [0.4, 0.2, 0];

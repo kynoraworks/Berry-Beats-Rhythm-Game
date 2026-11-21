@@ -16,10 +16,10 @@ export const DEFAULT_ORDER: readonly FruitId[] = ['pear', 'lemon', 'watermelon',
 
 export type Dancer = FruitId | 'berry';
 
-/** One enemy round: who dances, and the part of their own stop's chart and song they dance it to. */
+/** One enemy round: who dances, and the part of their set's chart and song they dance it to. */
 export interface CrewRoundDef {
   enemy: FruitId;
-  /** The enemy's stop chart. */
+  /** The set's chart (stop12a, stop12b; the last round the stop 12 chart). */
   chartId: string;
   chartUrl: string;
   /** Bars of that chart, start inclusive, end exclusive. */
@@ -40,16 +40,18 @@ const BEATS_PER_BAR = 4;
 const ROUND_LINES: readonly Line[] = SCRIPT.find((script) => script.stop === 12)?.rounds ?? [];
 
 /**
- * Segments are cut on four-bar phrase lines where both sides dance, about 37
- * seconds each at that song's tempo (20 to 24 bars since the songs were sped
- * up). The last round, about 50 seconds, runs from bar 16 of the stop 12 chart
- * (its first section with both sides together) to the song's real ending.
+ * Sets one and two each have a 75-second song of their own (grand_stage_a at
+ * 144 BPM, grand_stage_b at 148), charted as two rounds in the shape of each
+ * enemy's own stop chart (CREW_SET_CHARTS in tools/analyze_audio.py, whose bars
+ * must match these). Each round is cut on a four-bar phrase line and runs about
+ * 33 to 34 seconds. The last round, about 50 seconds, runs from bar 16 of the
+ * stop 12 chart (its first section with both sides together) to the song's end.
  */
 export const CREW_ROUNDS: readonly CrewRoundDef[] = [
-  { enemy: 'grape', chartId: 'stop04', chartUrl: 'charts/stop04.json', startBar: 8, endBar: 28, skill: 2, before: ROUND_LINES.slice(0, 1) },
-  { enemy: 'coconut', chartId: 'stop09', chartUrl: 'charts/stop09.json', startBar: 8, endBar: 32, skill: 3, before: ROUND_LINES.slice(1, 2) },
-  { enemy: 'pineapple', chartId: 'stop11', chartUrl: 'charts/stop11.json', startBar: 16, endBar: 40, skill: 3, before: ROUND_LINES.slice(2, 3) },
-  { enemy: 'dragonfruit', chartId: 'stop07', chartUrl: 'charts/stop07.json', startBar: 12, endBar: 34, skill: 3, before: ROUND_LINES.slice(3, 4) },
+  { enemy: 'grape', chartId: 'stop12a', chartUrl: 'charts/stop12a.json', startBar: 4, endBar: 24, skill: 2, before: ROUND_LINES.slice(0, 1) },
+  { enemy: 'coconut', chartId: 'stop12a', chartUrl: 'charts/stop12a.json', startBar: 24, endBar: 44, skill: 3, before: ROUND_LINES.slice(1, 2) },
+  { enemy: 'pineapple', chartId: 'stop12b', chartUrl: 'charts/stop12b.json', startBar: 0, endBar: 21, skill: 3, before: ROUND_LINES.slice(2, 3) },
+  { enemy: 'dragonfruit', chartId: 'stop12b', chartUrl: 'charts/stop12b.json', startBar: 24, endBar: 45, skill: 3, before: ROUND_LINES.slice(3, 4) },
   { enemy: 'blueberry', chartId: 'stop12', chartUrl: 'charts/stop12.json', startBar: 16, endBar: 48, skill: 4, before: ROUND_LINES.slice(4) },
 ];
 
