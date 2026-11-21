@@ -95,6 +95,8 @@ export type SfxName =
   | 'djCut'
   | 'djRewind'
   | 'djBrake'
+  /** A miss: the record grabbed and scrubbed back and forth for a moment (made from the song in battles). */
+  | 'djScrub'
   | 'needleDrop'
   // Low impacts: a boom, the biggest slam, the hype's sub drop.
   | 'boom'
@@ -113,6 +115,8 @@ export type SfxName =
   | 'defeat'
   | 'crowdCheer'
   | 'crowdOhh'
+  /** A broken streak: the crowd's disappointed "aww". */
+  | 'crowdAww'
   | 'crowdRoar'
   | 'crowdBed'
   | 'mcRound1'
@@ -126,7 +130,12 @@ export type SfxName =
   | 'mcCrowdWild'
   | 'mcWinner'
   | 'mcOhNo'
-  | 'mcLetsDance';
+  | 'mcLetsDance'
+  // Now and then after a miss (see MissReactor in src/play/battleLife.ts).
+  | 'mcDropped'
+  | 'mcOffBeat'
+  | 'mcGetItBack'
+  | 'mcStreakOver';
 
 interface Layer {
   /** Oscillator shape, or 'noise' for a filtered noise burst. */
@@ -445,6 +454,7 @@ const RECIPES: Record<SfxName, Layer[]> = {
     { type: 'square', from: 220, to: 22, dur: 0.8, gain: 0.04, attack: 0.01 },
     { type: 'noise', from: 2400, to: 160, dur: 0.7, gain: 0.05, attack: 0.01 },
   ],
+  djScrub: [...stroke(2600, 700, 0.07, 0, 0.18), ...stroke(700, 2800, 0.06, 0.08, 0.16), ...stroke(3000, 380, 0.13, 0.15, 0.18)],
   needleDrop: [
     { type: 'sine', from: 80, to: 45, dur: 0.14, gain: 0.2 },
     { type: 'noise', from: 3000, dur: 0.4, gain: 0.02, attack: 0.02 },
@@ -505,6 +515,7 @@ const RECIPES: Record<SfxName, Layer[]> = {
   crowdCheer: CHEER_RECIPE,
   crowdOhh: [{ type: 'noise', from: 520, to: 360, dur: 0.9, gain: 0.07, attack: 0.15, q: 2 }],
   crowdRoar: CHEER_RECIPE,
+  crowdAww: [{ type: 'noise', from: 600, to: 380, dur: 1.1, gain: 0.07, attack: 0.12, q: 2 }],
   crowdBed: [],
   mcRound1: [],
   mcRound2: [],
@@ -518,6 +529,10 @@ const RECIPES: Record<SfxName, Layer[]> = {
   mcWinner: [],
   mcOhNo: [],
   mcLetsDance: [],
+  mcDropped: [],
+  mcOffBeat: [],
+  mcGetItBack: [],
+  mcStreakOver: [],
 };
 
 /**
@@ -553,6 +568,7 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
   defeat: { file: 'assets/audio/sfx/stinger_lose.mp3', gain: 0.5 },
   crowdCheer: { file: 'assets/audio/sfx/crowd_cheer.mp3', gain: 0.5 },
   crowdOhh: { file: 'assets/audio/sfx/crowd_ohh.mp3', gain: 0.45 },
+  crowdAww: { file: 'assets/audio/sfx/crowd_aww.mp3', gain: 0.28 },
   crowdBed: { file: 'assets/audio/sfx/crowd_bed.mp3', gain: 1 },
   mcRound1: { file: 'assets/audio/sfx/mc_round1.mp3', gain: 0.55 },
   mcRound2: { file: 'assets/audio/sfx/mc_round2.mp3', gain: 0.55 },
@@ -569,6 +585,11 @@ const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
   mcThree: { file: 'assets/audio/sfx/mc_three.mp3', gain: 0.55 },
   mcTwo: { file: 'assets/audio/sfx/mc_two.mp3', gain: 0.55 },
   mcOne: { file: 'assets/audio/sfx/mc_one.mp3', gain: 0.55 },
+  // The miss lines come out of the chain a little hotter than the others.
+  mcDropped: { file: 'assets/audio/sfx/mc_dropped.mp3', gain: 0.46 },
+  mcOffBeat: { file: 'assets/audio/sfx/mc_offbeat.mp3', gain: 0.46 },
+  mcGetItBack: { file: 'assets/audio/sfx/mc_getback.mp3', gain: 0.48 },
+  mcStreakOver: { file: 'assets/audio/sfx/mc_streakover.mp3', gain: 0.46 },
   count3: { file: 'assets/audio/sfx/count_3.mp3', gain: 0.6 },
   count2: { file: 'assets/audio/sfx/count_2.mp3', gain: 0.6 },
   count1: { file: 'assets/audio/sfx/count_1.mp3', gain: 0.6 },
@@ -823,20 +844,28 @@ export function startDeckHiss(game: Phaser.Game): Voice | null {
 }
 
 /** The turntable moves that can be made live from the battle song. */
-export type RecordMove = 'djRewind' | 'djBrake';
+export type RecordMove = 'djRewind' | 'djBrake' | 'djScrub';
 
 export function isRecordMove(name: SfxName): name is RecordMove {
-  return name === 'djRewind' || name === 'djBrake';
+  return name === 'djRewind' || name === 'djBrake' || name === 'djScrub';
 }
 
 const SPINBACK = 0.62;
 const CATCH = 0.06;
 const BRAKE = 1.0;
+/** A scrub: back, forward, back, all within about a third of a second. */
+const SCRUB = 0.34;
+/** The scrub's strokes: start (s), length (s), direction, and the record speed at each end. */
+const SCRUB_STROKES: readonly { at: number; dur: number; back: boolean; from: number; to: number }[] = [
+  { at: 0, dur: 0.075, back: true, from: 1.7, to: 0.25 },
+  { at: 0.085, dur: 0.065, back: false, from: 0.3, to: 1.9 },
+  { at: 0.16, dur: 0.17, back: true, from: 2.1, to: 0.12 },
+];
 /** Song audio is mastered hot: a record move sits a little under the hype samples. */
 const RECORD_GAIN = 0.6;
 
 export function recordMoveDuration(move: RecordMove): number {
-  return move === 'djRewind' ? SPINBACK : BRAKE;
+  return move === 'djRewind' ? SPINBACK : move === 'djScrub' ? SCRUB : BRAKE;
 }
 
 /**
@@ -856,6 +885,7 @@ export function scheduleRecordMove(
 ): AudioScheduledSourceNode[] {
   const pos = Math.min(Math.max(position, 0), Math.max(0, song.duration - 0.05));
   const level = volume * RECORD_GAIN;
+  if (move === 'djScrub') return scheduleScrub(ctx, song, pos, at, level, out);
   if (move === 'djBrake') {
     const source = ctx.createBufferSource();
     source.buffer = song;
@@ -910,6 +940,63 @@ export function scheduleRecordMove(
   return [grab, back];
 }
 
+/**
+ * The DJ fumbling the record on a miss: the hand grabs it and scrubs the last
+ * moment of the song back, forward and back again. Each stroke reads the
+ * song at a speed sliding between its two ends, through a band-pass so it
+ * sounds like a stylus in the groove rather than the full mix. The song
+ * itself keeps playing underneath, on time.
+ */
+function scheduleScrub(ctx: BaseAudioContext, song: AudioBuffer, pos: number, at: number, level: number, out: AudioNode): AudioScheduledSourceNode[] {
+  const rate = song.sampleRate;
+  const span = Math.min(pos, 0.45);
+  if (span < 0.1) return [];
+  const length = Math.floor(span * rate);
+  const from = Math.floor(pos * rate);
+  // The groove just played, both ways: backwards for the back strokes, forwards for the push.
+  const back = ctx.createBuffer(song.numberOfChannels, length, rate);
+  const ahead = ctx.createBuffer(song.numberOfChannels, length, rate);
+  for (let channel = 0; channel < song.numberOfChannels; channel++) {
+    const src = song.getChannelData(channel);
+    const rev = back.getChannelData(channel);
+    const fwd = ahead.getChannelData(channel);
+    for (let i = 0; i < length; i++) {
+      rev[i] = src[from - 1 - i];
+      fwd[i] = src[from - length + i];
+    }
+  }
+  const tone = ctx.createBiquadFilter();
+  tone.type = 'bandpass';
+  tone.frequency.value = 1400;
+  tone.Q.value = 0.8;
+  tone.connect(out);
+  const sources: AudioScheduledSourceNode[] = [];
+  let backRead = 0;
+  for (const stroke of SCRUB_STROKES) {
+    const source = ctx.createBufferSource();
+    source.buffer = stroke.back ? back : ahead;
+    const start = at + stroke.at;
+    const end = start + stroke.dur;
+    source.playbackRate.setValueAtTime(stroke.from, start);
+    source.playbackRate.linearRampToValueAtTime(stroke.to, end);
+    const gain = ctx.createGain();
+    // The stylus is louder the faster the record moves.
+    const peak = level * 1.5 * Math.min(1, Math.max(stroke.from, stroke.to) / 1.6);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.linearRampToValueAtTime(peak, start + 0.008);
+    gain.gain.setValueAtTime(peak, end - 0.02);
+    gain.gain.linearRampToValueAtTime(0.0001, end);
+    source.connect(gain).connect(tone);
+    // Back strokes pick up where the last back stroke left off; the push replays the end of the groove.
+    const offset = stroke.back ? Math.min(backRead, span - 0.05) : Math.max(0, span - 0.12);
+    if (stroke.back) backRead += stroke.dur * (stroke.from + stroke.to) * 0.5;
+    source.start(start, offset);
+    source.stop(end + 0.01);
+    sources.push(source);
+  }
+  return sources;
+}
+
 /** A record move made from the battle song, through the hype limiter. Null when muted or locked. */
 export function startRecordMove(game: Phaser.Game, move: RecordMove, song: AudioBuffer, position: number, delay = 0): Voice | null {
   const volume = getSettings().sfxVolume;
@@ -919,6 +1006,10 @@ export function startRecordMove(game: Phaser.Game, move: RecordMove, song: Audio
   const out = ctx.createGain();
   out.connect(busInput(ctx, 'hype'));
   const sources = scheduleRecordMove(ctx, move, song, position, ctx.currentTime + delay, volume, out);
+  if (sources.length === 0) {
+    out.disconnect();
+    return null;
+  }
   return voiceOf(ctx, out, sources, recordMoveDuration(move));
 }
 

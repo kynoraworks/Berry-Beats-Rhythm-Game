@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, CSS, LANE_COLORS, LANE_NAMES, SceneKeys, Tex } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { music } from '../core/music';
-import { getSettings, keyLabel, resetSettings, updateSettings, type Settings } from '../core/settings';
+import { CAMERA_MOTIONS, getSettings, keyLabel, resetSettings, updateSettings, type CameraMotion, type Settings } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { SCHEME_INFO, TOUCH_SCHEMES, zonesFor, type TouchScheme } from '../core/touchSchemes';
 import { UiButton, addBackdrop, addBody, addBox, addHeader, addHints, addSlider, addText, addToggle, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
@@ -135,15 +135,15 @@ export class OptionsScene extends Phaser.Scene {
     this.addToggle(RIGHT, rightY(1), 'No fail', 'Keep playing when the bar runs out.', 'noFail');
     this.addToggle(RIGHT, rightY(2), 'Reduce motion', 'Turn off screen shakes, bright bursts and pulsing. Flashes become dark smoke.', 'reduceMotion');
     this.addToggle(RIGHT, rightY(3), 'Hype camera', 'Tilt the stage into 2.5D during a hype streak. Off, or with Reduce motion, hype stays flat.', 'hypeCamera');
+    this.addCameraRow(rightY(4));
 
-    const controlsY = rightY(3) + 48;
+    const controlsY = rightY(4) + 48;
     if (isTouch()) {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Touch controls');
       this.addTouchControls(controlsY);
     } else {
       addSectionTitle(this, RIGHT.x + 32, controlsY, RIGHT.w - 64, 'Lane keys');
       LANE_NAMES.forEach((_, lane) => this.addKeyRow(lane, controlsY + 52 + lane * KEY_DY));
-      addBody(this, RIGHT.x + RIGHT.w / 2, RIGHT.y + RIGHT.h - 30, 'Two keys per lane. Press Enter to change one.', 18, { color: CSS.grey, wrapWidth: RIGHT.w - 48 });
     }
 
     this.addButtonRow(DESC.x + DESC.w / 2 - 156, 668, 'Reset options', 296, 'Put every option and key back to how it started.', () => this.reset());
@@ -249,9 +249,44 @@ export class OptionsScene extends Phaser.Scene {
       updateSettings({ [key]: !getSettings()[key] });
       playSfx(this.game, getSettings()[key] ? 'toggleOn' : 'toggleOff');
       refresh();
+      // Reduce motion also shows on the Camera row.
+      if (key === 'reduceMotion') this.rows.forEach((row) => row.refresh());
     };
     this.addHitZone(bounds, index, toggle);
     this.rows.push({ hint, bounds, refresh, adjust: toggle, confirm: toggle });
+  }
+
+  /** Battle camera motion: Full, Light or Off, stepped with the arrows. Reduce motion overrides it. */
+  private addCameraRow(y: number): void {
+    const index = this.rows.length;
+    const bounds = this.rowBounds(RIGHT, y);
+    const at = controls(RIGHT);
+    this.addHitZone(bounds, index);
+    addText(this, at.label, y, 'Camera', 32, { origin: [0, 0.5], stroke: false });
+    const value = addText(this, at.control, y, '', 24, { color: CSS.yellow, stroke: false });
+    const names: Record<CameraMotion, string> = { full: 'Full', light: 'Light', off: 'Off' };
+    const refresh = () => {
+      const settings = getSettings();
+      value.setText(settings.reduceMotion ? 'Off' : names[settings.cameraMotion]).setColor(settings.reduceMotion ? CSS.grey : CSS.yellow);
+    };
+    const adjust = (dir: number) => {
+      const list = CAMERA_MOTIONS;
+      const next = list[(list.indexOf(getSettings().cameraMotion) + dir + list.length) % list.length];
+      updateSettings({ cameraMotion: next });
+      playSfx(this.game, 'sliderTick', next === 'full' ? 1.3 : next === 'light' ? 1 : 0.8);
+      refresh();
+      // Reduce motion changes what this row shows.
+      this.rows.forEach((row) => row.refresh());
+    };
+    const press = (dir: -1 | 1) => () => {
+      if (!this.idle()) return;
+      this.setFocus(index, false);
+      adjust(dir);
+    };
+    addStepArrow(this, at.arrowLeft, y, -1, press(-1), () => this.setFocus(index, false));
+    addStepArrow(this, at.arrowRight, y, 1, press(1), () => this.setFocus(index, false));
+    const hint = 'Battle camera: Full bumps on the beat and leans in on turns, Light only bumps a little. Reduce motion turns it off.';
+    this.rows.push({ hint, bounds, refresh, adjust, confirm: () => adjust(1) });
   }
 
   /** A labelled row with a small button on the right. */
@@ -284,7 +319,7 @@ export class OptionsScene extends Phaser.Scene {
     addText(this, at.label, y, 'Controls', 32, { origin: [0, 0.5], stroke: false });
     const value = addText(this, at.control, y, '', 24, { color: CSS.yellow, stroke: false });
     const preview = this.add.graphics();
-    const previewBox: Bounds = { x: RIGHT.x + RIGHT.w / 2 - 150, y: top + 142, w: 300, h: 140 };
+    const previewBox: Bounds = { x: RIGHT.x + RIGHT.w / 2 - 130, y: top + 124, w: 260, h: 110 };
     addBox(this, previewBox.x - 10, previewBox.y - 10, previewBox.w + 20, previewBox.h + 20, 'track');
     preview.setDepth(1);
     const row: Row = { hint: '', bounds, refresh: () => undefined };

@@ -11,12 +11,13 @@ import {
   buildTurns,
   planRival,
   rivalPersonality,
+  seededRandom,
   type Side,
   type Turn,
   type TurnSegment,
 } from '../core/battle';
-import { COLORS, CSS, GAME_W, SceneKeys, Tex, type Lane } from '../core/config';
-import { secToBeat, toTimedNotes, type Chart } from '../core/chart';
+import { COLORS, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex, type Lane } from '../core/config';
+import { beatToSec, secToBeat, toTimedNotes, type Chart } from '../core/chart';
 import { HypeAudio, type CountCall, type HypeEvent } from '../core/announcer';
 import { Conductor } from '../core/conductor';
 import { Engine, START_HEALTH, type JudgeEvent, type PlayNote } from '../core/engine';
@@ -41,6 +42,8 @@ import { BattleEffects } from '../play/BattleEffects';
 import { effectChips } from '../play/fighterCard';
 import { HypeMode } from '../play/HypeMode';
 import { StageFx } from '../play/StageFx';
+import { BattleCamera } from '../play/BattleCamera';
+import { MissReactor, cameraLevel, phraseEnds, songShape, type SongShape } from '../play/battleLife';
 import { VersusCard } from '../play/VersusCard';
 import { Countdown } from '../play/Countdown';
 import { planCountdown } from '../play/countdownPlan';
@@ -85,6 +88,17 @@ const TURN_LEAD = 0.45;
 const ROUND_SETTLE = 0.3;
 /** Mean timing error is only reported from this many hits. */
 const MIN_ERROR_SAMPLES = 20;
+/** Perfects in a row from which each one bursts a ring out of its receptor. */
+const PERFECT_RUN = 8;
+/** Camera kicks (zoom added): the end of a phrase, a milestone, the drop, a round lost. */
+const PHRASE_PUNCH = 0.03;
+const MILESTONE_PUNCH = 0.055;
+const DROP_PUNCH = 0.085;
+const ROUND_PUNCH = 0.05;
+/** Seconds the camera holds the wide shot after a round. */
+const ROUND_WIDE = 1.8;
+/** How far up from the dancers' feet the camera looks on a turn: about chest height. */
+const CHEST = 28 * PX;
 
 const TURN_LABELS: Record<'battle' | 'lesson', Record<Exclude<Turn, 'rest'>, string>> = {
   battle: { player: 'Your turn!', rival: "'s turn", both: 'Face-off!' },
@@ -166,6 +180,18 @@ export class PlayScene extends Phaser.Scene {
   private idleClock = 0;
   private autoHeld: (PlayNote | null)[] = [null, null, null, null];
   private nextMilestone = COMBO_MILESTONES[0];
+  /** The stage camera (null with camera motion off). */
+  private camera: BattleCamera | null = null;
+  /** The song's drops and intense bars, read from the chart. */
+  private shape: SongShape = { drops: [], intense: [] };
+  private dropIndex = 0;
+  /** Ids of the notes that end a phrase, for a small camera punch when they land. */
+  private playerEnds = new Set<number>();
+  private rivalEnds = new Set<number>();
+  private missReactor = new MissReactor(Math.random);
+  /** The combo as it stood after the last hit, so a miss knows what it broke. */
+  private lastCombo = 0;
+  private perfectRun = 0;
 
   constructor() {
     super(SceneKeys.Play);
@@ -217,6 +243,14 @@ export class PlayScene extends Phaser.Scene {
     this.stopRotateWatch = null;
     this.autoHeld = [null, null, null, null];
     this.nextMilestone = COMBO_MILESTONES[0];
+    this.camera = null;
+    this.shape = { drops: [], intense: [] };
+    this.dropIndex = 0;
+    this.playerEnds = new Set();
+    this.rivalEnds = new Set();
+    this.missReactor = new MissReactor(seededRandom(`${data.chart.id}:misses`));
+    this.lastCombo = 0;
+    this.perfectRun = 0;
   }
 
   create(): void {
@@ -289,6 +323,7 @@ export class PlayScene extends Phaser.Scene {
       player: crew?.ally ?? 'berry',
       crew: crew ? { round: crew.round, results: session?.results ?? [] } : null,
       gimmick: this.rules.gimmick,
+      calm: settings.reduceMotion,
     });
     this.hud.setBattle(this.battle, 60 / chart.bpm);
     if (this.rivalEngine) {
@@ -300,6 +335,21 @@ export class PlayScene extends Phaser.Scene {
       this.hud.setSolo();
       this.stage.setTurn('player');
     }
+
+    // The stage camera, the song's shape and the phrase ends (src/play/battleLife.ts).
+    this.shape = songShape([...chart.notes, ...rivalChart].map((n) => n.b));
+    this.dropIndex = startAt > 0 ? this.shape.drops.filter((b) => beatToSec(chart, b) < startAt).length : 0;
+    this.camera = BattleCamera.create(this, cameraLevel(settings.cameraMotion, settings.reduceMotion), {
+      width: GAME_W,
+      height: GAME_H,
+      playerX,
+      rivalX: this.rival ? RIVAL_X : null,
+      bodyY: feetY(stageFloor, playerX) - CHEST,
+    }, this.shape);
+    const camera = this.camera;
+    this.stage.setPunchTarget(camera ? (size) => camera.punch(size) : null);
+    this.playerEnds = phraseEndIds(chart, this.engine.notes);
+    this.rivalEnds = this.rivalEngine ? phraseEndIds(chart, this.rivalEngine.notes) : new Set();
 
     if (this.rules.gimmick || this.rules.ability) {
       const hud = this.hud;
@@ -339,7 +389,7 @@ export class PlayScene extends Phaser.Scene {
         chart, engine: this.engine, stage: this.stage, player: this.player, rival: this.rival,
         playerField: this.playerField, rivalField: this.rivalField, playerLanes: PLAYER_LANES, rivalLanes: RIVAL_LANES, playerX, rivalX: RIVAL_X,
         camera: settings.hypeCamera && !settings.reduceMotion,
-        hooks: { sfx: (name) => this.hypeModeSfx(name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch() },
+        hooks: { sfx: (name) => this.hypeModeSfx(name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch(0.075) },
       });
     }
 
@@ -714,6 +764,8 @@ export class PlayScene extends Phaser.Scene {
     if (this.errorCount >= MIN_ERROR_SAMPLES) results.meanErrorMs = (this.errorSum / this.errorCount) * 1000;
 
     const playerOnTop = !failed && (summary?.won ?? true);
+    this.camera?.setTurn(playerOnTop ? 'player' : 'rival');
+    this.camera?.wide(1.2);
     this.player.finish(playerOnTop);
     this.rival?.finish(!playerOnTop);
     this.stage.setTurn(playerOnTop ? 'player' : 'rival');
@@ -753,6 +805,7 @@ export class PlayScene extends Phaser.Scene {
       this.conductor?.pause();
       this.cheer({ kind: 'fail' }, 'fail');
       if (!getSettings().reduceMotion) this.cameras.main.shake(350, 0.008);
+      this.camera?.shake(12);
       this.countText.setText('Failed').setColor(CSS.miss).setAlpha(1).setScale(1);
       this.time.delayedCall(1300, wrapUp);
     } else {
@@ -945,6 +998,7 @@ export class PlayScene extends Phaser.Scene {
   private handleEvents(events: JudgeEvent[]): void {
     for (const event of events) {
       const { judgement, note, part } = event;
+      const hyped = !!this.hype?.active;
       this.battle?.record('player', note.t, judgement);
       this.flawless?.record(note.t, judgement);
       this.effects?.record(event);
@@ -959,16 +1013,16 @@ export class PlayScene extends Phaser.Scene {
           playSfx(this.game, 'remove');
           continue;
         }
-        this.hud.showJudgement('miss', 0);
-        this.player.stumble();
-        playSfx(this.game, 'miss');
-        // Past the 25 milestone the crowd feels a broken streak.
-        if (this.nextMilestone > COMBO_MILESTONES[1]) this.cheer({ kind: 'bigMiss' });
+        this.reactToMiss(note.t, hyped);
         this.nextMilestone = COMBO_MILESTONES[0];
         continue;
       }
-      this.hud.showJudgement(judgement, this.engine.stats.combo);
-      this.playerField.hitFx(note.lane, judgement === 'perfect' ? 1 : judgement === 'good' ? 0.6 : 0.3);
+      this.lastCombo = this.engine.stats.combo;
+      if (part !== 'holdEnd') this.perfectRun = judgement === 'perfect' ? this.perfectRun + 1 : 0;
+      const burst = this.perfectRun >= PERFECT_RUN && judgement === 'perfect' && !getSettings().reduceMotion;
+      this.hud.showJudgement(judgement, this.engine.stats.combo, this.perfectRun);
+      this.playerField.hitFx(note.lane, judgement === 'perfect' ? 1 : judgement === 'good' ? 0.6 : 0.3, burst);
+      if (part !== 'holdEnd' && this.playerEnds.has(note.id)) this.camera?.punch(PHRASE_PUNCH);
       if (part !== 'holdEnd') {
         if (getSettings().hitSounds) playSfx(this.game, judgement);
         if (!this.playData.autoplay) {
@@ -982,12 +1036,49 @@ export class PlayScene extends Phaser.Scene {
         // The milestone shows in the dancer's showpiece and the combo count by the lanes, not a centre call-out.
         this.player.special();
         this.stage.flash(COLORS.yellow, 0.22);
-        this.stage.punch();
+        this.stage.punch(MILESTONE_PUNCH);
+        this.hud.kick(0.8);
         this.cheer({ kind: 'combo', combo }, 'combo');
         const index = COMBO_MILESTONES.indexOf(this.nextMilestone);
         this.nextMilestone = index >= 0 && index < COMBO_MILESTONES.length - 1 ? COMBO_MILESTONES[index + 1] : this.nextMilestone + 50;
       }
     }
+  }
+
+  /**
+   * A miss lands: Berry is knocked back, the stage camera shakes, the edges
+   * flush red, the song is muffled and dips, and in a battle the DJ scrubs the
+   * record, the crowd groans and now and then the MC has something to say.
+   * A broken streak gets all of it, harder; MissReactor sizes it. Nothing here
+   * touches the song's clock or the timing of the next notes.
+   */
+  private reactToMiss(time: number, hyped: boolean): void {
+    const lost = this.lastCombo;
+    this.lastCombo = 0;
+    this.perfectRun = 0;
+    const reaction = this.missReactor.react(time, lost);
+    const force = reaction.tier === 'stray' ? 0.35 : reaction.tier === 'break' ? 0.7 : 1;
+    this.hud.showJudgement('miss', 0, 0, lost);
+    this.player.stumble(force, -1);
+    this.camera?.shake(reaction.shake);
+    this.stage.missSting(force);
+    this.conductor?.muffle(reaction.muffle);
+    playSfx(this.game, 'miss');
+    if (this.hypeAudio) {
+      // A miss that ends hype already spins the record back.
+      const { scratch, crowd, line, duck, duckLength } = reaction;
+      this.hypeAudio.event({ kind: 'miss', scratch: scratch && !hyped, crowd, line, duck, duckLength });
+    }
+    if (reaction.tier !== 'stray') this.rival?.getReady('boast', 0.4);
+  }
+
+  /** The song drops: a flash, a punch, the HUD kicks and the crowd jumps. */
+  private drop(): void {
+    this.stage.flash(0xffffff, 0.24);
+    this.stage.punch(DROP_PUNCH);
+    this.stage.cheer();
+    this.hud.kick(1);
+    if (this.hypeAudio) this.hypeAudio.event({ kind: 'drop' });
   }
 
   /** Battle hype: the MC, crowd and stingers. Outside a battle only `fallback` plays. */
@@ -1020,9 +1111,10 @@ export class PlayScene extends Phaser.Scene {
         this.engine.adjustHealth(RIVAL_PULL[judgement]);
       }
       if (judgement === 'miss') {
-        if (part !== 'holdEnd' || note.state !== 'missed') this.rival?.stumble();
+        if (part !== 'holdEnd' || note.state !== 'missed') this.rival?.stumble(0.3, 1);
         continue;
       }
+      if (part !== 'holdEnd' && this.rivalEnds.has(note.id)) this.camera?.punch(PHRASE_PUNCH * 0.8);
       if (part === 'holdEnd') {
         field?.setPressed(note.lane, false);
         continue;
@@ -1071,6 +1163,7 @@ export class PlayScene extends Phaser.Scene {
     const label = turn === 'rival' && this.battle ? `${this.rivalName}${labels.rival}` : labels[turn];
     this.hud.setTurn(label, turn === 'rival' ? this.rivalLook.css : TURN_COLORS[turn]);
     this.stage.setTurn(turn);
+    this.camera?.setTurn(turn);
     this.playerField.setDimmed(turn === 'rival');
     this.rivalField?.setDimmed(turn === 'player');
     if (turn === 'both') playSfx(this.game, 'banner');
@@ -1088,15 +1181,19 @@ export class PlayScene extends Phaser.Scene {
     }
     this.stage.flash(mine ? COLORS.blue : this.rivalLook.color, 0.28);
     this.cheer(mine ? { kind: 'roundWon' } : { kind: 'roundLost' }, 'round');
+    // The camera pulls back to take in both of them, with a kick.
+    this.camera?.wide(ROUND_WIDE);
+    this.hud.kick(0.9);
     if (mine) {
       this.player.special();
-      this.rival?.stumble();
+      this.rival?.stumble(0.5, 1);
       this.stage.cheer();
-      this.stage.punch();
+      this.stage.punch(ROUND_PUNCH * 1.3);
       if (!this.hypeAudio) playSfx(this.game, 'cheer');
     } else {
       this.rival?.special();
-      this.player.stumble();
+      this.player.stumble(0.5, -1);
+      this.stage.punch(ROUND_PUNCH);
     }
   }
 
@@ -1114,6 +1211,8 @@ export class PlayScene extends Phaser.Scene {
       this.player.update(dt, idleBeat);
       this.rival?.update(dt, idleBeat);
       this.stage.update(idleBeat, dt);
+      // No beat bumps over a conversation: the camera only settles.
+      this.camera?.update(-1, dt, 0);
       return;
     }
     const time = this.heardTime();
@@ -1126,6 +1225,12 @@ export class PlayScene extends Phaser.Scene {
       this.handleEvents(this.engine.update(time));
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
       this.updateBattle(time);
+      const drops = this.shape.drops;
+      while (this.dropIndex < drops.length && beat >= drops[this.dropIndex]) {
+        // A drop already passed (a seek, a long frame) goes by quietly.
+        if (beat < drops[this.dropIndex] + 1) this.drop();
+        this.dropIndex++;
+      }
 
       const crew = this.crew;
       const fade = crew && time > crew.end - ROUND_FADE ? Phaser.Math.Clamp((crew.end + 0.4 - time) / ROUND_FADE, 0, 1) : 1;
@@ -1163,6 +1268,7 @@ export class PlayScene extends Phaser.Scene {
       this.rival?.update(dt, beat);
       this.stage.update(beat, dt);
       this.hype?.update(time, dt, this.speed, this.state === 'playing');
+      this.camera?.update(this.state === 'playing' ? beat : -1, dt, this.hype?.tiltAmount ?? 0);
       const progress = this.crew ? (time - this.crew.start) / (this.crew.end - this.crew.start) : time / conductor.duration;
       this.hud.update(this.engine.stats, this.battle ? (this.rivalEngine?.stats ?? null) : null, { time, beat, progress: Phaser.Math.Clamp(progress, 0, 1), effects: this.effectList(time) }, dt);
       this.playerField.setOutline(this.state === 'playing' && this.effects?.steadyOn(time) ? COLORS.yellow : null);
@@ -1206,6 +1312,14 @@ export class PlayScene extends Phaser.Scene {
     });
   }
 
+  /** The development `?miss=` flag: true for a note autoplay should let go. */
+  private autoDrops(id: number): boolean {
+    const skip = this.playData.autoMiss;
+    if (skip === undefined) return false;
+    if (Array.isArray(skip)) return skip.includes(id);
+    return skip > 1 && id % skip === skip - 1;
+  }
+
   /** Plays every note perfectly (and fires the Flair when full). Used for demos and automated tests. */
   private autoplay(time: number): void {
     if (this.effects?.ready && this.effects.goodMoment(time)) this.effects.fire(time);
@@ -1216,6 +1330,8 @@ export class PlayScene extends Phaser.Scene {
         this.playerField.setPressed(lane, false);
       }
       const next = this.engine.peek(lane);
+      // Development only (?miss=): let some notes go by, to show the miss reactions.
+      if (next && this.autoDrops(next.id)) continue;
       if (next && next.state === 'pending' && next.t <= time) {
         this.playerField.setPressed(lane, true);
         this.player.dance(lane);
@@ -1285,4 +1401,12 @@ export class PlayScene extends Phaser.Scene {
     const hint = isTouch() ? 'Tap to change backup' : 'Left / Right: change backup';
     this.backupLabel?.setText(`${this.backupBlurb()}\n${hint}`);
   }
+}
+
+/** Ids of the notes in `notes` that end a phrase (see phraseEnds). */
+function phraseEndIds(chart: Chart, notes: readonly PlayNote[]): Set<number> {
+  const sorted = [...notes].sort((a, b) => a.t - b.t);
+  const ids = new Set<number>();
+  for (const index of phraseEnds(sorted.map((n) => secToBeat(chart, n.t)))) ids.add(sorted[index].id);
+  return ids;
 }

@@ -1,5 +1,10 @@
 import { masterInput } from './sfx';
 
+/** The song's low-pass when nothing is happening: above hearing, so it changes nothing. */
+const OPEN_HZ = 20000;
+/** Where the low-pass dives to after the biggest miss. */
+const MUFFLE_HZ = 520;
+
 /**
  * Plays one decoded song and reports the playback position from the audio
  * clock, so notes stay in sync regardless of frame rate. Supports a silent
@@ -9,6 +14,8 @@ export class Conductor {
   readonly ctx: AudioContext;
   readonly buffer: AudioBuffer;
   private readonly gain: GainNode;
+  /** A low-pass on the way out, wide open except for a moment after a miss (see muffle). */
+  private readonly tone: BiquadFilterNode;
   private source: AudioBufferSourceNode | null = null;
   /** Context time at which song position `anchorPos` is (or was) reached. */
   private anchorCtx = 0;
@@ -24,7 +31,29 @@ export class Conductor {
     this.buffer = buffer;
     this.gain = ctx.createGain();
     this.gain.gain.value = volume;
-    this.gain.connect(masterInput(ctx));
+    this.tone = ctx.createBiquadFilter();
+    this.tone.type = 'lowpass';
+    this.tone.frequency.value = OPEN_HZ;
+    this.tone.Q.value = 0.7;
+    this.gain.connect(this.tone).connect(masterInput(ctx));
+  }
+
+  /**
+   * A miss muffles the song for a moment: the low-pass dives (deeper for a
+   * bigger `amount`, 0..1) and opens again within about a third of a second.
+   * Only the tone changes; the song's clock and position are untouched.
+   */
+  muffle(amount: number): void {
+    const depth = Math.min(1, Math.max(0, amount));
+    if (depth <= 0) return;
+    const now = this.ctx.currentTime;
+    const f = this.tone.frequency;
+    const low = OPEN_HZ * Math.pow(MUFFLE_HZ / OPEN_HZ, depth);
+    f.cancelScheduledValues(now);
+    f.setValueAtTime(Math.max(low, f.value), now);
+    f.exponentialRampToValueAtTime(low, now + 0.035);
+    f.setValueAtTime(low, now + 0.035 + 0.06 * depth);
+    f.exponentialRampToValueAtTime(OPEN_HZ, now + 0.12 + 0.24 * depth);
   }
 
   get duration(): number {
@@ -130,6 +159,7 @@ export class Conductor {
     this.running = false;
     this.stopSource();
     this.gain.disconnect();
+    this.tone.disconnect();
   }
 
   private stopSource(): void {

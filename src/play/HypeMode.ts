@@ -78,6 +78,11 @@ export class HypeMode {
     return { left: this.tracker.remaining(), beats: Math.ceil(this.tracker.secondsLeft() / (60 / this.setup.chart.bpm) - 1e-6), frozen: this.tracker.frozen };
   }
 
+  /** How far the hype camera is tilted right now, 0 (flat) to 1. 0 when it never tilts (option off). */
+  get tiltAmount(): number {
+    return this.view ? Phaser.Math.Easing.Sine.InOut(this.tilt) : 0;
+  }
+
   /** Times hype started this song. */
   get triggers(): number {
     return this.tracker.triggers;

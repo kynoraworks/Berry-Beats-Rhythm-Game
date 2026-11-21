@@ -5,6 +5,7 @@ import { Depth, NOTE_SCALE, RECEPTOR_Y } from './layout';
 import type { FieldProjection } from './Projection';
 
 const SPARK_KEY = 'spark';
+const RING_KEY = 'hit_ring';
 const HOLD_WIDTH = 34;
 const HOLD_BORDER = 5;
 const MARGIN = 70;
@@ -29,6 +30,8 @@ export class NoteField {
   private readonly notes: PlayNote[];
   private readonly receptors: Phaser.GameObjects.Image[] = [];
   private readonly flashes: Phaser.GameObjects.Image[] = [];
+  /** A ring that bursts out of a receptor on the strongest hits, one per lane, reused. */
+  private readonly rings: Phaser.GameObjects.Image[] = [];
   private readonly holdGfx: Phaser.GameObjects.Graphics;
   private readonly sparks: Phaser.GameObjects.Particles.ParticleEmitter;
   private readonly active = new Map<number, Phaser.GameObjects.Image>();
@@ -58,6 +61,13 @@ export class NoteField {
       g.generateTexture(SPARK_KEY, 8, 8);
       g.destroy();
     }
+    if (!scene.textures.exists(RING_KEY)) {
+      // Drawn at the pixel art's scale: a chunky ring 2 art pixels thick.
+      const g = scene.make.graphics({}, false);
+      g.lineStyle(10, 0xffffff, 1).strokeCircle(48, 48, 42);
+      g.generateTexture(RING_KEY, 96, 96);
+      g.destroy();
+    }
 
     const left = lanes[0] - 55;
     const width = lanes[3] - lanes[0] + 110;
@@ -83,6 +93,7 @@ export class NoteField {
           .setBlendMode(Phaser.BlendModes.ADD)
           .setVisible(false),
       );
+      this.rings.push(scene.add.image(x, RECEPTOR_Y, RING_KEY).setDepth(Depth.effects).setBlendMode(Phaser.BlendModes.ADD).setTint(LANE_COLORS[lane]).setVisible(false));
     });
     this.sparks = scene.add
       .particles(0, 0, SPARK_KEY, {
@@ -134,8 +145,11 @@ export class NoteField {
     this.receptors[lane].setFrame(down ? lane : 4 + lane).setScale(down ? NOTE_SCALE * 0.9 : NOTE_SCALE);
   }
 
-  /** Burst and glow on a lane's receptor. `strength` 0..1 scales the effect. */
-  hitFx(lane: Lane, strength = 1): void {
+  /**
+   * Burst and glow on a lane's receptor. `strength` 0..1 scales the effect;
+   * `burst` (a run of Perfects, a milestone) adds a ring and a bigger shower.
+   */
+  hitFx(lane: Lane, strength = 1, burst = false): void {
     const flash = this.flashes[lane];
     this.scene.tweens.killTweensOf(flash);
     flash.setVisible(true).setAlpha(0.9).setScale(NOTE_SCALE);
@@ -148,7 +162,13 @@ export class NoteField {
       onComplete: () => flash.setVisible(false),
     });
     this.sparks.setParticleTint(LANE_COLORS[lane]);
-    this.sparks.explode(Math.round(3 + 7 * strength), this.lanes[lane], RECEPTOR_Y);
+    this.sparks.explode(Math.round(3 + 7 * strength + (burst ? 8 : 0)), this.lanes[lane], this.projectY(RECEPTOR_Y));
+    if (burst) {
+      const ring = this.rings[lane];
+      this.scene.tweens.killTweensOf(ring);
+      ring.setVisible(true).setAlpha(0.85).setScale(0.6).setY(this.projectY(RECEPTOR_Y));
+      this.scene.tweens.add({ targets: ring, scale: 1.5, alpha: 0, duration: 260, ease: 'Cubic.easeOut', onComplete: () => ring.setVisible(false) });
+    }
     if (!this.pressed[lane]) {
       const receptor = this.receptors[lane];
       this.scene.tweens.killTweensOf(receptor);

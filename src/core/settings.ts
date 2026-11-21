@@ -1,6 +1,10 @@
 import { LANE_COUNT } from './config';
 import { DEFAULT_TOUCH_SCHEME, TOUCH_SCHEMES, type TouchScheme } from './touchSchemes';
 
+/** How much the battle camera moves: bumps, punches, leaning in on turns and shakes. */
+export type CameraMotion = 'full' | 'light' | 'off';
+export const CAMERA_MOTIONS: readonly CameraMotion[] = ['full', 'light', 'off'];
+
 export interface Settings {
   /** 0..1 */
   musicVolume: number;
@@ -24,6 +28,8 @@ export interface Settings {
   reduceMotion: boolean;
   /** Tilt the battle into 2.5D during a hype streak (reduce motion keeps it flat). */
   hypeCamera: boolean;
+  /** Battle camera: Full (zoom bumps on the beat, leaning in on turns, punches and shakes), Light (small bumps) or Off. Reduce motion turns it off. */
+  cameraMotion: CameraMotion;
   /** How battles are played by touch. */
   touchScheme: TouchScheme;
   /** Keep the touch guide on screen for the whole song (otherwise it fades after a few seconds). */
@@ -42,6 +48,7 @@ export const DEFAULT_SETTINGS: Settings = {
   noFail: false,
   reduceMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
   hypeCamera: true,
+  cameraMotion: 'full',
   touchScheme: DEFAULT_TOUCH_SCHEME,
   touchGuides: false,
   keys: [
@@ -78,6 +85,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     noFail: typeof raw.noFail === 'boolean' ? raw.noFail : d.noFail,
     reduceMotion: typeof raw.reduceMotion === 'boolean' ? raw.reduceMotion : d.reduceMotion,
     hypeCamera: typeof raw.hypeCamera === 'boolean' ? raw.hypeCamera : d.hypeCamera,
+    cameraMotion: CAMERA_MOTIONS.includes(raw.cameraMotion as CameraMotion) ? (raw.cameraMotion as CameraMotion) : d.cameraMotion,
     touchScheme: TOUCH_SCHEMES.includes(raw.touchScheme as TouchScheme) ? (raw.touchScheme as TouchScheme) : d.touchScheme,
     touchGuides: typeof raw.touchGuides === 'boolean' ? raw.touchGuides : d.touchGuides,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),

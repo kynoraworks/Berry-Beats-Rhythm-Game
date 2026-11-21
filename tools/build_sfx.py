@@ -3,6 +3,7 @@
 
     python3 tools/build_sfx.py archive/generated-audio/mc [--countdown]
     python3 tools/build_sfx.py archive/generated-audio/cassette --cassette
+    python3 tools/build_sfx.py archive/generated-audio/miss --miss
 
 RAW_DIR holds the generated takes (ElevenLabs v4, preset voice "Barrett",
 [shouting] tag): mc_*.mp3 for the MC lines and src_ahh.mp3, a
@@ -23,6 +24,11 @@ is synthesised here.
   * Cassette (--cassette): the main menu's tape deck, cut from Mirelo foley
     takes (*_raw.mp3): a tape picked up off the desk, a tape seating in the
     deck and the door shutting, and the deck's motor spinning up to speed.
+  * Miss reactions (--miss): the MC's lines for a dropped streak ("Ooh!
+    Dropped it!", "Whoa! Off beat!", "Come on, get it back!", "Ouch! The
+    streak is over!"), same voice and mic chain, and the crowd's "aww", a
+    Mirelo crowd take given a falling droop. Every take is kept in RAW_DIR;
+    MISS_LINES names the one used.
 """
 import os
 import subprocess
@@ -554,10 +560,40 @@ def cassette(raw):
     save(fade(norm(motor, -3), 0.004, 0.22), 'tape_motor')
 
 
+# Chosen takes for the miss reactions: output name -> take in archive/generated-audio/miss.
+MISS_LINES = {
+    'mc_dropped': 'mc_dropped_a',
+    'mc_offbeat': 'mc_offbeat_b',
+    'mc_getback': 'mc_getback_a',
+    'mc_streakover': 'mc_ouch_streak',
+}
+
+
+def crowd_aww(raw):
+    """The crowd's "aww" for a broken streak: the take eased in, sagging in pitch as it dies away."""
+    x = hp(cut(load(os.path.join(raw, 'crowd_aww_raw.mp3')), 0.05, 1.75), 140, 2)
+    t = np.arange(len(x)) / SR
+    rate = 1.0 - 0.14 * np.clip(t / 1.4, 0, 1) ** 1.5
+    y = varispeed(x, rate)
+    t = np.arange(len(y)) / SR
+    y *= np.clip(t / 0.09, 0, 1) * np.clip(1.15 - t / 1.6, 0, 1)
+    y = lp(y, 7000, 2)
+    save(fade(limit(norm(y, -1.5), -2.0), 0.01, 0.35), 'crowd_aww')
+
+
+def miss_lines(raw):
+    for dst, src in MISS_LINES.items():
+        save(mc_chain(load(os.path.join(raw, f'{src}.mp3'))), dst)
+    crowd_aww(raw)
+
+
 def main():
     if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
     raw = sys.argv[1]
+    if len(sys.argv) == 3 and sys.argv[2] == '--miss':
+        miss_lines(raw)
+        return
     if len(sys.argv) == 3 and sys.argv[2] == '--cassette':
         cassette(raw)
         return

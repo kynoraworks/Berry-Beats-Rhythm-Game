@@ -13,6 +13,10 @@ import { hitStrength } from './stageLoops';
 
 const SPOT_COLOR = 0xfff0c0;
 const PULSE_DARK = 0xd2cdea;
+const VIGNETTE_KEY = 'stage_vignette';
+const MISS_RED = 0xff2a48;
+/** How much brighter the stage's beat light swells on a bar's downbeat than on other beats. */
+const BAR_SWELL = 0.35;
 
 export interface StageLayers {
   background: Phaser.GameObjects.Image;
@@ -46,8 +50,17 @@ export class StageFx {
   private lastBeat = -Infinity;
   private pulse = 0;
   private flashLevel = 0;
-  private punchLevel = 0;
   private hop = 0;
+  /**
+   * The stage's edges flushed red on a miss. Only drawn while it shows: a
+   * full-screen blend every frame costs phones more than it is worth.
+   */
+  private readonly sting: Phaser.GameObjects.Image | null;
+  private stingLevel = 0;
+  /** The light swells a little more on each bar's downbeat. */
+  private bar = 0;
+  /** Where a camera kick goes: the battle camera, when there is one (see BattleCamera). */
+  private punchTo: ((size: number) => void) | null = null;
 
   /** `stage` is a texture key; anything not loaded falls back to the room. */
   constructor(scene: Phaser.Scene, stage: string, playerX: number, rivalX: number | null, calm: boolean) {
@@ -79,6 +92,13 @@ export class StageFx {
           .setScale(PX)
           .setDepth(Depth.characters + 1)
       : null;
+    // Reduced motion keeps the stage as it was: no red flush.
+    this.sting = calm ? null : this.makeVignette(MISS_RED);
+  }
+
+  /** Send camera kicks to the battle camera. Without one, punches do nothing. */
+  setPunchTarget(punch: ((size: number) => void) | null): void {
+    this.punchTo = punch;
   }
 
   /** The pieces the hype camera moves: the back wall, the crowd, the spotlights and the time of day's tint. */
@@ -100,9 +120,14 @@ export class StageFx {
     this.flashLevel = Math.max(this.flashLevel, strength);
   }
 
-  /** A small camera kick for a showpiece. */
-  punch(): void {
-    if (!this.calm) this.punchLevel = 1;
+  /** A small camera kick for a showpiece. `size` is the zoom it adds (0.05 is a good kick). */
+  punch(size = 0.05): void {
+    if (!this.calm) this.punchTo?.(size);
+  }
+
+  /** A miss: the stage's edges flush red for a moment, stronger for a bigger `amount` (0..1). */
+  missSting(amount: number): void {
+    this.stingLevel = Math.max(this.stingLevel, Math.min(1, amount));
   }
 
   /** The crowd jumps, for a round won. */
@@ -121,6 +146,7 @@ export class StageFx {
       this.lastBeat = whole;
       this.extras?.onBeat(whole);
       this.pulse = 1;
+      this.bar = ((whole % 4) + 4) % 4 === 0 && whole >= 0 ? 1 : 0;
       this.crowd?.setFrame(((whole % 2) + 2) % 2);
     }
     for (const side of ['player', 'rival'] as const) {
@@ -130,7 +156,9 @@ export class StageFx {
     if (this.calm) return;
 
     this.pulse = Math.max(0, this.pulse - dt * 3.2);
-    const beatLight = mixColor(PULSE_DARK, 0xffffff, Math.round(this.pulse * 100) / 100);
+    // Bars dip a little darker first, so their swell reads bigger than the beats between.
+    const swing = this.pulse * (1 + BAR_SWELL * this.bar) - BAR_SWELL * this.bar * 0.5;
+    const beatLight = mixColor(PULSE_DARK, 0xffffff, Math.round(Math.min(1, Math.max(0, swing)) * 100) / 100);
     const [tl, tr, bl, br] = this.grade;
     this.background.setTint(multiplyColor(tl, beatLight), multiplyColor(tr, beatLight), multiplyColor(bl, beatLight), multiplyColor(br, beatLight));
     // The stage's loop and the speakers people sit on keep the song's time, in the stage's light.
@@ -140,8 +168,8 @@ export class StageFx {
     this.flashLevel = Math.max(0, this.flashLevel - dt * 1.4);
     this.flashRect.setAlpha(this.flashLevel);
 
-    this.punchLevel = Math.max(0, this.punchLevel - dt * 5);
-    this.scene.cameras.main.setZoom(1 + 0.022 * this.punchLevel * this.punchLevel);
+    this.stingLevel = Math.max(0, this.stingLevel - dt * 2.6);
+    this.sting?.setAlpha(0.55 * this.stingLevel).setVisible(this.stingLevel > 0);
 
     if (this.crowd) {
       this.hop = Math.max(0, this.hop - dt * 2.2);
@@ -222,6 +250,36 @@ export class StageFx {
     }
     // The room is also every custom map's default stage, so it names no stop by itself.
     return stage === Tex.room ? undefined : STOPS.find((stop) => stop.stage === stage);
+  }
+
+  /** The stage's edges and corners in a colour, soft toward the middle. Starts hidden. */
+  private makeVignette(tint: number): Phaser.GameObjects.Image {
+    const textures = this.scene.textures;
+    if (!textures.exists(VIGNETTE_KEY)) {
+      const w = GAME_W / 2;
+      const h = GAME_H / 2;
+      const canvas = textures.createCanvas(VIGNETTE_KEY, w, h);
+      if (canvas) {
+        const ctx = canvas.getContext();
+        const gradient = ctx.createRadialGradient(w / 2, h * 0.46, h * 0.28, w / 2, h * 0.46, w * 0.62);
+        gradient.addColorStop(0, 'rgba(255,255,255,0)');
+        gradient.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+        gradient.addColorStop(1, 'rgba(255,255,255,1)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, w, h);
+        canvas.refresh();
+        canvas.setFilter(Phaser.Textures.FilterMode.LINEAR);
+      }
+    }
+    return this.scene.add
+      .image(0, 0, VIGNETTE_KEY)
+      .setOrigin(0)
+      .setDisplaySize(GAME_W, GAME_H)
+      .setTint(tint)
+      .setTintMode(Phaser.TintModes.FILL)
+      .setDepth(Depth.background + 0.55)
+      .setAlpha(0)
+      .setVisible(false);
   }
 
   /** A spotlight cone from the top of the screen to a pool under feet at `floorY`. */

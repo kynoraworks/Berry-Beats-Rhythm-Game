@@ -311,6 +311,8 @@ export class Dancer {
   private plan: FinisherPlan | null = null;
   private moveFx: MoveFx = 'none';
   private moveOffset = 0;
+  /** Sideways knock from a miss, in screen pixels, easing back to 0. */
+  private recoil = 0;
   private shownIndex = -1;
   private checkedAt = -Infinity;
 
@@ -431,15 +433,23 @@ export class Dancer {
     this.hype = hype;
   }
 
-  /** Lose balance after a missed note. */
-  stumble(): void {
+  /**
+   * Lose balance after a missed note. `force` 0..1 knocks the dancer back
+   * toward `away` (-1 left, 1 right) and squashes them: a broken streak hits
+   * harder than a stray miss. Reduced motion keeps only the pose and tint.
+   */
+  stumble(force = 0, away: -1 | 1 = -1): void {
     if (this.mode === 'final') return;
     this.pending = null;
     this.plan = null;
     this.runMissed = true;
-    this.sprite.setTint(0xff8090);
-    this.scene.time.delayedCall(140, () => this.sprite.clearTint());
+    this.sprite.setTint(force >= 0.5 ? 0xff6070 : 0xff8090);
+    this.scene.time.delayedCall(force >= 0.5 ? 220 : 140, () => this.mode !== 'final' && this.sprite.clearTint());
     if (this.frames.stumble) this.start('stumble', this.frames.stumble, STUMBLE_TIME / 2, STUMBLE_TIME);
+    if (force > 0 && !this.calm) {
+      this.recoil = away * (2 + 4 * force) * this.baseScale;
+      this.squash(1 + 0.08 * force, 1 - 0.1 * force, 200);
+    }
   }
 
   /** Show off: a spin first, then a different showpiece each time. */
@@ -473,11 +483,13 @@ export class Dancer {
     this.frameTime = 0.32;
     this.scene.tweens.killTweensOf(this.sprite);
     this.moveOffset = 0;
+    this.recoil = 0;
     this.sprite.clearTint().setFlipX(false).setPosition(this.baseX, this.baseY).setScale(this.baseScale);
     this.show(this.sequence[0]);
   }
 
   update(dt: number, beat: number): void {
+    this.recoil = Math.abs(this.recoil) < 0.25 ? 0 : this.recoil * Math.exp(-dt * 8);
     this.sinceDance += dt;
     this.elapsed += dt;
     if (this.mode === 'final') {
@@ -596,7 +608,7 @@ export class Dancer {
 
     const shaking = !this.calm && ((this.mode === 'special' && this.specialFx === 'shake') || (this.mode === 'move' && this.moveFx === 'shake'));
     const shake = shaking ? (Math.floor(this.elapsed / 0.045) % 2 === 0 ? -1 : 1) * this.baseScale : 0;
-    sprite.setX(this.baseX + this.jolt + shake + this.moveOffset);
+    sprite.setX(this.baseX + this.jolt + shake + this.moveOffset + Math.round(this.recoil));
   }
 
   /**

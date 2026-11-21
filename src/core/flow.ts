@@ -19,6 +19,12 @@ export interface PlayData {
   practice?: boolean;
   /** The game plays itself (used by automated tests and demos). */
   autoplay?: boolean;
+  /**
+   * Development only (the `?miss=` URL flag): autoplay lets notes go, so the
+   * miss reactions can be seen. A number N drops one note in N; a list drops
+   * those note ids. Never set by the game itself.
+   */
+  autoMiss?: number | number[];
   /** Part of the story: which stop and which of its segments this is. */
   story?: StoryRef;
 }

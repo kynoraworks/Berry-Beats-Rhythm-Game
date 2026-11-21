@@ -112,7 +112,8 @@ export class PreloadScene extends Phaser.Scene {
   /**
    * Normally goes to the title screen. For development and automated tests the
    * URL can jump straight to a scene: `?scene=Menu`, or `?scene=Play&level=tutorial&autoplay=1`
-   * (`&chart=charts/some.json` plays any chart file, `&at=30` starts 30 seconds in).
+   * (`&chart=charts/some.json` plays any chart file, `&at=30` starts 30 seconds in,
+   * `&miss=12` makes autoplay drop one note in 12, `&miss=50,62` those notes, to show the miss reactions).
    * `level` takes a stop's chart id too (`level=stop05`); add `&story=1` to play it as the
    * story does, with its dialogue, its win lines and the rematch after a loss.
    * `?scene=Explore&stop=stop03&place=street` opens a station, street or Berry's room.
@@ -137,6 +138,7 @@ export class PreloadScene extends Phaser.Scene {
           chart: chartUrl ? chart : { ...chart, stage: chart.stage ?? level.stage },
           returnTo: { scene: SceneKeys.LevelSelect, data: stop ? { levelId: stop.id } : undefined },
           autoplay: params.get('autoplay') === '1',
+          autoMiss: parseMissFlag(params.get('miss')),
           startAt: Number(params.get('at')) || undefined,
           story: stop && params.get('story') === '1' ? { stop: stop.id, segment: stop.number === 1 ? 1 : 0 } : undefined,
         };
@@ -160,4 +162,12 @@ export class PreloadScene extends Phaser.Scene {
     }
     this.scene.start(SceneKeys.Title);
   }
+}
+
+/** The development `miss` flag: one note in N (`12`), or a list of note ids (`50,62`). */
+function parseMissFlag(value: string | null): number | number[] | undefined {
+  if (!value) return undefined;
+  const ids = value.split(',').map(Number).filter((n) => Number.isInteger(n) && n >= 0);
+  if (ids.length === 0) return undefined;
+  return value.includes(',') ? ids : ids[0];
 }

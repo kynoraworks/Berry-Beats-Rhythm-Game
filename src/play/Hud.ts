@@ -13,6 +13,7 @@ import { chipIconTexture } from './hudIcons';
 import { HYPE_PINK } from './HypeMode';
 import { CENTER_GAP, Depth, PLAYER_FIELD_CENTER } from './layout';
 import { rivalProfile } from './rivals';
+import { hudPulse } from './battleLife';
 
 // The whole card sits in the gap between the two lane fields (see HUD in
 // fighterCard.ts), so it never covers a falling note.
@@ -71,6 +72,8 @@ export interface HudOptions {
   crew?: CrewInfo | null;
   /** The enemy's gimmick (Pineapple's double miss damage tints the HP bar). */
   gimmick?: GimmickId | null;
+  /** Reduced motion: the score, turn label and combo keep still on the beat. */
+  calm?: boolean;
 }
 
 /** What the HUD needs each frame besides the two engines' stats. */
@@ -165,6 +168,14 @@ export class Hud {
   private verdictAge = Infinity;
   private pulse = 0;
   private solo = false;
+  private readonly calm: boolean;
+  /** A bigger kick of the score and combo for a moment (drops, milestones), 0..1. */
+  private kickLevel = 0;
+  /** Seconds since the combo count last grew, for its pop; and its resting size. */
+  private comboAge = Infinity;
+  private comboScale = 1;
+  /** Seconds the "combo lost" line has been up, while it shakes and fades. */
+  private lostAge = Infinity;
 
   constructor(scene: Phaser.Scene, options: HudOptions) {
     this.scene = scene;
@@ -176,6 +187,7 @@ export class Hud {
     this.playerWho = options.player ?? 'berry';
     this.rivalWho = rivalCharacter(rivalKind);
     this.scored = options.rounds > 0 || !!options.crew;
+    this.calm = options.calm ?? false;
     const hud = <T extends Phaser.GameObjects.Components.Depth>(object: T): T => object.setDepth(Depth.hud);
     const barH = HUD.barH;
 
@@ -262,12 +274,25 @@ export class Hud {
     for (const part of this.rivalParts) (part as unknown as Phaser.GameObjects.Components.Visible).setVisible(false);
   }
 
-  showJudgement(judgement: Judgement, combo: number): void {
+  /**
+   * Pop a judgement. It lands squashed and springs up; a run of Perfects
+   * (`streak`) lands harder. The combo count under it grows with the combo.
+   * A miss that breaks a streak of 10 or more (`lost`) says so in red.
+   */
+  showJudgement(judgement: Judgement, combo: number, streak = 0, lost = 0): void {
     const tweens = this.scene.tweens;
     const pop = this.judgeArt ?? this.judgeText;
     if (judgement === 'miss') {
       pop.setVisible(false);
-      this.comboText.setVisible(false);
+      tweens.killTweensOf(this.comboText);
+      if (lost >= 10) {
+        this.comboText.setText(`${lost} combo lost`).setColor(CSS.miss).setVisible(true).setAlpha(1).setScale(1.2);
+        this.lostAge = 0;
+        this.comboAge = Infinity;
+      } else {
+        this.comboText.setVisible(false);
+        this.lostAge = Infinity;
+      }
       this.missSplash.setVisible(true).play(Anim.missSplash);
       return;
     }
@@ -276,16 +301,29 @@ export class Hud {
     const scale = this.judgeArt ? 3 : 1;
     if (this.judgeArt) this.judgeArt.setFrame(JUDGE_FRAME[judgement] ?? 0);
     else this.judgeText.setText(JUDGE_LABEL[judgement]).setColor(JUDGE_COLOR[judgement]);
-    pop.setVisible(true).setAlpha(1).setScale(scale * 1.25);
-    tweens.add({ targets: pop, scale, duration: 90, ease: 'Quad.easeOut' });
+    const hard = judgement === 'perfect' && streak >= 8 && !this.calm;
+    if (this.calm) pop.setVisible(true).setAlpha(1).setScale(scale * 1.15);
+    else pop.setVisible(true).setAlpha(1).setScale(scale * (hard ? 1.55 : 1.4), scale * (hard ? 0.7 : 0.78)).setAngle(hard ? (streak % 2 === 0 ? -4 : 4) : 0);
+    tweens.add({ targets: pop, scaleX: scale, scaleY: scale, angle: 0, duration: hard ? 200 : 160, ease: 'Back.easeOut' });
     tweens.add({ targets: pop, alpha: 0, delay: 350, duration: 200 });
     tweens.killTweensOf(this.comboText);
+    this.lostAge = Infinity;
     if (combo >= 5) {
-      this.comboText.setText(`${combo} combo`).setVisible(true).setAlpha(1);
-      tweens.add({ targets: this.comboText, alpha: 0, delay: 350, duration: 200 });
+      // The count swells as the streak grows, and warms from cream to gold to the Perfect colour.
+      this.comboScale = 1 + Math.min(0.6, (combo - 5) / 160);
+      const color = combo >= 100 ? CSS.perfect : combo >= 50 ? CSS.yellow : CSS.cream;
+      this.comboText.setText(`${combo} combo`).setColor(color).setVisible(true).setAlpha(1).setAngle(0);
+      this.comboAge = 0;
+      tweens.add({ targets: this.comboText, alpha: 0, delay: 450, duration: 220 });
     } else {
       this.comboText.setVisible(false);
+      this.comboAge = Infinity;
     }
+  }
+
+  /** A big moment (the drop, a milestone): the score and combo kick out for a beat. */
+  kick(strength = 1): void {
+    if (!this.calm) this.kickLevel = Math.max(this.kickLevel, Math.min(1, strength));
   }
 
   /** Queue a brief call-out in the gap between the lane fields. They are shown one after another. */
@@ -360,7 +398,14 @@ export class Hud {
 
     this.updateCallout(dt);
     this.turnAge += dt;
-    this.turnText.setScale(1 + 0.2 * Math.max(0, 1 - this.turnAge / 0.16));
+    // The score, turn label and combo bump on the song's beats (bars fuller), and kick out on big moments.
+    const beatPulse = this.calm ? 0 : hudPulse(beat);
+    this.kickLevel = Math.max(0, this.kickLevel - dt * 2.5);
+    const kick = this.kickLevel * this.kickLevel;
+    this.scoreText.setScale(1 + 0.1 * beatPulse + 0.3 * kick);
+    this.multiplierText.setScale(1 + 0.12 * beatPulse + 0.3 * kick);
+    this.turnText.setScale(1 + 0.2 * Math.max(0, 1 - this.turnAge / 0.16) + 0.07 * beatPulse);
+    this.updateCombo(dt, beatPulse, kick);
     for (let i = 0; i < METER_TICKS; i++) {
       if (this.tickAge[i] > TICK_LIFE) continue;
       this.tickAge[i] += dt;
@@ -370,6 +415,26 @@ export class Hud {
   }
 
   // -------------------------------------------------------------------------
+
+  /** The combo count: pops on each hit, breathes on the beat; a lost streak shakes and fades. */
+  private updateCombo(dt: number, beatPulse: number, kick: number): void {
+    const text = this.comboText;
+    if (this.lostAge !== Infinity) {
+      this.lostAge += dt;
+      const t = this.lostAge;
+      const shake = this.calm ? 0 : Math.sin(t * 70) * 6 * Math.max(0, 1 - t / 0.45);
+      text.setX(PLAYER_FIELD_CENTER + shake).setScale(this.calm ? 1 : 1 + 0.2 * Math.max(0, 1 - t / 0.2)).setAlpha(Math.min(1, Math.max(0, (0.9 - t) / 0.3)));
+      if (t > 0.9) {
+        text.setVisible(false).setX(PLAYER_FIELD_CENTER);
+        this.lostAge = Infinity;
+      }
+      return;
+    }
+    if (this.comboAge === Infinity || !text.visible) return;
+    this.comboAge += dt;
+    const pop = this.calm ? 0 : 0.3 * Math.max(0, 1 - this.comboAge / 0.12);
+    text.setX(PLAYER_FIELD_CENTER).setScale(this.comboScale * (1 + pop + 0.06 * beatPulse + 0.25 * kick));
+  }
 
   private addFaceBox(x: number, who: CharacterId, color: number): Phaser.GameObjects.Container {
     const size = HUD.face;

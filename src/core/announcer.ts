@@ -23,6 +23,12 @@ import { getAudioContext } from './songs';
  *   round lost      falling sting, boom .17, "ohh"                        .2
  *   hype start      riser, baby scratch .08, sub drop .48, horn, roar, "HYPE!"  .55
  *   hype end        the song spun back ("ohh" too if a miss broke it)    song cut for the spinback
+ *   miss            the song scrubbed by the DJ's hand (stray misses not too often),
+ *                   sometimes "ohh"; a broken streak (10+) gets "aww" every time, and
+ *                   the MC now and then: "Ooh! Dropped it!", "Whoa! Off beat!",
+ *                   "Come on, get it back!", "Ouch! The streak is over!", "Oh no!"
+ *                   (MissReactor in src/play/battleLife.ts decides)      .22 to .5, brief
+ *   drop            the crowd cheers as the song drops
  *   flawless        chirp, cheer, "FLAWLESS!"
  *   ability         whoosh, the ability's hit and a boom .12, cheer       .25
  *   lets dance      needle drop, "LET'S DANCE!"
@@ -51,6 +57,10 @@ export type HypeEvent =
   | { kind: 'ability'; ability: AbilityId }
   /** A miss that broke a long streak. */
   | { kind: 'bigMiss' }
+  /** A miss, sized by MissReactor: what plays and how far the song dips. */
+  | { kind: 'miss'; scratch: boolean; crowd: SfxName | null; line: SfxName | null; duck: number; duckLength: number }
+  /** The song drops (the notes pile in after a build). */
+  | { kind: 'drop' }
   | { kind: 'letsDance' }
   | { kind: 'battleWon' }
   | { kind: 'battleLost' }
@@ -85,6 +95,8 @@ export interface Cue {
   duck?: number;
   /** Seconds the dip lasts; by default until the cue's stingers and crowd finish. */
   duckLength?: number;
+  /** Dip the song even if none of the cue's stingers or crowd get to play (a miss's short dip). */
+  duckAlways?: boolean;
 }
 
 const fx = (sound: SfxName, delay?: number): CuePart => ({ sound, channel: 'fx', delay });
@@ -186,6 +198,16 @@ export function cueFor(event: HypeEvent): Cue {
       return { priority: 3, duck: 0.25, parts: [fx('whoosh'), sting(ABILITY_HITS[event.ability], 0.12), sting('boom', 0.12), crowd('crowdCheer', 0.2)] };
     case 'bigMiss':
       return { priority: 1, parts: [crowd('crowdOhh')] };
+    case 'miss': {
+      // The scratch always plays when asked (MissReactor spaces them); the crowd and MC queue like any other.
+      const parts: CuePart[] = [];
+      if (event.scratch) parts.push(fx('djScrub'));
+      if (event.crowd) parts.push(crowd(event.crowd, 0.08));
+      if (event.line) parts.push(mc(event.line, 0.3));
+      return { priority: 1, duck: event.duck, duckLength: event.duckLength, duckAlways: true, parts };
+    }
+    case 'drop':
+      return { priority: 1, parts: [crowd('crowdCheer')] };
     case 'letsDance':
       return { priority: 2, parts: [sting('needleDrop'), mc('mcLetsDance', 0.25)] };
     case 'battleWon':
@@ -271,7 +293,7 @@ export class HypeMixer {
       const end = this.claim(channel, parts, cue.priority, now);
       if (end !== null) loudest = Math.max(loudest, end);
     }
-    if (cue.duck && loudest > now) this.duckFor(cue.duck, now, cue.duckLength !== undefined ? now + cue.duckLength : loudest);
+    if (cue.duck && (loudest > now || cue.duckAlways)) this.duckFor(cue.duck, now, cue.duckLength !== undefined ? now + cue.duckLength : loudest);
   }
 
   /** Call every frame: starts a waiting MC line once the line before it is done. */
@@ -387,7 +409,8 @@ export type SongTap = () => { buffer: AudioBuffer; time: number } | null;
 function hypePlayer(game: Phaser.Game, song: SongTap = () => null): PlayFn {
   return (sound, delay) => {
     const playing = isRecordMove(sound) ? song() : null;
-    if (playing && isRecordMove(sound)) return startRecordMove(game, sound, playing.buffer, playing.time + delay, delay);
+    // Too near the start of the song to make the move from it: the prepared sound stands in.
+    if (playing && isRecordMove(sound)) return startRecordMove(game, sound, playing.buffer, playing.time + delay, delay) ?? startSfx(game, sound, delay, 1, 'hype');
     return startSfx(game, sound, delay, 1, 'hype');
   };
 }
