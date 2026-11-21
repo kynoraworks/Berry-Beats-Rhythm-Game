@@ -853,6 +853,8 @@ export function isRecordMove(name: SfxName): name is RecordMove {
 const SPINBACK = 0.62;
 const CATCH = 0.06;
 const BRAKE = 1.0;
+/** A scrub sits over the (ducked) song, so it is pushed a little past the song's own level. */
+const SCRUB_GAIN = 1.6;
 /** A scrub: back, forward, back, all within about a third of a second. */
 const SCRUB = 0.34;
 /** The scrub's strokes: start (s), length (s), direction, and the record speed at each end. */
@@ -943,8 +945,7 @@ export function scheduleRecordMove(
 /**
  * The DJ fumbling the record on a miss: the hand grabs it and scrubs the last
  * moment of the song back, forward and back again. Each stroke reads the
- * song at a speed sliding between its two ends, through a band-pass so it
- * sounds like a stylus in the groove rather than the full mix. The song
+ * song at a speed sliding between its two ends, thinned and brightened. The song
  * itself keeps playing underneath, on time.
  */
 function scheduleScrub(ctx: BaseAudioContext, song: AudioBuffer, pos: number, at: number, level: number, out: AudioNode): AudioScheduledSourceNode[] {
@@ -965,11 +966,17 @@ function scheduleScrub(ctx: BaseAudioContext, song: AudioBuffer, pos: number, at
       fwd[i] = src[from - length + i];
     }
   }
+  // Thinned at the bottom, so it reads as a stylus in the groove rather than the full mix.
   const tone = ctx.createBiquadFilter();
-  tone.type = 'bandpass';
-  tone.frequency.value = 1400;
-  tone.Q.value = 0.8;
-  tone.connect(out);
+  tone.type = 'highpass';
+  tone.frequency.value = 280;
+  tone.Q.value = 0.7;
+  const presence = ctx.createBiquadFilter();
+  presence.type = 'peaking';
+  presence.frequency.value = 1800;
+  presence.Q.value = 0.9;
+  presence.gain.value = 5;
+  tone.connect(presence).connect(out);
   const sources: AudioScheduledSourceNode[] = [];
   let backRead = 0;
   for (const stroke of SCRUB_STROKES) {
@@ -981,7 +988,7 @@ function scheduleScrub(ctx: BaseAudioContext, song: AudioBuffer, pos: number, at
     source.playbackRate.linearRampToValueAtTime(stroke.to, end);
     const gain = ctx.createGain();
     // The stylus is louder the faster the record moves.
-    const peak = level * 1.5 * Math.min(1, Math.max(stroke.from, stroke.to) / 1.6);
+    const peak = level * SCRUB_GAIN * Math.min(1, Math.max(stroke.from, stroke.to) / 1.6);
     gain.gain.setValueAtTime(0.0001, start);
     gain.gain.linearRampToValueAtTime(peak, start + 0.008);
     gain.gain.setValueAtTime(peak, end - 0.02);

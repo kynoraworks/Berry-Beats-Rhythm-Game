@@ -319,7 +319,7 @@ export class OptionsScene extends Phaser.Scene {
     addText(this, at.label, y, 'Controls', 32, { origin: [0, 0.5], stroke: false });
     const value = addText(this, at.control, y, '', 24, { color: CSS.yellow, stroke: false });
     const preview = this.add.graphics();
-    const previewBox: Bounds = { x: RIGHT.x + RIGHT.w / 2 - 130, y: top + 124, w: 260, h: 110 };
+    const previewBox: Bounds = { x: RIGHT.x + RIGHT.w / 2 - 110, y: top + 138, w: 220, h: 88 };
     addBox(this, previewBox.x - 10, previewBox.y - 10, previewBox.w + 20, previewBox.h + 20, 'track');
     preview.setDepth(1);
     const row: Row = { hint: '', bounds, refresh: () => undefined };
@@ -356,7 +356,9 @@ export class OptionsScene extends Phaser.Scene {
     g.clear();
     g.fillStyle(COLORS.night, 1).fillRoundedRect(box.x, box.y, box.w, box.h, 14);
     // The note fields, faintly, so it is clear what the hands leave uncovered.
-    g.fillStyle(COLORS.purple, 0.25).fillRect(box.x + 20, box.y + 10, 90, box.h - 20).fillRect(box.x + box.w - 110, box.y + 10, 90, box.h - 20);
+    const field = Math.round(box.w * 0.3);
+    const pad = Math.round(box.w * 0.067);
+    g.fillStyle(COLORS.purple, 0.25).fillRect(box.x + pad, box.y + 10, field, box.h - 20).fillRect(box.x + box.w - pad - field, box.y + 10, field, box.h - 20);
     if (scheme === 'swipe') {
       g.fillStyle(COLORS.lilac, 0.18).fillRect(box.x, box.y + box.h / 3, box.w, (box.h * 2) / 3);
       const cx = box.x + box.w / 2;

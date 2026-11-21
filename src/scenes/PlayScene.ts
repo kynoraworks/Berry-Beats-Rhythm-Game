@@ -1013,7 +1013,8 @@ export class PlayScene extends Phaser.Scene {
           playSfx(this.game, 'remove');
           continue;
         }
-        this.reactToMiss(note.t, hyped);
+        // A miss that ends hype already spins the record back (a slip in hype's first beats does not end it).
+        this.reactToMiss(note.t, hyped && !this.hype?.active);
         this.nextMilestone = COMBO_MILESTONES[0];
         continue;
       }
@@ -1052,7 +1053,7 @@ export class PlayScene extends Phaser.Scene {
    * A broken streak gets all of it, harder; MissReactor sizes it. Nothing here
    * touches the song's clock or the timing of the next notes.
    */
-  private reactToMiss(time: number, hyped: boolean): void {
+  private reactToMiss(time: number, endedHype: boolean): void {
     const lost = this.lastCombo;
     this.lastCombo = 0;
     this.perfectRun = 0;
@@ -1065,9 +1066,8 @@ export class PlayScene extends Phaser.Scene {
     this.conductor?.muffle(reaction.muffle);
     playSfx(this.game, 'miss');
     if (this.hypeAudio) {
-      // A miss that ends hype already spins the record back.
       const { scratch, crowd, line, duck, duckLength } = reaction;
-      this.hypeAudio.event({ kind: 'miss', scratch: scratch && !hyped, crowd, line, duck, duckLength });
+      this.hypeAudio.event({ kind: 'miss', scratch: scratch && !endedHype, crowd, line, duck, duckLength });
     }
     if (reaction.tier !== 'stray') this.rival?.getReady('boast', 0.4);
   }

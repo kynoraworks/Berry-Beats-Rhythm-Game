@@ -39,7 +39,7 @@ The site is installable as a web app from the browser menu and works offline aft
 
 ### Sync and options
 
-Keys, volume, scroll speed, audio offset and a reduce-motion switch are under Options. If notes feel early or late on your setup (Bluetooth headphones especially), use "measure offset" there. The results screen also tells you if you were consistently early or late and can apply the correction in one tap.
+Keys, volume, scroll speed, audio offset and a reduce-motion switch are under Options. **Camera** sets how much the battle camera moves: Full (zoom bumps on the beat, leaning in on whoever is dancing, punches on big moments, a shake on a miss), Light (small bar bumps only) or Off. Only the stage moves; the lanes, notes and HUD never zoom. Reduce motion turns it off. If notes feel early or late on your setup (Bluetooth headphones especially), use "measure offset" there. The results screen also tells you if you were consistently early or late and can apply the correction in one tap.
 
 ### Story mode
 
@@ -72,6 +72,7 @@ Dialogue moves on with a click, a tap or `Enter`; `Esc` skips a scene. Options h
 
 - **The bar** is a tug of war. Your hits push it toward your side, your misses and your rival's hits pull it back. If it empties you fail the stage (unless No Fail is on).
 - **Turns:** sections of the song belong to you, to your rival or to both. A label and a spotlight show whose turn it is. Finishing one of your turns without a miss pays a Flawless bonus.
+- **The stage reacts:** the camera bumps on every bar, leans in on whoever has the floor and pulls back for a face-off, and the song's drops (found from where the notes pile in) flash and punch. A miss knocks Berry back, muffles the song for a moment and has the DJ scrub the record; breaking a streak of 10 or more also gets the crowd's "aww", and now and then the MC has something to say.
 - **Rounds:** the song is split into three or four rounds. Each goes to whoever was more accurate in it, and whoever takes the most rounds wins the battle. Losing the battle still clears the stage if you survive.
 - **Showpieces:** combos of 10, 25, 50, 75 and 100 trigger a spin, dab, kick or freeze.
 
@@ -152,7 +153,7 @@ Project layout:
 | `tests` | Unit tests and the browser smoke test |
 | `archive` | The original Unity project, concept art, game art and music masters |
 
-Handy URLs while developing: `?scene=Menu` jumps to a scene, `?scene=Play&level=stop04&autoplay=1` watches a stop's battle play itself (add `&story=1` for its dialogue), and `&at=30` starts 30 seconds in. Note that `story=1` with autoplay can mark a stop cleared in your save.
+Handy URLs while developing: `?scene=Menu` jumps to a scene, `?scene=Play&level=stop04&autoplay=1` watches a stop's battle play itself (add `&story=1` for its dialogue), and `&at=30` starts 30 seconds in. `&miss=12` makes autoplay drop one note in 12 (or `&miss=50,62` those note ids) to show the miss reactions. Note that `story=1` with autoplay can mark a stop cleared in your save.
 
 ### Changing the story
 

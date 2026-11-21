@@ -168,8 +168,9 @@ export class StageFx {
     this.flashLevel = Math.max(0, this.flashLevel - dt * 1.4);
     this.flashRect.setAlpha(this.flashLevel);
 
-    this.stingLevel = Math.max(0, this.stingLevel - dt * 2.6);
-    this.sting?.setAlpha(0.55 * this.stingLevel).setVisible(this.stingLevel > 0);
+    // A slow, soft fade: a run of misses holds a steady glow instead of flickering.
+    this.stingLevel = Math.max(0, this.stingLevel - dt * 1.2);
+    this.sting?.setAlpha(0.45 * this.stingLevel).setVisible(this.stingLevel > 0);
 
     if (this.crowd) {
       this.hop = Math.max(0, this.hop - dt * 2.2);

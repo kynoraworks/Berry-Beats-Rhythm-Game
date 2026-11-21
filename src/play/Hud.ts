@@ -303,9 +303,12 @@ export class Hud {
     else this.judgeText.setText(JUDGE_LABEL[judgement]).setColor(JUDGE_COLOR[judgement]);
     const hard = judgement === 'perfect' && streak >= 8 && !this.calm;
     if (this.calm) pop.setVisible(true).setAlpha(1).setScale(scale * 1.15);
-    else pop.setVisible(true).setAlpha(1).setScale(scale * (hard ? 1.55 : 1.4), scale * (hard ? 0.7 : 0.78)).setAngle(hard ? (streak % 2 === 0 ? -4 : 4) : 0);
+    // The lettering nearly fills the lane field, so it squashes down more than it stretches out.
+    else pop.setVisible(true).setAlpha(1).setScale(scale * (hard ? 1.16 : 1.1), scale * (hard ? 0.6 : 0.72)).setAngle(hard ? (streak % 2 === 0 ? -4 : 4) : 0);
     tweens.add({ targets: pop, scaleX: scale, scaleY: scale, angle: 0, duration: hard ? 200 : 160, ease: 'Back.easeOut' });
     tweens.add({ targets: pop, alpha: 0, delay: 350, duration: 200 });
+    // A "combo lost" line stays up for its moment while the new streak is still short.
+    if (combo < 5 && this.lostAge !== Infinity) return;
     tweens.killTweensOf(this.comboText);
     this.lostAge = Infinity;
     if (combo >= 5) {
