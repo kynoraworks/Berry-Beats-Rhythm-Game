@@ -12,6 +12,8 @@ export interface SongDef {
   /** Tempo and first-beat offset in seconds (measured by tools/analyze_audio.py), used as defaults when composing. */
   bpm: number;
   offset: number;
+  /** The song's lead stem for the hit layer (see core/hitLayer.ts), if it has one. */
+  lead?: string;
 }
 
 /** Artist credit for the generated stop songs (see the music credits in README.md). */
@@ -27,18 +29,18 @@ export const SONGS: SongDef[] = [
   { key: 'level_select', title: 'Character Select', artist: OST_ARTIST, url: 'assets/audio/level_select.mp3', bpm: 77, offset: 0 },
   { key: 'pause', title: 'Pause Screen', artist: OST_ARTIST, url: 'assets/audio/pause.mp3', bpm: 77, offset: 0 },
   // The twelve story stops, one generated song each (src/story/stops.ts).
-  { key: 'berry_town', title: 'Berry Town Lo-Fi', artist: GENERATED, url: 'assets/audio/berry_town.mp3', bpm: 100, offset: 0.025 },
-  { key: 'peel_street', title: 'Peel Street Slap', artist: GENERATED, url: 'assets/audio/peel_street.mp3', bpm: 108, offset: 0.025 },
-  { key: 'graffiti_corner', title: 'Graffiti Corner Breaks', artist: GENERATED, url: 'assets/audio/graffiti_corner.mp3', bpm: 108, offset: 0.025 },
-  { key: 'vine_crossing', title: 'Vine Crossing Chant', artist: GENERATED, url: 'assets/audio/vine_crossing.mp3', bpm: 104, offset: 0.025 },
-  { key: 'citrus_labs', title: 'Citrus Labs Glitch', artist: GENERATED, url: 'assets/audio/citrus_labs.mp3', bpm: 132, offset: 0.025 },
-  { key: 'lantern_market', title: 'Lantern Market Nights', artist: GENERATED, url: 'assets/audio/lantern_market.mp3', bpm: 96, offset: 0.034 },
-  { key: 'the_club', title: 'The Club', artist: GENERATED, url: 'assets/audio/the_club.mp3', bpm: 126, offset: 0.025 },
-  { key: 'rooftop', title: 'Rooftop Sunset', artist: GENERATED, url: 'assets/audio/rooftop.mp3', bpm: 104, offset: 0.037 },
-  { key: 'the_tunnel', title: 'The Tunnel', artist: GENERATED, url: 'assets/audio/the_tunnel.mp3', bpm: 140, offset: 0.025 },
-  { key: 'orange_plaza', title: 'Orange Plaza Festival', artist: GENERATED, url: 'assets/audio/orange_plaza.mp3', bpm: 128, offset: 0.025 },
-  { key: 'pineapple_hall', title: 'Pineapple Hall', artist: GENERATED, url: 'assets/audio/pineapple_hall.mp3', bpm: 134, offset: 0.032 },
-  { key: 'grand_stage', title: 'Grand Stage Finale', artist: GENERATED, url: 'assets/audio/grand_stage.mp3', bpm: 117, offset: 0.039 },
+  { key: 'berry_town', title: 'Berry Town Lo-Fi', artist: GENERATED, url: 'assets/audio/berry_town.mp3', bpm: 120, offset: 0.021, lead: 'assets/audio/stems/berry_town_lead.mp3' },
+  { key: 'peel_street', title: 'Peel Street Slap', artist: GENERATED, url: 'assets/audio/peel_street.mp3', bpm: 126, offset: 0.023, lead: 'assets/audio/stems/peel_street_lead.mp3' },
+  { key: 'graffiti_corner', title: 'Graffiti Corner Breaks', artist: GENERATED, url: 'assets/audio/graffiti_corner.mp3', bpm: 132, offset: 0.022, lead: 'assets/audio/stems/graffiti_corner_lead.mp3' },
+  { key: 'vine_crossing', title: 'Vine Crossing Chant', artist: GENERATED, url: 'assets/audio/vine_crossing.mp3', bpm: 130, offset: 0.022, lead: 'assets/audio/stems/vine_crossing_lead.mp3' },
+  { key: 'citrus_labs', title: 'Citrus Labs Glitch', artist: GENERATED, url: 'assets/audio/citrus_labs.mp3', bpm: 140, offset: 0.025, lead: 'assets/audio/stems/citrus_labs_lead.mp3' },
+  { key: 'lantern_market', title: 'Lantern Market Nights', artist: GENERATED, url: 'assets/audio/lantern_market.mp3', bpm: 120, offset: 0.028, lead: 'assets/audio/stems/lantern_market_lead.mp3' },
+  { key: 'the_club', title: 'The Club', artist: GENERATED, url: 'assets/audio/the_club.mp3', bpm: 144, offset: 0.02, lead: 'assets/audio/stems/the_club_lead.mp3' },
+  { key: 'rooftop', title: 'Rooftop Sunset', artist: GENERATED, url: 'assets/audio/rooftop.mp3', bpm: 130, offset: 0.032, lead: 'assets/audio/stems/rooftop_lead.mp3' },
+  { key: 'the_tunnel', title: 'The Tunnel', artist: GENERATED, url: 'assets/audio/the_tunnel.mp3', bpm: 152, offset: 0.025, lead: 'assets/audio/stems/the_tunnel_lead.mp3' },
+  { key: 'orange_plaza', title: 'Orange Plaza Festival', artist: GENERATED, url: 'assets/audio/orange_plaza.mp3', bpm: 156, offset: 0.02, lead: 'assets/audio/stems/orange_plaza_lead.mp3' },
+  { key: 'pineapple_hall', title: 'Pineapple Hall', artist: GENERATED, url: 'assets/audio/pineapple_hall.mp3', bpm: 160, offset: 0.029, lead: 'assets/audio/stems/pineapple_hall_lead.mp3' },
+  { key: 'grand_stage', title: 'Grand Stage Finale', artist: GENERATED, url: 'assets/audio/grand_stage.mp3', bpm: 150, offset: 0.031, lead: 'assets/audio/stems/grand_stage_lead.mp3' },
 ];
 
 /**
@@ -142,12 +144,23 @@ export async function songTitle(key: string): Promise<string> {
 // Decoding
 // ---------------------------------------------------------------------------
 
-// Decoded audio is large (about 30 MB per song), so only the most recent few are kept.
-const CACHE_SIZE = 3;
+// Decoded audio is large (about 30 MB per song), so only the most recent few are kept
+// (a battle song and its lead stem are two entries).
+const CACHE_SIZE = 4;
 const cache: { key: string; buffer: AudioBuffer }[] = [];
 const pending = new Map<string, Promise<AudioBuffer>>();
 
+/** Cache key for a song's lead stem. */
+const LEAD_SUFFIX = '#lead';
+
 async function fetchBytes(key: string): Promise<ArrayBuffer> {
+  if (key.endsWith(LEAD_SUFFIX)) {
+    const lead = getSong(key.slice(0, -LEAD_SUFFIX.length))?.lead;
+    if (!lead) throw new Error('This song has no hit layer');
+    const response = await fetch(lead);
+    if (!response.ok) throw new Error(`Could not load the hit layer (${response.status})`);
+    return response.arrayBuffer();
+  }
   if (key.startsWith(CUSTOM_PREFIX)) {
     const row = await run<{ blob: Blob } | undefined>('readonly', (store) => store.get(key.slice(CUSTOM_PREFIX.length)));
     if (!row) throw new Error('The audio for this beat map is not on this device. Import the audio file again.');
@@ -187,4 +200,14 @@ export function loadSongBuffer(game: Phaser.Game, key: string): Promise<AudioBuf
     );
   pending.set(key, promise);
   return promise;
+}
+
+/**
+ * Load and decode a song's lead stem for the hit layer. Resolves to null for a
+ * song without one, or if it cannot be loaded: the battle then plays the full
+ * mix with no layer.
+ */
+export function loadLeadBuffer(game: Phaser.Game, key: string): Promise<AudioBuffer | null> {
+  if (!getSong(key)?.lead) return Promise.resolve(null);
+  return loadSongBuffer(game, key + LEAD_SUFFIX).catch(() => null);
 }

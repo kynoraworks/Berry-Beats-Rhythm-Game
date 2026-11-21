@@ -65,18 +65,26 @@ export const SLIDE_END = 0.58;
 
 /**
  * The lane each tap note starts its fall in. Holds fall straight. Notes close
- * together shift the same way so they keep their order; a group that cannot
- * shift both ways without leaving the field falls straight.
+ * together shift the same way so they keep their order and no two paths cross:
+ * a group grows while it can still shift one way without leaving the field, and
+ * a group that follows close behind another shifts the same way or falls straight.
  */
 export function slidePlan(notes: readonly PlayNote[], seed: string): Map<number, Lane> {
   const random = seededRandom(`${seed}:slide`);
   const plan = new Map<number, Lane>();
   const taps = notes.filter((note) => !note.isHold).sort((a, b) => a.t - b.t || a.lane - b.lane);
+  const shiftable = (lanes: Lane[]) => lanes.every((lane) => lane > 0) || lanes.every((lane) => lane < 3);
+  let previous = { shift: 0, end: Number.NEGATIVE_INFINITY };
   let i = 0;
   while (i < taps.length) {
     const group = [taps[i]];
-    while (i + group.length < taps.length && taps[i + group.length].t - group[group.length - 1].t < SLIDE_GROUP) {
-      group.push(taps[i + group.length]);
+    while (i + group.length < taps.length) {
+      const next = taps[i + group.length];
+      const gap = next.t - group[group.length - 1].t;
+      if (gap >= SLIDE_GROUP) break;
+      // A chord always stays together (and falls straight if it spans the field).
+      if (gap > 1e-3 && !shiftable([...group, next].map((note) => note.lane))) break;
+      group.push(next);
     }
     i += group.length;
     const roll = random();
@@ -84,11 +92,18 @@ export function slidePlan(notes: readonly PlayNote[], seed: string): Map<number,
     const canLeft = lanes.every((lane) => lane > 0);
     const canRight = lanes.every((lane) => lane < 3);
     let shift = 0;
-    if (canLeft && canRight) shift = roll < 0.5 ? -1 : 1;
+    if (group[0].t - previous.end < SLIDE_GROUP && previous.shift !== 0) {
+      // Close behind the last group: the same way, or straight.
+      shift = (previous.shift < 0 ? canLeft : canRight) ? previous.shift : 0;
+    } else if (canLeft && canRight) shift = roll < 0.5 ? -1 : 1;
     else if (canLeft) shift = -1;
     else if (canRight) shift = 1;
     // Every so often a note falls straight, so the slide stays a surprise.
-    if (shift === 0 || random() < 0.15) continue;
+    if (shift !== 0 && random() < 0.15) shift = 0;
+    // A straight group in a quick run keeps the run's direction for the groups after it.
+    const chained = group[0].t - previous.end < SLIDE_GROUP;
+    previous = { shift: shift !== 0 ? shift : chained ? previous.shift : 0, end: group[group.length - 1].t };
+    if (shift === 0) continue;
     for (const note of group) plan.set(note.id, (note.lane + shift) as Lane);
   }
   return plan;

@@ -173,7 +173,14 @@ python3 tools/build_characters.py   # every dancer's sprite sheet (full and lite
 python3 tools/make_crowd.py         # crowd silhouettes, built from the dancers
 ```
 
-Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat (the stop songs are searched near the tempo they were made at), places notes on detected onsets following a section plan per chart, and validates the result. It writes the tutorial, the twelve stops and the six soundtrack charts. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
+The stop songs are sped up from the generated originals (kept in `archive/music/stops-original`) by `tools/stretch_songs.py`, with Rubber Band's R3 engine (pitch kept, loudness matched, true peak under -1 dBTP; needs `apt-get install rubberband-cli`). Each song's hit layer stem (`public/assets/audio/stems/<song>_lead.mp3`, see below) is then split from that very file with htdemucs (Higgsfield's stem separation, four stems) and built by `tools/hit_layer_stems.py`, which checks that it lines up with the mix to the sample. Redo both, then the charts, whenever a stop song changes:
+
+```bash
+python3 tools/stretch_songs.py                 # archive originals -> public/assets/audio, at the new tempos
+python3 tools/hit_layer_stems.py STEMS_DIR      # STEMS_DIR/<song>/{vocals,other,drums}.flac -> lead stems
+```
+
+Story charts are built from the music by `tools/analyze_audio.py` (needs numpy, scipy and ffmpeg). It measures each track's tempo and first beat (the stop songs are searched near the tempo they play at), places notes on detected onsets following a section plan per chart, and validates the result. It writes the tutorial, the twelve stops and the six soundtrack charts. The composer's auto chart ([`src/composer/autochart.ts`](src/composer/autochart.ts)) is a port of the same method that runs in the browser and plans its own sections:
 
 ```bash
 pip install numpy scipy
@@ -198,7 +205,7 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 - The rival is scored too, so the tug-of-war bar from the original mockups is a real contest with turns and rounds.
 - Raspberry, who only existed as one concept sprite, is the rival with a full 51-frame move set. Blackberry gained 30 new frames: an idle dance loop that both characters keep up between moves, alternate moves, a hold groove, a stumble, victory and defeat poses, and showpieces (spin, dab, kick, freeze) that fire on combo milestones. These new frames were generated with an image model from the original sprites and converted to real pixel art; see `tools/build_characters.py`. In November 2026 Berry and Raspberry were redesigned (Berry with his hood half up, Raspberry in sporty streetwear) and all their frames regenerated; the first versions, including Blackberry's 21 original 2021 frames, are kept in `archive/generated-sprites/v1`. The Coach, the Pear and Dr. Lemon (51 frames), the nine other fruits (18 frames each), the portraits, the stations, streets and stages, and the judgement lettering were made the same way.
 - The story grew from a handful of test levels into a 12-stop journey with dialogue, exploration, per-fruit gimmicks, crew abilities and a 5v5 finale, written up in `docs/STORY_BIBLE.md`.
-- Each of the twelve stops has its own song (96 to 140 BPM, generated in November 2026) and a chart generated from it by `tools/analyze_audio.py`. Nicole Yazmin's original tracks play in the tutorial and in Beat Maps under Soundtrack, each with one chart (the charts the stops used before they had their own songs). The old test levels were timed to a placeholder song that is not part of the game.
+- Each of the twelve stops has its own song (generated in November 2026 at 96 to 140 BPM, then sped up to 120 to 160 BPM so the story starts lively and climbs fast) and a chart generated from it by `tools/analyze_audio.py`. In battle each stop song has a hit layer, like the vocal track in Friday Night Funkin': its lead (melody, chords and any voice) plays only while notes are being hit, fades a beat after the last one and cuts out on a miss until the next hit ([`src/core/hitLayer.ts`](src/core/hitLayer.ts)). Nicole Yazmin's original tracks play in the tutorial and in Beat Maps under Soundtrack, each with one chart (the charts the stops used before they had their own songs). The old test levels were timed to a placeholder song that is not part of the game.
 - The menu's "Online" entry, which was never built, is replaced by Beat Maps.
 
 ## Credits
@@ -217,7 +224,7 @@ The link preview tags in `index.html` (`og:url`, `og:image`, `twitter:image`) mu
 
 Listen to the tracks: [Berry Beats Tracks](https://drive.google.com/drive/folders/1M5X1kcofPPYjnJhVeCuum3J1FNX8nzcd?usp=sharing)
 
-- The twelve stop songs (`public/assets/audio/berry_town.mp3` to `grand_stage.mp3`, credited in game as "Berry Beats (generated)") were generated with an AI music model (ElevenLabs Music through Higgsfield) from text prompts, in November 2026. They also play on the title, menu, map and pause screens. **Their usage rights have not been verified**: check the generator's terms for your use before shipping them commercially. They are not built from `archive/`, so `tools/prepare_assets.py` leaves them alone.
+- The twelve stop songs (`public/assets/audio/berry_town.mp3` to `grand_stage.mp3`, credited in game as "Berry Beats (generated)") were generated with an AI music model (ElevenLabs Music through Higgsfield) from text prompts, in November 2026, then time-stretched to faster tempos with Rubber Band (`tools/stretch_songs.py`; the generated originals are in `archive/music/stops-original`). Their hit layer stems (`public/assets/audio/stems`) were split from them with htdemucs through Higgsfield. They also play on the title, menu, map and pause screens. **Their usage rights have not been verified**: check the generator's terms for your use before shipping them commercially. They are not built from `archive/`, so `tools/prepare_assets.py` leaves them alone.
 
 ## More pictures
 

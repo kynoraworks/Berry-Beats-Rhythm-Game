@@ -204,6 +204,12 @@ describe('banana slide', () => {
     const notes = new Engine(toTimedNotes(chart, chart.notes)).notes;
     const plan = slidePlan(notes, chart.id);
     expect(plan.size / notes.length).toBeGreaterThan(0.6);
+    // At speed, notes in quick succession still never slide towards each other.
+    const slid = notes.filter((n) => plan.has(n.id)).sort((a, b) => a.t - b.t);
+    for (let i = 1; i < slid.length; i++) {
+      const [a, b] = [slid[i - 1], slid[i]];
+      if (b.t - a.t < 0.45) expect(plan.get(b.id)! - b.lane).toBe(plan.get(a.id)! - a.lane);
+    }
   });
 });
 

@@ -17,6 +17,8 @@ export class Conductor {
   /** A low-pass on the way out, wide open except for a moment after a miss (see muffle). */
   private readonly tone: BiquadFilterNode;
   private source: AudioBufferSourceNode | null = null;
+  /** The hit layer (see core/hitLayer.ts): a second buffer that plays in lockstep with the song. */
+  private layer: { buffer: AudioBuffer; gain: GainNode; source: AudioBufferSourceNode | null } | null = null;
   /** Context time at which song position `anchorPos` is (or was) reached. */
   private anchorCtx = 0;
   private anchorPos = 0;
@@ -54,6 +56,20 @@ export class Conductor {
     f.exponentialRampToValueAtTime(low, now + 0.035);
     f.setValueAtTime(low, now + 0.035 + 0.06 * depth);
     f.exponentialRampToValueAtTime(OPEN_HZ, now + 0.12 + 0.24 * depth);
+  }
+
+  /**
+   * Play `buffer` alongside the song, sample-locked to it (same start time,
+   * offset and rate), through the returned gain node, which starts at 0. It
+   * joins the song before the volume and the low-pass, so both apply to it.
+   * Takes effect from the next play, seek or resume.
+   */
+  setLayer(buffer: AudioBuffer): GainNode {
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0;
+    gain.connect(this.gain);
+    this.layer = { buffer, gain, source: null };
+    return gain;
   }
 
   get duration(): number {
@@ -117,6 +133,16 @@ export class Conductor {
     const floor = this.floor;
     if (from >= floor) source.start(now, from);
     else source.start(now + (floor - from) / this.rate, floor);
+    const layer = this.layer;
+    if (layer) {
+      const extra = this.ctx.createBufferSource();
+      extra.buffer = layer.buffer;
+      extra.playbackRate.value = this.rate;
+      extra.connect(layer.gain);
+      if (from >= floor) extra.start(now, from);
+      else extra.start(now + (floor - from) / this.rate, floor);
+      layer.source = extra;
+    }
     source.onended = () => {
       if (this.source === source) {
         this.source = null;
@@ -158,11 +184,22 @@ export class Conductor {
   destroy(): void {
     this.running = false;
     this.stopSource();
+    this.layer?.gain.disconnect();
     this.gain.disconnect();
     this.tone.disconnect();
   }
 
   private stopSource(): void {
+    const extra = this.layer?.source;
+    if (extra && this.layer) {
+      this.layer.source = null;
+      try {
+        extra.stop();
+      } catch {
+        // already stopped
+      }
+      extra.disconnect();
+    }
     const source = this.source;
     if (!source) return;
     this.source = null;

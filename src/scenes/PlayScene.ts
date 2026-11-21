@@ -27,7 +27,8 @@ import { isRotateNoticeShown, isTouch, onRotateNoticeChange } from '../core/mobi
 import { music, pauseSongFor } from '../core/music';
 import { getSettings, keyLabel } from '../core/settings';
 import { playSfx, preloadSamples, type SfxName } from '../core/sfx';
-import { getAudioContext, loadSongBuffer } from '../core/songs';
+import { getAudioContext, loadLeadBuffer, loadSongBuffer } from '../core/songs';
+import { HitLayer } from '../core/hitLayer';
 import { TouchLanes } from '../core/touchLanes';
 import { onBackGesture } from '../core/backGesture';
 import { SCHEME_INFO } from '../core/touchSchemes';
@@ -128,6 +129,8 @@ export class PlayScene extends Phaser.Scene {
   private chart!: Chart;
   private state: State = 'loading';
   private conductor: Conductor | null = null;
+  /** The song's lead, heard only while notes are being hit (core/hitLayer.ts). Null for songs without one. */
+  private hitLayer: HitLayer | null = null;
   /** The MC, crowd and stingers of a battle. */
   private hypeAudio: HypeAudio | null = null;
   private engine!: Engine;
@@ -175,6 +178,7 @@ export class PlayScene extends Phaser.Scene {
   /** The story segment being played, if this is part of the story. */
   private story: ReturnType<typeof segmentAt> = null;
   private buffer: AudioBuffer | null = null;
+  private leadBuffer: AudioBuffer | null = null;
   private introDone = true;
   private loadingBack: UiButton | null = null;
   private idleClock = 0;
@@ -209,6 +213,7 @@ export class PlayScene extends Phaser.Scene {
     this.chart = data.chart;
     this.state = 'loading';
     this.conductor = null;
+    this.hitLayer = null;
     this.hypeAudio = null;
     this.laneInput = null;
     this.rivalField = null;
@@ -234,6 +239,7 @@ export class PlayScene extends Phaser.Scene {
     this.dialogue = null;
     this.story = null;
     this.buffer = null;
+    this.leadBuffer = null;
     this.introDone = true;
     this.loadingBack = null;
     this.idleClock = 0;
@@ -430,8 +436,9 @@ export class PlayScene extends Phaser.Scene {
       this.showLoading();
     }
 
-    loadSongBuffer(this.game, chart.song).then(
-      (buffer) => {
+    Promise.all([loadSongBuffer(this.game, chart.song), loadLeadBuffer(this.game, chart.song)]).then(
+      ([buffer, lead]) => {
+        this.leadBuffer = lead;
         this.buffer = buffer;
         this.maybeBegin();
       },
@@ -504,6 +511,10 @@ export class PlayScene extends Phaser.Scene {
     this.countText.setFontSize(64);
     this.touchLanes?.setGuideVisible(true);
     this.conductor = new Conductor(ctx, buffer, getSettings().musicVolume);
+    if (this.leadBuffer) {
+      const notes = [...this.engine.notes, ...(this.rivalEngine?.notes ?? [])];
+      this.hitLayer = new HitLayer(ctx, this.conductor.setLayer(this.leadBuffer), this.chart.bpm, notes);
+    }
     const startAt = this.playData.startAt ?? 0;
     // A crew round enters its song part-way through, after a silent count-in.
     if (this.crew) this.conductor.play(this.origin - LEAD_IN - this.introTime, this.origin);
@@ -858,6 +869,7 @@ export class PlayScene extends Phaser.Scene {
     this.stopRotateWatch?.();
     this.conductor?.destroy();
     this.conductor = null;
+    this.hitLayer = null;
     this.hypeAudio?.silence();
   }
 
@@ -1015,10 +1027,12 @@ export class PlayScene extends Phaser.Scene {
         }
         // A miss that ends hype already spins the record back (a slip in hype's first beats does not end it).
         this.reactToMiss(note.t, hyped && !this.hype?.active);
+        this.hitLayer?.miss(Math.max(note.t, this.heardTime()));
         this.nextMilestone = COMBO_MILESTONES[0];
         continue;
       }
       this.lastCombo = this.engine.stats.combo;
+      if (part !== 'holdEnd') this.hitLayer?.hit('player', note.t, note.end);
       if (part !== 'holdEnd') this.perfectRun = judgement === 'perfect' ? this.perfectRun + 1 : 0;
       const burst = this.perfectRun >= PERFECT_RUN && judgement === 'perfect' && !getSettings().reduceMotion;
       this.hud.showJudgement(judgement, this.engine.stats.combo, this.perfectRun);
@@ -1119,6 +1133,7 @@ export class PlayScene extends Phaser.Scene {
         field?.setPressed(note.lane, false);
         continue;
       }
+      this.hitLayer?.hit('rival', note.t, note.end);
       field?.hitFx(note.lane, 0.5);
       field?.setPressed(note.lane, true);
       this.rival?.dance(note.lane);
@@ -1224,6 +1239,7 @@ export class PlayScene extends Phaser.Scene {
       if (this.playData.autoplay) this.autoplay(time);
       this.handleEvents(this.engine.update(time));
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
+      this.hitLayer?.update(time);
       this.updateBattle(time);
       const drops = this.shape.drops;
       while (this.dropIndex < drops.length && beat >= drops[this.dropIndex]) {

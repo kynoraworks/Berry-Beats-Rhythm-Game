@@ -92,7 +92,7 @@ function load(id: string): Chart {
 }
 
 /** Song lengths in seconds (ffprobe). */
-const DURATION: Record<string, number> = { vine_crossing: 100.0, the_tunnel: 100.0, pineapple_hall: 100.05, the_club: 100.0, grand_stage: 100.05 };
+const DURATION: Record<string, number> = { vine_crossing: 80.0, the_tunnel: 92.1, pineapple_hall: 83.79, the_club: 87.5, grand_stage: 78.04 };
 
 describe('crew battle segments', () => {
   const segments = CREW_ROUNDS.map((round, i) => {

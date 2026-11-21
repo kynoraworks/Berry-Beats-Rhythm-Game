@@ -41,15 +41,16 @@ const ROUND_LINES: readonly Line[] = SCRIPT.find((script) => script.stop === 12)
 
 /**
  * Segments are cut on four-bar phrase lines where both sides dance, about 37
- * seconds each at that song's tempo (16 to 22 bars). The last round, about 50
- * seconds, runs from the stop 12 chart's last trade to the song's real ending.
+ * seconds each at that song's tempo (20 to 24 bars since the songs were sped
+ * up). The last round, about 50 seconds, runs from bar 16 of the stop 12 chart
+ * (its first section with both sides together) to the song's real ending.
  */
 export const CREW_ROUNDS: readonly CrewRoundDef[] = [
-  { enemy: 'grape', chartId: 'stop04', chartUrl: 'charts/stop04.json', startBar: 8, endBar: 24, skill: 2, before: ROUND_LINES.slice(0, 1) },
-  { enemy: 'coconut', chartId: 'stop09', chartUrl: 'charts/stop09.json', startBar: 12, endBar: 34, skill: 3, before: ROUND_LINES.slice(1, 2) },
-  { enemy: 'pineapple', chartId: 'stop11', chartUrl: 'charts/stop11.json', startBar: 16, endBar: 36, skill: 3, before: ROUND_LINES.slice(2, 3) },
-  { enemy: 'dragonfruit', chartId: 'stop07', chartUrl: 'charts/stop07.json', startBar: 12, endBar: 32, skill: 3, before: ROUND_LINES.slice(3, 4) },
-  { enemy: 'blueberry', chartId: 'stop12', chartUrl: 'charts/stop12.json', startBar: 24, endBar: 48, skill: 4, before: ROUND_LINES.slice(4) },
+  { enemy: 'grape', chartId: 'stop04', chartUrl: 'charts/stop04.json', startBar: 8, endBar: 28, skill: 2, before: ROUND_LINES.slice(0, 1) },
+  { enemy: 'coconut', chartId: 'stop09', chartUrl: 'charts/stop09.json', startBar: 8, endBar: 32, skill: 3, before: ROUND_LINES.slice(1, 2) },
+  { enemy: 'pineapple', chartId: 'stop11', chartUrl: 'charts/stop11.json', startBar: 16, endBar: 40, skill: 3, before: ROUND_LINES.slice(2, 3) },
+  { enemy: 'dragonfruit', chartId: 'stop07', chartUrl: 'charts/stop07.json', startBar: 12, endBar: 34, skill: 3, before: ROUND_LINES.slice(3, 4) },
+  { enemy: 'blueberry', chartId: 'stop12', chartUrl: 'charts/stop12.json', startBar: 16, endBar: 48, skill: 4, before: ROUND_LINES.slice(4) },
 ];
 
 /** Points each round is worth: the last, Berry against Blueberry, counts double. */

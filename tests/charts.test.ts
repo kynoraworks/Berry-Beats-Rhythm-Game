@@ -18,18 +18,18 @@ const SONGS: Record<string, { duration: number; bpm: number; offset: number }> =
   title: { duration: 74.87, bpm: 77, offset: 0.024 },
   tutorial: { duration: 77.98, bpm: 77, offset: 0.024 },
   // The stop songs.
-  berry_town: { duration: 120.03, bpm: 100, offset: 0.025 },
-  peel_street: { duration: 100.05, bpm: 108, offset: 0.025 },
-  graffiti_corner: { duration: 100.05, bpm: 108, offset: 0.025 },
-  vine_crossing: { duration: 100.0, bpm: 104, offset: 0.025 },
-  citrus_labs: { duration: 100.05, bpm: 132, offset: 0.025 },
-  lantern_market: { duration: 145.11, bpm: 96, offset: 0.034 },
-  the_club: { duration: 100.0, bpm: 126, offset: 0.025 },
-  rooftop: { duration: 100.0, bpm: 104, offset: 0.037 },
-  the_tunnel: { duration: 100.0, bpm: 140, offset: 0.025 },
-  orange_plaza: { duration: 100.0, bpm: 128, offset: 0.025 },
-  pineapple_hall: { duration: 100.05, bpm: 134, offset: 0.032 },
-  grand_stage: { duration: 100.05, bpm: 117, offset: 0.039 },
+  berry_town: { duration: 100.03, bpm: 120, offset: 0.021 },
+  peel_street: { duration: 85.76, bpm: 126, offset: 0.023 },
+  graffiti_corner: { duration: 81.86, bpm: 132, offset: 0.022 },
+  vine_crossing: { duration: 80.00, bpm: 130, offset: 0.022 },
+  citrus_labs: { duration: 94.33, bpm: 140, offset: 0.025 },
+  lantern_market: { duration: 116.09, bpm: 120, offset: 0.028 },
+  the_club: { duration: 87.50, bpm: 144, offset: 0.02 },
+  rooftop: { duration: 80.00, bpm: 130, offset: 0.032 },
+  the_tunnel: { duration: 92.10, bpm: 152, offset: 0.025 },
+  orange_plaza: { duration: 82.05, bpm: 156, offset: 0.02 },
+  pineapple_hall: { duration: 83.79, bpm: 160, offset: 0.029 },
+  grand_stage: { duration: 78.04, bpm: 150, offset: 0.031 },
 };
 
 /** Nicole Yazmin's six songs, each with exactly one Beat Maps chart. */
@@ -38,15 +38,15 @@ const SOUNDTRACK = ['tutorial', 'level1', 'title', 'menu', 'level_select', 'paus
 /** The twelve story stops: docs/STORY_BIBLE.md, and the plans in tools/analyze_audio.py. */
 const STOPS: { id: string; rival: string; song: string; difficulty: number }[] = [
   { id: 'stop01', rival: 'raspberry', song: 'berry_town', difficulty: 2 },
-  { id: 'stop02', rival: 'banana', song: 'peel_street', difficulty: 1 },
-  { id: 'stop03', rival: 'pear', song: 'graffiti_corner', difficulty: 2 },
+  { id: 'stop02', rival: 'banana', song: 'peel_street', difficulty: 2 },
+  { id: 'stop03', rival: 'pear', song: 'graffiti_corner', difficulty: 3 },
   { id: 'stop04', rival: 'grape', song: 'vine_crossing', difficulty: 3 },
   { id: 'stop05', rival: 'lemon', song: 'citrus_labs', difficulty: 3 },
   { id: 'stop06', rival: 'plum', song: 'lantern_market', difficulty: 3 },
   { id: 'stop07', rival: 'dragonfruit', song: 'the_club', difficulty: 4 },
-  { id: 'stop08', rival: 'watermelon', song: 'rooftop', difficulty: 3 },
+  { id: 'stop08', rival: 'watermelon', song: 'rooftop', difficulty: 4 },
   { id: 'stop09', rival: 'coconut', song: 'the_tunnel', difficulty: 4 },
-  { id: 'stop10', rival: 'orange', song: 'orange_plaza', difficulty: 4 },
+  { id: 'stop10', rival: 'orange', song: 'orange_plaza', difficulty: 5 },
   { id: 'stop11', rival: 'pineapple', song: 'pineapple_hall', difficulty: 5 },
   { id: 'stop12', rival: 'blueberry', song: 'grand_stage', difficulty: 5 },
 ];
@@ -261,17 +261,40 @@ describe('the twelve story stops', () => {
     expect(quiet).toBeGreaterThanOrEqual(4);
   });
 
-  it('get harder through the run', () => {
+  it('get harder through the run, and quickly', () => {
     const scores = new Map(STOPS.map((stop) => [stop.id, effort(charts.get(stop.id)!)]));
     const meanFor = (difficulty: number) => {
       const values = STOPS.filter((s) => s.difficulty === difficulty).map((s) => scores.get(s.id)!);
       return values.reduce((a, b) => a + b, 0) / values.length;
     };
-    for (let d = 2; d <= 5; d++) expect(meanFor(d)).toBeGreaterThan(meanFor(d - 1));
+    // The level select shows two to five pips: no stop is a one any more.
+    expect(Math.min(...STOPS.map((s) => s.difficulty))).toBe(2);
+    for (let d = 3; d <= 5; d++) expect(meanFor(d)).toBeGreaterThan(meanFor(d - 1));
     const all = [...scores.values()];
-    expect(scores.get('stop02')).toBe(Math.min(...all));
+    expect(scores.get('stop01')).toBe(Math.min(...all));
     expect(scores.get('stop12')).toBe(Math.max(...all));
     const hardestFour = Math.max(...STOPS.filter((s) => s.difficulty === 4).map((s) => scores.get(s.id)!));
     expect(scores.get('stop11')!).toBeGreaterThan(hardestFour);
+    // Even the first stop asks for steady eighth notes: about three notes a second while it plays.
+    expect(scores.get('stop01')!).toBeGreaterThan(2.8);
+    // Each third of the story is harder than the one before.
+    const third = (from: number) => STOPS.slice(from, from + 4).reduce((sum, s) => sum + scores.get(s.id)!, 0) / 4;
+    expect(third(4)).toBeGreaterThan(third(0));
+    expect(third(8)).toBeGreaterThan(third(4));
   });
+
+  for (const stop of STOPS) {
+    it(`${stop.id}: plays fast, with a short intro, and builds through the song`, () => {
+      const chart = charts.get(stop.id)!;
+      expect(chart.bpm).toBeGreaterThanOrEqual(120);
+      // The player's first note comes within the first five bars (the Tunnel opens on four quiet ones).
+      const first = Math.min(...chart.notes.map((n) => n.b));
+      expect(first).toBeLessThan(20);
+      // The second half of the player's part is busier than the first quarter.
+      const beats = chart.notes.map((n) => n.b).sort((a, b) => a - b);
+      const span = beats[beats.length - 1] - beats[0];
+      const count = (from: number, to: number) => beats.filter((b) => b >= beats[0] + from * span && b < beats[0] + to * span).length;
+      expect(count(0.5, 1.0001) / 2).toBeGreaterThan(count(0, 0.25));
+    });
+  }
 });
