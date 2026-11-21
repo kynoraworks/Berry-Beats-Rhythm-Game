@@ -3,7 +3,7 @@ import { GAME_H, GAME_W, PX, SceneKeys } from '../core/config';
 import { canFullscreen, hint, onSwipe, toggleFullscreen } from '../core/mobile';
 import { music } from '../core/music';
 import { getSettings } from '../core/settings';
-import { playSfx, preloadSamples } from '../core/sfx';
+import { playSfx, preloadSamples, startDeckHiss, startSfx, type Voice } from '../core/sfx';
 import { UiButton, addBody, addBox, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { DECK, LEAF_FRAMES, MenuTex, TAPE, TAPE_REEL_FRAMES, TAPE_TINT, tapeTexture, type TapeColor } from '../menu/art';
 import { SUB_EM, deckRect, fitText, labelRoom, menuLayout, neighbour, tapeRect, type MenuLayout, type Placement } from '../menu/layout';
@@ -27,6 +27,8 @@ const REEL_FPS = 6;
 const WIND = 5;
 /** Art pixels a chosen tape lifts off the desk. */
 const LIFT = 2;
+/** A pointer resting on a tape as the menu opens is not a choice: no sound for this long. */
+const HOVER_QUIET_MS = 400;
 
 /** Remembered between visits so backing out of a sub-menu lands on the same tape. */
 let lastIndex = 0;
@@ -95,6 +97,8 @@ export class MenuScene extends Phaser.Scene {
   private busy = false;
   private syncNote: (Phaser.GameObjects.GameObject | UiButton)[] = [];
   private leafTimer: Phaser.Time.TimerEvent | null = null;
+  private hiss: Voice | null = null;
+  private quietUntil = 0;
 
   constructor() {
     super(SceneKeys.Menu);
@@ -121,6 +125,8 @@ export class MenuScene extends Phaser.Scene {
     this.busy = false;
     this.syncNote = [];
     this.leafTimer = null;
+    this.quietUntil = this.time.now + HOVER_QUIET_MS;
+    this.hiss = startDeckHiss(this.game);
 
     this.build();
 
@@ -131,6 +137,8 @@ export class MenuScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       clearLetterbox();
+      this.hiss?.stop();
+      this.hiss = null;
     });
 
     onSwipe(this, { up: () => this.move('down'), down: () => this.move('up'), left: () => this.move('right'), right: () => this.move('left') });
@@ -281,8 +289,9 @@ export class MenuScene extends Phaser.Scene {
       container.add(addText(this, ix, iy, number, layout.idSize, { color: ID_INK, stroke: false, origin: [0, 0.5] }));
 
       const zone = this.keep(this.add.zone(rect.x, rect.y, rect.w, rect.h).setOrigin(0).setInteractive({ useHandCursor: true }));
-      zone.on(Phaser.Input.Events.POINTER_OVER, () => {
-        if (i !== this.index && !this.busy) this.select(i, 'pointer');
+      zone.on(Phaser.Input.Events.POINTER_OVER, (pointer: Phaser.Input.Pointer) => {
+        // A finger lands and plays at once, so only a mouse hover picks the tape up audibly.
+        if (i !== this.index && !this.busy) this.select(i, 'pointer', pointer.wasTouch);
       });
       zone.on(Phaser.Input.Events.POINTER_UP, () => this.play(i));
       this.tapes.push({ container, shadow, reels, restY: slot.y, color });
@@ -314,12 +323,15 @@ export class MenuScene extends Phaser.Scene {
   private move(direction: 'left' | 'right' | 'up' | 'down'): void {
     if (this.busy || isLeaving(this)) return;
     const next = neighbour(this.index, this.tracks.length, direction);
+    // Off the end of the row the choice wraps round: the tape knocks the desk's edge first.
+    const forward = direction === 'right' || direction === 'down';
+    if (next === this.index || next < this.index === forward) playSfx(this.game, 'deskBump');
     if (next === this.index) return;
     this.select(next, next < this.index ? 'rewind' : 'forward');
   }
 
-  /** Pick a tape: it lifts off the desk, its reels turn and the marker ticks it. */
-  private select(index: number, how: 'none' | 'pointer' | 'rewind' | 'forward'): void {
+  /** Pick a tape: it lifts off the desk, its reels turn and the marker ticks it. `quiet` skips the sounds. */
+  private select(index: number, how: 'none' | 'pointer' | 'rewind' | 'forward', quiet = false): void {
     const previous = this.index;
     this.index = index;
     lastIndex = index;
@@ -346,10 +358,12 @@ export class MenuScene extends Phaser.Scene {
     }
     if (how === 'rewind' || how === 'forward') {
       this.wind(how === 'rewind' ? -WIND : WIND, 260);
+      playSfx(this.game, 'tapeLift');
       playSfx(this.game, how === 'rewind' ? 'tapeRewind' : 'tapeForward');
-      this.time.delayedCall(110, () => playSfx(this.game, 'marker'));
-    } else if (how === 'pointer') {
-      playSfx(this.game, 'marker');
+      startSfx(this.game, 'marker', 0.11);
+    } else if (how === 'pointer' && !quiet && this.time.now >= this.quietUntil) {
+      playSfx(this.game, 'tapeLift');
+      startSfx(this.game, 'marker', 0.06);
     }
   }
 
@@ -371,7 +385,10 @@ export class MenuScene extends Phaser.Scene {
     this.tick?.setVisible(false);
     const leave = () => goTo(this, track.scene, track.data, 200);
     const load = () => {
-      playSfx(this.game, 'tapePlay');
+      // The tape seats and the door shuts, the play key latches, the motor comes up to speed.
+      playSfx(this.game, 'tapeInsert');
+      startSfx(this.game, 'tapePlay', 0.14);
+      startSfx(this.game, 'tapeMotor', 0.17);
       this.loaded?.setFillStyle(TAPE_TINT[tape.color], 0.7).setVisible(true);
       this.deckSpeed = REEL_FPS * WIND;
     };
@@ -389,6 +406,7 @@ export class MenuScene extends Phaser.Scene {
     tape.shadow.setVisible(false);
     tape.container.setDepth(2);
     this.wind(WIND * 1.6, 500);
+    playSfx(this.game, 'tapeSlide');
     this.tweens.add({
       targets: tape.container,
       x: bayX,
@@ -419,6 +437,7 @@ export class MenuScene extends Phaser.Scene {
     this.busy = true;
     this.input.enabled = false;
     playSfx(this.game, 'tapeEject');
+    startSfx(this.game, 'tapeSpring', 0.03);
     const leave = () => goTo(this, SceneKeys.Title);
     if (!this.deck || getSettings().reduceMotion) {
       this.time.delayedCall(150, leave);

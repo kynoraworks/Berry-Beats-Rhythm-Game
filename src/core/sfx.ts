@@ -40,6 +40,12 @@ export type SfxName =
   | 'tapeEject'
   | 'tapeForward'
   | 'tapeRewind'
+  | 'tapeLift'
+  | 'tapeSlide'
+  | 'tapeInsert'
+  | 'tapeMotor'
+  | 'tapeSpring'
+  | 'deskBump'
   | 'paperFlip'
   | 'marker'
   | 'doorChime'
@@ -268,6 +274,69 @@ const MICRO = {
   pauseClose: [thump(150, 0.1, 0, 0.05), snap(700, 0.07, 0, 0.03), { type: 'sawtooth', from: 80, to: 330, dur: 0.2, gain: 0.025, delay: 0.04, attack: 0.05 }],
 } satisfies Partial<Record<SfxName, Layer[]>>;
 
+/** A reel winding for a moment: the motor's buzz and the tape's whirr gliding up (forward) or down (rewind), with the spools ticking. */
+function wind(forward: boolean): Layer[] {
+  const [lo, hi] = forward ? [1, 1.9] : [1.9, 1];
+  // The spools tick faster as they get going, and slower as they run down.
+  const ticks = forward ? [0.03, 0.075, 0.11, 0.14, 0.165, 0.185, 0.205] : [0.03, 0.05, 0.07, 0.095, 0.125, 0.16, 0.2];
+  return [
+    { type: 'sawtooth', from: 85 * lo, to: 85 * hi, dur: 0.24, gain: 0.016, attack: 0.05 },
+    { type: 'noise', from: 1500 * lo, to: 1500 * hi, dur: 0.24, gain: 0.06, attack: 0.05, q: 2.5 },
+    { type: 'noise', from: 6500, dur: 0.22, gain: 0.014, attack: 0.06 },
+    ...ticks.map((delay, i) => snap(3800 * (forward ? 1 + i * 0.05 : 1.3 - i * 0.05), 0.022, delay, 0.006)),
+  ];
+}
+
+/**
+ * The main menu: a desk of cassettes and a tape deck. A tape is picked up
+ * (tapeLift), its reels wind forward or back as the choice moves, a marker
+ * ticks it; played, it slides over (tapeSlide), seats with the door shutting
+ * (tapeInsert), the play key latches (tapePlay) and the motor spins up
+ * (tapeMotor). Backing out presses eject and the door springs open. The lift,
+ * insert and motor are recorded (see SAMPLES); these are their stand-ins.
+ */
+const CASSETTE = {
+  tapeLift: [snap(3800, 0.04, 0, 0.008), snap(2600, 0.07, 0.025, 0.016), thump(260, 0.05, 0.025, 0.035)],
+  tapeForward: wind(true),
+  tapeRewind: wind(false),
+  // A felt tip's check mark: a short stroke down, a longer flick up with a squeak in it.
+  marker: [
+    { type: 'noise', from: 2600, to: 2000, dur: 0.035, gain: 0.08, attack: 0.008, q: 3 },
+    { type: 'noise', from: 3000, to: 4800, dur: 0.075, gain: 0.08, delay: 0.045, attack: 0.015, q: 3 },
+    { type: 'sine', from: 2900, to: 3500, dur: 0.05, gain: 0.008, delay: 0.055, attack: 0.01 },
+  ],
+  // The tape gliding over the desk to the deck.
+  tapeSlide: [{ type: 'noise', from: 900, to: 2600, dur: 0.3, gain: 0.03, attack: 0.18, q: 0.8 }],
+  tapeInsert: [snap(2000, 0.1, 0, 0.02), thump(190, 0.12, 0, 0.06), snap(1500, 0.07, 0.07, 0.02), thump(150, 0.1, 0.07, 0.07)],
+  // The play key: a clunk as it latches.
+  tapePlay: [
+    { type: 'noise', from: 700, dur: 0.05, gain: 0.14 },
+    { type: 'triangle', from: 150, to: 80, dur: 0.09, gain: 0.14 },
+    { type: 'noise', from: 3200, dur: 0.012, gain: 0.08, delay: 0.035 },
+  ],
+  tapeMotor: [
+    { type: 'sawtooth', from: 55, to: 110, dur: 0.55, gain: 0.018, attack: 0.12 },
+    { type: 'noise', from: 900, to: 1800, dur: 0.55, gain: 0.03, attack: 0.15, q: 2 },
+    { type: 'noise', from: 6000, dur: 0.6, gain: 0.02, attack: 0.2, q: 0.6 },
+  ],
+  // The eject key and the door springing open...
+  tapeEject: [
+    { type: 'noise', from: 1400, to: 500, dur: 0.07, gain: 0.12 },
+    { type: 'triangle', from: 260, to: 620, dur: 0.1, gain: 0.08, delay: 0.04 },
+    { type: 'noise', from: 2600, dur: 0.02, gain: 0.07, delay: 0.12 },
+  ],
+  // ...and its spring ringing out: two detuned tones beating against each other, with a rattle.
+  tapeSpring: [
+    snap(3000, 0.04, 0, 0.012),
+    { type: 'triangle', from: 540, to: 500, dur: 0.2, gain: 0.03 },
+    { type: 'triangle', from: 556, to: 512, dur: 0.2, gain: 0.025 },
+    { type: 'sine', from: 1320, to: 1260, dur: 0.12, gain: 0.012 },
+    { type: 'noise', from: 2200, dur: 0.07, gain: 0.025, delay: 0.01, q: 6 },
+  ],
+  // Bumping the end of the row: a soft knock on the desk.
+  deskBump: [thump(130, 0.08, 0, 0.08), { type: 'noise', from: 500, dur: 0.04, gain: 0.05, q: 1.2 }, snap(1800, 0.025, 0, 0.01)],
+} satisfies Partial<Record<SfxName, Layer[]>>;
+
 const RECIPES: Record<SfxName, Layer[]> = {
   // The train: a two-tone chime before the doors move, the air hiss as they slide, the bump as they meet.
   doorChime: [
@@ -358,35 +427,10 @@ const RECIPES: Record<SfxName, Layer[]> = {
   ],
   // The camera settling back: a short falling whoosh.
   hypeOut: [{ type: 'noise', from: 4000, to: 500, dur: 0.24, gain: 0.06, attack: 0.02 }],
-  // The main menu's tape deck. A clunk of the play key...
-  tapePlay: [
-    { type: 'noise', from: 700, dur: 0.05, gain: 0.14 },
-    { type: 'triangle', from: 150, to: 80, dur: 0.09, gain: 0.14 },
-    { type: 'noise', from: 3200, dur: 0.012, gain: 0.08, delay: 0.035 },
-  ],
-  // ...the eject key and the door springing open...
-  tapeEject: [
-    { type: 'noise', from: 1400, to: 500, dur: 0.07, gain: 0.12 },
-    { type: 'triangle', from: 260, to: 620, dur: 0.1, gain: 0.08, delay: 0.04 },
-    { type: 'noise', from: 2600, dur: 0.02, gain: 0.07, delay: 0.12 },
-  ],
-  // ...a short wind forward and back...
-  tapeForward: [
-    { type: 'sawtooth', from: 260, to: 760, dur: 0.2, gain: 0.025, attack: 0.04 },
-    { type: 'noise', from: 2400, to: 5200, dur: 0.2, gain: 0.04, attack: 0.04 },
-    { type: 'square', from: 70, to: 110, dur: 0.18, gain: 0.02 },
-  ],
-  tapeRewind: [
-    { type: 'sawtooth', from: 760, to: 260, dur: 0.2, gain: 0.025, attack: 0.04 },
-    { type: 'noise', from: 5200, to: 2400, dur: 0.2, gain: 0.04, attack: 0.04 },
-    { type: 'square', from: 110, to: 70, dur: 0.18, gain: 0.02 },
-  ],
-  // ...a card flicked over, and a marker ticking the chosen track.
+  // The main menu's desk of tapes (see CASSETTE above).
+  ...CASSETTE,
+  // A card flicked over.
   paperFlip: [{ type: 'noise', from: 2200, to: 6500, dur: 0.14, gain: 0.07, attack: 0.03 }],
-  marker: [
-    { type: 'noise', from: 3600, to: 2600, dur: 0.06, gain: 0.05, attack: 0.01 },
-    { type: 'noise', from: 5200, to: 4200, dur: 0.05, gain: 0.04, delay: 0.07, attack: 0.01 },
-  ],
 
   // Battle hype. The turntable sounds are recorded scratches (see SAMPLES);
   // these rough stand-ins only play until the samples have loaded.
@@ -482,10 +526,14 @@ const RECIPES: Record<SfxName, Layer[]> = {
  * stingers from ElevenLabs music, and the MC from ElevenLabs v4 (a shouted
  * arena read, put through a live-mic chain). The turntable sounds scratch a
  * shouted stab from the same voice; tools/build_sfx.py builds the MC, the
- * turntable, the impacts and the crowd roar.
+ * turntable, the impacts, the crowd roar and the menu's tape deck (a tape
+ * lifted, a tape seating as the door shuts, the motor spinning up).
  */
 const SAMPLES: Partial<Record<SfxName, { file: string; gain: number }>> = {
-  tapePlay: { file: 'assets/audio/sfx/tape_play.mp3', gain: 0.55 },
+  tapeLift: { file: 'assets/audio/sfx/tape_lift.mp3', gain: 0.14 },
+  tapeInsert: { file: 'assets/audio/sfx/tape_insert.mp3', gain: 0.4 },
+  tapeMotor: { file: 'assets/audio/sfx/tape_motor.mp3', gain: 0.12 },
+  tapePlay: { file: 'assets/audio/sfx/tape_play.mp3', gain: 0.45 },
   tapeEject: { file: 'assets/audio/sfx/tape_eject.mp3', gain: 0.5 },
   paperFlip: { file: 'assets/audio/sfx/paper_flip.mp3', gain: 0.5 },
   airhorn: { file: 'assets/audio/sfx/airhorn.mp3', gain: 0.38 },
@@ -673,6 +721,8 @@ export const GAPS: Partial<Record<SfxName, number>> = {
   countTick: 0.04,
   tick: 0.04,
   step: 0.09,
+  tapeLift: 0.05,
+  marker: 0.05,
 };
 
 /** Sounds that repeat get up to this much random pitch spread (a ratio), so a run of them never sounds mechanical. */
@@ -682,6 +732,8 @@ export const JITTER: Partial<Record<SfxName, number>> = {
   move: 0.02,
   countTick: 0.02,
   listScroll: 0.03,
+  tapeLift: 0.06,
+  marker: 0.05,
 };
 
 const lastPlayed = new Map<SfxName, number>();
@@ -732,6 +784,42 @@ export function startSfx(game: Phaser.Game, name: SfxName, delay = 0, gain = 1, 
     sources.push(...scheduleRecipe(ctx, name, at, volume, out, rate));
   }
   return voiceOf(ctx, out, sources, sfxDuration(name) / (buffer && sample ? rate : 1));
+}
+
+/** How loud the menu's tape hiss sits, before the Sound volume: well under the menu music. */
+export const DECK_HISS_GAIN = 0.0045;
+
+/**
+ * The tape deck on the menu desk, switched on: a faint hiss that loops for as
+ * long as the menu is open, fading in so it is never noticed arriving. Null
+ * when muted or when audio is still locked.
+ */
+export function startDeckHiss(game: Phaser.Game): Voice | null {
+  const volume = getSettings().sfxVolume;
+  if (volume <= 0) return null;
+  const ctx = getAudioContext(game);
+  if (ctx.state !== 'running') return null;
+  // Its own few seconds of noise: the shared one-second buffer would be heard repeating once a second.
+  const noise = ctx.createBuffer(1, Math.round(ctx.sampleRate * 4.3), ctx.sampleRate);
+  const data = noise.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const source = ctx.createBufferSource();
+  source.buffer = noise;
+  source.loop = true;
+  // Tape hiss is mostly top end.
+  const high = ctx.createBiquadFilter();
+  high.type = 'highpass';
+  high.frequency.value = 2500;
+  const low = ctx.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 9000;
+  const out = ctx.createGain();
+  const now = ctx.currentTime;
+  out.gain.setValueAtTime(0, now);
+  out.gain.linearRampToValueAtTime(DECK_HISS_GAIN * volume, now + 1.5);
+  source.connect(high).connect(low).connect(out).connect(busInput(ctx, 'main'));
+  source.start(now);
+  return voiceOf(ctx, out, [source], Infinity);
 }
 
 /** The turntable moves that can be made live from the battle song. */

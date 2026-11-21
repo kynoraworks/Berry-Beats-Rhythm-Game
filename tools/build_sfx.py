@@ -2,6 +2,7 @@
 """Build the battle hype sounds in public/assets/audio/sfx.
 
     python3 tools/build_sfx.py archive/generated-audio/mc [--countdown]
+    python3 tools/build_sfx.py archive/generated-audio/cassette --cassette
 
 RAW_DIR holds the generated takes (ElevenLabs v4, preset voice "Barrett",
 [shouting] tag): mc_*.mp3 for the MC lines and src_ahh.mp3, a
@@ -19,6 +20,9 @@ is synthesised here.
     the record, and a crossfader gate cuts it.
   * Impacts: sub booms and slams layered from a pitched sub, a kick click, a
     body thump and a crack, saturated so they read on phone speakers.
+  * Cassette (--cassette): the main menu's tape deck, cut from Mirelo foley
+    takes (*_raw.mp3): a tape picked up off the desk, a tape seating in the
+    deck and the door shutting, and the deck's motor spinning up to speed.
 """
 import os
 import subprocess
@@ -517,10 +521,46 @@ def crowd_roar():
     save(fade(limit(norm(y, 0) * 1.6, -2.5), 0.01, 0.4), 'crowd_roar')
 
 
+
+# ------------------------------------------------------------------- cassette
+
+def cut(x, start, end):
+    return x[int(start * SR):int(end * SR)]
+
+
+def varispeed(x, rate):
+    """Read `x` at a speed that changes over time (`rate` per output sample), like a motor coming up to speed."""
+    pos = np.cumsum(rate)
+    pos = pos[pos < len(x) - 1]
+    return np.interp(pos, np.arange(len(x)), x)
+
+
+def cassette(raw):
+    # Picked up: a small tick as the fingers catch the shell, then the clack as it leaves the desk.
+    lift = hp(cut(load(os.path.join(raw, 'lift_raw.mp3')), 0.948, 1.012), 160, 4)
+    save(fade(norm(lift, -3), 0.002, 0.018), 'tape_lift')
+    # Pushed into the deck: the shell seats with a clack and the door latches shut behind it.
+    insert = hp(cut(load(os.path.join(raw, 'insert_raw.mp3')), 1.148, 1.42), 70, 4)
+    save(fade(norm(insert, -3), 0.002, 0.08), 'tape_insert')
+    # The motor: the take's running hum and hiss after its key clunk, read slow at first
+    # and eased up to speed (the wow of a capstan catching), with a little flutter.
+    motor = hp(cut(load(os.path.join(raw, 'spinup_raw.mp3')), 1.335, 2.0), 90, 4)
+    n = int(0.62 * SR)
+    t = np.arange(n) / SR
+    rate = 1 - 0.5 * np.exp(-t / 0.07) + 0.004 * np.sin(2 * np.pi * 6 * t)
+    motor = varispeed(motor, rate)
+    t = np.arange(len(motor)) / SR
+    motor *= np.clip(t / 0.05, 0, 1)
+    save(fade(norm(motor, -3), 0.004, 0.22), 'tape_motor')
+
+
 def main():
     if len(sys.argv) not in (2, 3):
         sys.exit(__doc__)
     raw = sys.argv[1]
+    if len(sys.argv) == 3 and sys.argv[2] == '--cassette':
+        cassette(raw)
+        return
     if len(sys.argv) == 3 and sys.argv[2] == '--countdown':
         # Only the countdown: the MC's numbers and the hits.
         for dst in ('mc_three', 'mc_two', 'mc_one'):
