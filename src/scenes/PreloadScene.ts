@@ -133,7 +133,8 @@ export class PreloadScene extends Phaser.Scene {
           return;
         }
         const data: PlayData = {
-          chart,
+          // A story chart played on its own is danced on its stop's stage.
+          chart: chartUrl ? chart : { ...chart, stage: chart.stage ?? level.stage },
           returnTo: { scene: SceneKeys.LevelSelect, data: stop ? { levelId: stop.id } : undefined },
           autoplay: params.get('autoplay') === '1',
           startAt: Number(params.get('at')) || undefined,

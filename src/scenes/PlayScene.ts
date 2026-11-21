@@ -50,7 +50,7 @@ import { cycleBackup, getBackup, listAvailable } from '../story/crew';
 import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
-import { rivalLevelFor, stopById, stopForChart } from '../story/stops';
+import { STOPS, rivalLevelFor, stopById, stopForChart } from '../story/stops';
 import { CREW_ROUNDS, endSession, getSession, recordRound, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
 import { segmentAt } from '../story/flow';
 import { characterSheet, stageTexture } from '../story/placeholders';
@@ -271,7 +271,9 @@ export class PlayScene extends Phaser.Scene {
     const playerX = hasRival ? PLAYER_X : GAME_W / 2;
     const place = story?.stop ?? (crew ? stopById('stop12') : undefined);
     let stageKey = segment?.stage ?? (crew ? place?.stage : undefined) ?? chart.stage ?? Tex.room;
-    if (place && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, place.station, place.time, CAST[place.fruit].color);
+    // A stop's stage not drawn yet is cut from its street, or stood in for, also when its chart is played on its own.
+    const owner = place ?? STOPS.find((stop) => stop.stage === stageKey);
+    if (owner && !this.textures.exists(stageKey)) stageKey = stageTexture(this, stageKey, owner.station, owner.time, CAST[owner.fruit].color);
     this.stage = new StageFx(this, stageKey, playerX, hasRival ? RIVAL_X : null, settings.reduceMotion);
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     // Feet go on the stage art's own floor line under each dancer.
