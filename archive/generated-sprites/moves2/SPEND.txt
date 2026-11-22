@@ -6,3 +6,7 @@ batch 5 submitted: banana_f grape d e f plum d e f dragonfruit_d = 10.0 (total 4
 batch 6 submitted: dragonfruit e f, watermelon d e f, coconut d e f = 10.0 (total 52.5)
 batch 7 submitted: orange d e f, pineapple d e f, instructor d e = 10.0 (total 62.5)
 batch 8: instructor_f = 1.25 (total 63.75)
+hype redo (new look: normal Berry, hood down, smile; refs concept b9aa2328 + blackberry_ref, 1k = 1.25 each):
+  hype_a = 1.25
+  hype_b hype_c hype_d hype_e hype_f = 6.25 (redo total 7.5)
+  hype_f reroll (point pose came out as fists) = 1.25 (redo total 8.75, total 72.5)

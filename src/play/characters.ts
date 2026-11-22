@@ -140,8 +140,8 @@ const LEMON_STYLE: DanceStyle = {
 };
 
 /**
- * Hype Berry: hood down, headphones on, all the energy. Poses snap harder and
- * the idle dance dips on every beat.
+ * Hype Berry: his hood pushed down, hair out, a small smile, all the energy.
+ * Poses snap harder and the idle dance dips on every beat.
  */
 const HYPE_STYLE: DanceStyle = {
   ...STANDARD,
@@ -436,8 +436,8 @@ export class Dancer {
   }
 
   /**
-   * Hype mode's transformation: Berry swaps into his hype pack (hood down,
-   * glowing headphones and jacket) and back when it ends, with a white flash
+   * Hype mode's transformation: Berry swaps into his hype pack (the same
+   * outfit with the hood pushed down) and back when it ends, with a white flash
    * and a pop each way. Reduced motion swaps without the flash. Only Berry has
    * the pack; anyone else, or a game without the sheet, ignores this.
    */

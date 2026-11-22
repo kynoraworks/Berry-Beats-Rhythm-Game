@@ -19,13 +19,27 @@ order (top row left to right, then bottom row):
 Rivals' duo sheets say "a partner who stands to his/her/their LEFT" (Berry's
 says RIGHT), so every duo pose already faces the other dancer.
 
-Hype Berry (hype_a to hype_f) used hype_a's job as the reference instead, with:
-"a chibi boy with spiky dark indigo hair with glowing cyan streaks, glowing cyan
-headphones, a black cropped bomber jacket with neon cyan and magenta light-up
-trim over a purple hoodie, grey joggers with a glowing cyan stripe, white
-high-tops with glowing cyan soles, and a thin cyan energy outline". Its palette
-(palette_berry_hype.png) was derived from hype_a with tools/derive_palette.py,
-plus three magenta shades for the trim.
+Hype Berry (hype_a to hype_f) is normal Berry with his hood down. It was
+regenerated at 1k (1.25 credits a sheet) with two references: the approved
+concept (Higgsfield job b9aa2328-1b60-45a6-b04a-f684d3cf06f5, three poses of the
+new look) first, then refs/blackberry_ref.png. CHARACTER was:
+"Berry, a shy chibi boy who is a BLACKBERRY, drawn EXACTLY like the normal Berry
+in the second reference image (the same purple hoodie with white drawstrings and
+a front pocket, grey joggers, purple and white high-top sneakers, messy dark
+indigo hair, the same proportions, head size and height, the same palette) with
+ONE change, as in the first reference image: the hood is pushed DOWN and sits
+bunched on his shoulders behind his neck, so his full messy dark indigo hair is
+visible; a thick fringe of hair still completely covers his eyes (NO eyes
+visible ever); his mouth is a small subtle closed-mouth smile. No headphones, no
+jacket, no glow, no neon, no light-up trim, no cyan, no magenta, no pink, no
+energy outline, no motion lines, no swirls, no sparks, no effects". The prefix
+also said "Directions LEFT and RIGHT mean the left and right of the image".
+Its palette (palette_berry_hype.png) was derived from the new hype_a with
+tools/derive_palette.py and is close to Berry's own.
+
+The first Hype Berry (spiky hair with cyan streaks, glowing cyan headphones, a
+black bomber jacket with cyan and magenta light-up trim, a cyan energy outline)
+was replaced; its raw sheets are in git history.
 
 ## Sheets and poses (sheet tag: frames in <sheet>_moves.png)
 
