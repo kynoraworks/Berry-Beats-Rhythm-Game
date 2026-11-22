@@ -211,7 +211,7 @@ function street(stop: StopDef): PlaceDef | null {
   const spots = [...looksAt(chapter.street.looks, 'street', floor), ...peopleAt(chapter.street.residents, floor), fruit];
   // Stop 1: Berry's front door at the left end, and the station steps at the right (after the boss).
   if (stop.number === 1) {
-    spots.push({ id: 'home', kind: 'exit', label: 'Home', x: 18, y: floor(30) - 56, w: 24, h: 56, lines: [], to: { place: 'room', at: 200 } });
+    spots.push({ id: 'home', kind: 'exit', label: 'Home', x: 18, y: floor(30) - 56, w: 24, h: 56, lines: [], to: { place: 'room', at: BERRY_ROOM.doorX + 22 } });
     spots.push({ id: 'steps', kind: 'exit', label: 'Station steps', x: chapter.street.exitX - 14, y: floor(chapter.street.exitX) - 56, w: 28, h: 56, lines: [], to: { place: 'depart' } });
   }
   return { stop: stop.id, kind: 'street', bg, width: STREET_W, floor: floorAt(bg, 22), startX: stop.number === 1 ? 44 : 22, hotspots: spots };
@@ -224,19 +224,36 @@ function street(stop: StopDef): PlaceDef | null {
 /** The faded photo of the trio, on the wall of Berry's room (above the skateboards). */
 export const TRIO_PHOTO = { x: 70, y: 34, w: 20, h: 15 } as const;
 
-/** Berry's door out of his room, on the right. */
+/** Berry's door out of his room, on the right (the older room.png). */
 export const ROOM_DOOR_X = 238;
+
+/**
+ * Berry's room as the v2 art draws it (room_berry.png, story_v2_env MANIFEST):
+ * the door on the left, the wardrobe beside it, the desk with the phone and
+ * the postcards, the faded trio photo in its frame above them, the curtained
+ * window, the duvet lump on the bed. Its own photo is in the art.
+ */
+export const BERRY_ROOM = {
+  bg: 'room_berry',
+  doorX: 17,
+  /** The frame of the trio photo over the desk. */
+  photo: { x: 104, y: 70, w: 15, h: 13 },
+  looks: { photo: 111, wardrobe: 53, desk: 84, phone: 106, window: 155 } as Record<string, number>,
+} as const;
 
 function room(stop: StopDef): PlaceDef {
   const chapter = chapterOf(stop.id);
-  const floor = (x: number) => floorAt('room', x);
-  const looks = looksAt(chapter?.homeLooks ?? [], 'room:berry', floor);
-  // The trio photo keeps the spot the room art has for it.
+  const bg = BERRY_ROOM.bg;
+  const floor = (x: number) => floorAt(bg, x);
+  // Each thing stands where the art draws it.
+  const homeLooks = (chapter?.homeLooks ?? []).map((look) => (BERRY_ROOM.looks[look.id] !== undefined ? { ...look, x: BERRY_ROOM.looks[look.id] } : look));
+  const looks = looksAt(homeLooks, 'room:berry', floor);
   for (const look of looks) {
-    if (look.id === 'photo') Object.assign(look, { x: TRIO_PHOTO.x, y: TRIO_PHOTO.y, w: TRIO_PHOTO.w, h: TRIO_PHOTO.h, prop: 'photo' as PropKind });
+    if (look.id === 'photo') Object.assign(look, { ...BERRY_ROOM.photo, prop: 'photo' as PropKind });
   }
-  const door: Hotspot = { id: 'door', kind: 'exit', label: 'Out to the street', x: ROOM_DOOR_X, y: 76, w: 18, h: 61, lines: [], to: { place: 'street', at: 44 } };
-  return { stop: stop.id, kind: 'room', bg: 'room', width: STATION_W, floor: floorAt('room', 118), startX: 118, hotspots: [...looks, door] };
+  const doorX = BERRY_ROOM.doorX;
+  const door: Hotspot = { id: 'door', kind: 'exit', label: 'Out to the street', x: doorX - 12, y: floor(doorX) - 60, w: 24, h: 60, lines: [], to: { place: 'street', at: 44 } };
+  return { stop: stop.id, kind: 'room', bg, width: STATION_W, floor: floorAt(bg, 118), startX: 118, hotspots: [...looks, door] };
 }
 
 /** The platform where Berry boards: stop 1's departure scene and its postcard stand. */

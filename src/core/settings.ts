@@ -9,8 +9,10 @@ export const CAMERA_MOTIONS: readonly CameraMotion[] = ['full', 'light', 'off'];
 export interface Settings {
   /** 0..1 */
   musicVolume: number;
-  /** 0..1 */
+  /** 0..1: sound effects, the crowd, the MC and the story's stings. */
   sfxVolume: number;
+  /** 0..1: the speech box's voice blips (core/voice.ts). */
+  voiceVolume: number;
   /**
    * Audio/visual calibration in milliseconds. Positive values make notes arrive
    * later, which compensates for audio that reaches the player late
@@ -49,6 +51,7 @@ export const EFFECTS_LEVELS: readonly EffectsLevel[] = ['full', 'low'];
 export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 0.8,
   sfxVolume: 0.7,
+  voiceVolume: 0.7,
   audioOffsetMs: 0,
   scrollSpeed: 1,
   hitSounds: false,
@@ -88,6 +91,8 @@ function sanitize(raw: Partial<Settings>): Settings {
   return {
     musicVolume: clamp(raw.musicVolume, 0, 1, d.musicVolume),
     sfxVolume: clamp(raw.sfxVolume, 0, 1, d.sfxVolume),
+    // Saves from before the voices had their own volume keep them at the effects volume.
+    voiceVolume: clamp(raw.voiceVolume, 0, 1, clamp(raw.sfxVolume, 0, 1, d.voiceVolume)),
     audioOffsetMs: clamp(raw.audioOffsetMs, -500, 500, d.audioOffsetMs),
     scrollSpeed: clamp(raw.scrollSpeed, 0.5, 2.5, d.scrollSpeed),
     hitSounds: typeof raw.hitSounds === 'boolean' ? raw.hitSounds : d.hitSounds,

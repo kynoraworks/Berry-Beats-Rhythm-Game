@@ -36,7 +36,7 @@ export interface CharacterDef {
    * first and bold next), used when that sheet is loaded. A role can have its own
    * ("The Conductor").
    */
-  art?: { key: string; frame: number; roles?: Record<string, number> };
+  art?: { key: string; frame: number; roles?: Record<string, number>; single?: boolean };
   /**
    * Street and room sprite (64x64 cells, feet on row 62, 2-frame idle) for
    * someone who has no dance sheet yet. Until it is drawn, the stand-in NPC is
@@ -195,38 +195,45 @@ function minor(id: MinorId, name: string, color: number, tag: number, extra: Par
   };
 }
 
+/** The master sheet of the v2 speakers' portraits (archive/generated-sprites/story_v2/MANIFEST.md section 7). */
+export const PORTRAITS_V2 = 'portraits_v2';
+/** A bust in portraits_v2: neutral at `frame`, bold next (one frame for every mood when `single`). */
+const v2 = (frame: number, single = false): CharacterDef['art'] => ({ key: PORTRAITS_V2, frame, ...(single ? { single } : {}) });
+/** A trainer: their lite dance sheet (keyed by `sprite`), their portrait pair in portraits_v2. */
+const coachOf = (sprite: string, portrait: number): Partial<CharacterDef> => ({ sprite, sheet: sprite, layout: 'lite', art: v2(portrait) });
+
 /** The people of the chapters (types.ts MinorId), in the order they are met. */
 export const MINOR_CAST: Record<MinorId, CharacterDef> = {
-  strawberry: minor('strawberry', 'Strawberry', 0xe8243c, 0xc81830, { art: { key: 'legends_portraits', frame: 2, roles: { 'The Conductor': 4 } }, sprite: 'conductor' }),
+  strawberry: minor('strawberry', 'Strawberry', 0xe8243c, 0xc81830, { art: { key: PORTRAITS_V2, frame: 4, roles: { 'The Conductor': 6 } }, sprite: 'conductor', sheet: 'strawberry', layout: 'lite' }),
   juiceFm: minor('juiceFm', 'Juice FM', 0xff9a2e, 0xe8780f, { sprite: undefined }),
   phone: minor('phone', 'Text', 0x6fd6ff, 0x2f6a9a, { sprite: undefined }),
-  mrsDamson: minor('mrsDamson', 'Mrs. Damson', 0x6a3a7a, 0x4a2a5a),
-  gooseberry: minor('gooseberry', 'Postmaster Gooseberry', 0x8ac64a, 0x4f8a2a),
-  currant: minor('currant', 'Little Currant', 0xd81e3a, 0xa8142a),
-  lime: minor('lime', 'Lime', 0x9ad83a, 0x5a9a1e, { trait: 'Out of ten', sprite: 'lime' }),
-  kumquat: minor('kumquat', 'Kumquat', 0xff8a1e, 0xc8600a),
-  clerkDate: minor('clerkDate', 'Clerk Date', 0x8a5a3a, 0x5a3a22),
+  mrsDamson: minor('mrsDamson', 'Mrs. Damson', 0x6a3a7a, 0x4a2a5a, { art: v2(43, true) }),
+  gooseberry: minor('gooseberry', 'Postmaster Gooseberry', 0x8ac64a, 0x4f8a2a, { art: v2(38, true) }),
+  currant: minor('currant', 'Little Currant', 0xd81e3a, 0xa8142a, { art: v2(44, true) }),
+  lime: minor('lime', 'Lime', 0x9ad83a, 0x5a9a1e, { trait: 'Out of ten', ...coachOf('lime', 18) }),
+  kumquat: minor('kumquat', 'Kumquat', 0xff8a1e, 0xc8600a, { art: v2(39, true) }),
+  clerkDate: minor('clerkDate', 'Clerk Date', 0x8a5a3a, 0x5a3a22, { art: v2(40, true) }),
   sloe: minor('sloe', 'Mopper Sloe', 0x4a5a8a, 0x2f3a5a),
-  peach: minor('peach', 'Peach', 0xffb07a, 0xd8784a, { trait: 'Art snob', sprite: 'peach' }),
-  olive: minor('olive', 'Mr. Olive', 0x7a8a3a, 0x4f5a22),
+  peach: minor('peach', 'Peach', 0xffb07a, 0xd8784a, { trait: 'Art snob', ...coachOf('peach', 20) }),
+  olive: minor('olive', 'Mr. Olive', 0x7a8a3a, 0x4f5a22, { art: v2(46, true) }),
   nib: minor('nib', 'Nib', 0x5ac85a, 0x2f8a3a),
-  bing: minor('bing', 'Bing', 0xe8243c, 0xa8142a, { trait: 'The sweet one', sprite: 'cherries' }),
-  morello: minor('morello', 'Morello', 0x9a1428, 0x6a0a1a, { trait: 'The sour one', sprite: 'cherries' }),
-  elderberry: minor('elderberry', 'Officer Elderberry', 0x3a2a5a, 0x22183a),
-  seedless: minor('seedless', 'Seedless', 0xa8d84a, 0x6a9a2a),
-  grapefruit: minor('grapefruit', 'Grapefruit', 0xff7a6a, 0xc84a3a, { trait: 'Paid in snacks', sprite: 'grapefruit' }),
+  bing: minor('bing', 'Bing', 0xe8243c, 0xa8142a, { trait: 'The sweet one', ...coachOf('cherries', 22) }),
+  morello: minor('morello', 'Morello', 0x9a1428, 0x6a0a1a, { trait: 'The sour one', ...coachOf('cherries', 24) }),
+  elderberry: minor('elderberry', 'Officer Elderberry', 0x3a2a5a, 0x22183a, { art: v2(41, true) }),
+  seedless: minor('seedless', 'Seedless', 0xa8d84a, 0x6a9a2a, { art: v2(42, true) }),
+  grapefruit: minor('grapefruit', 'Grapefruit', 0xff7a6a, 0xc84a3a, { trait: 'Paid in snacks', ...coachOf('grapefruit', 26) }),
   b33: minor('b33', 'Robot B-33', 0xa8b8c8, 0x5a6a7a),
-  satsuma: minor('satsuma', 'Mrs. Satsuma', 0xff9a3a, 0xc8680a),
-  lychee: minor('lychee', 'Lychee', 0xf4d6dc, 0xc89aa4, { darkTag: true, trait: 'Whispers', sprite: 'lychee' }),
+  satsuma: minor('satsuma', 'Mrs. Satsuma', 0xff9a3a, 0xc8680a, { art: v2(47, true) }),
+  lychee: minor('lychee', 'Lychee', 0xf4d6dc, 0xc89aa4, { darkTag: true, trait: 'Whispers', ...coachOf('lychee', 28) }),
   longan: minor('longan', 'Auntie Longan', 0xb8864a, 0x7a5a2a),
-  passionFruit: minor('passionFruit', 'Passion Fruit', 0x7a3a8a, 0x4f2260, { trait: 'Poet', sprite: 'passion_fruit' }),
-  kiwi: minor('kiwi', 'Kiwi', 0x8a6a3a, 0x5a4422),
-  mango: minor('mango', 'Mango', 0xffb21e, 0xd8780a, { darkTag: true, trait: 'Always mid-order', sprite: 'mango' }),
-  fig: minor('fig', 'Fig', 0x7a4a6a, 0x5a3050, { trait: 'Rhymes', sprite: 'fig' }),
-  chestnut: minor('chestnut', 'Foreman Chestnut', 0x8a4a2a, 0x5a2e18),
-  clementine: minor('clementine', 'Ms. Clementine', 0xff8a2e, 0xc8600a),
-  quince: minor('quince', 'Quince', 0xe8d24a, 0xa8941e, { darkTag: true, trait: 'Ahem', sprite: 'quince' }),
-  medlar: minor('medlar', 'Lord Medlar', 0x8a6a4a, 0x5a422a),
+  passionFruit: minor('passionFruit', 'Passion Fruit', 0x7a3a8a, 0x4f2260, { trait: 'Poet', ...coachOf('passion_fruit', 30) }),
+  kiwi: minor('kiwi', 'Kiwi', 0x8a6a3a, 0x5a4422, { art: v2(48, true) }),
+  mango: minor('mango', 'Mango', 0xffb21e, 0xd8780a, { darkTag: true, trait: 'Always mid-order', ...coachOf('mango', 32) }),
+  fig: minor('fig', 'Fig', 0x7a4a6a, 0x5a3050, { trait: 'Rhymes', ...coachOf('fig', 34) }),
+  chestnut: minor('chestnut', 'Foreman Chestnut', 0x8a4a2a, 0x5a2e18, { art: v2(50, true) }),
+  clementine: minor('clementine', 'Ms. Clementine', 0xff8a2e, 0xc8600a, { art: v2(49, true) }),
+  quince: minor('quince', 'Quince', 0xe8d24a, 0xa8941e, { darkTag: true, trait: 'Ahem', ...coachOf('quince', 36) }),
+  medlar: minor('medlar', 'Lord Medlar', 0x8a6a4a, 0x5a422a, { art: v2(52, true) }),
 };
 
 Object.assign(CAST, MINOR_CAST);
@@ -255,7 +262,7 @@ export function portraitArt(line: Pick<Line, 'who' | 'mood' | 'role'>): { key: s
   const art = CAST[line.who]?.art;
   if (!art) return null;
   const base = (line.role ? art.roles?.[line.role] : undefined) ?? art.frame;
-  return { key: art.key, frame: base + (isBoldMood(line.mood) ? 1 : 0) };
+  return { key: art.key, frame: base + (isBoldMood(line.mood) && !art.single ? 1 : 0) };
 }
 
 /** Name for a line's tag. Station NPCs go by their role, in normal case ("Stall keeper", "DJ"). */

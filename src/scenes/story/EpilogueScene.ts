@@ -8,7 +8,8 @@ import { Cutscene, type CutShot } from '../../cutscene/Cutscene';
 import { CutDepth, flash } from '../../cutscene/fx';
 import { loadStoryArt } from '../../cutscene/flow';
 import { EPILOGUE_ARRIVALS, EPILOGUE_MOVES, EPILOGUE_REMATCH, EPILOGUE_WHO_WON } from '../../cutscene/scripts';
-import { cutsceneState, endingFlag, setEndingFlag } from '../../cutscene/storyState';
+import { POSTGAME_FLAGS, cutsceneState, endingFlag, setEndingFlag } from '../../cutscene/storyState';
+import { learnPostGameMove } from '../../story/moveset';
 import { at } from '../../cutscene/timeline';
 import { endingThen, type EndingData } from './FinaleScene';
 import { playSfx } from '../../core/sfx';
@@ -282,6 +283,9 @@ export class EpilogueScene extends Phaser.Scene {
 
   private learned(name: string, teacher: string, flag: string): () => boolean {
     setEndingFlag(flag);
+    // The move itself, for the Moves screen's finisher slots.
+    const id = POSTGAME_FLAGS[flag];
+    if (id) learnPostGameMove(id);
     playStinger(this.game, 'sting_move_learned', () => playSfx(this.game, 'unlock'));
     const card = this.add.container(GAME_W / 2, 160, [
       this.add.rectangle(0, 0, 760, 100, COLORS.ink, 0.92).setStrokeStyle(6, COLORS.yellow),

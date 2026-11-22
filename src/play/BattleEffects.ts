@@ -17,6 +17,7 @@ import {
   flairCapacity,
 } from '../story/abilities';
 import type { AbilityState } from './fighterCard';
+import type { FruitId } from '../story/types';
 import { flairRate, flashSchedule, inWindow, jitterOffset, meltdownWindows, missDamage, slidePlan, slideProgress, type BattleRules, type TimedWindow } from '../story/gimmicks';
 import { FlairWidget } from './FlairWidget';
 import { FlashCurtain } from './FlashCurtain';
@@ -50,6 +51,8 @@ export interface EffectsSetup {
   calm: boolean;
   touch: boolean;
   hooks: EffectsHooks;
+  /** Stop 7's soloists: this backup is benched, shown greyed on a meter that fills with nothing to fire. */
+  benched?: FruitId | null;
   /** How many times the ability may be fired (the crew battle allows one per round). Unlimited if omitted. */
   maxFires?: number;
 }
@@ -65,7 +68,7 @@ export class BattleEffects {
   private readonly setup: EffectsSetup;
   private readonly scene: Phaser.Scene;
   private rules: BattleRules;
-  private readonly meter: FlairMeter | null;
+  private meter: FlairMeter | null;
   private widget: FlairWidget | null;
   private readonly curtain: FlashCurtain | null;
   private readonly meltdowns: TimedWindow[];
@@ -76,6 +79,7 @@ export class BattleEffects {
   private scrambleUntil = -Infinity;
   private eurekaLeft = 0;
   private readonly boosted = new Set<number>();
+  private slides: ReturnType<typeof slidePlan> | undefined;
   private meltdownIndex = 0;
   private time = -Infinity;
   /** The windows the song started with (Easy's are wider), restored when Steady ends. */
@@ -95,6 +99,9 @@ export class BattleEffects {
       this.meter = new FlairMeter(flairCapacity(engine.stats.total), flairRate(rules.gimmick));
       this.widget = this.makeWidget();
       engine.mods.scoreFactor = (note, judgement, part) => this.scoreFactor(note, judgement, part);
+    } else if (setup.benched) {
+      this.meter = new FlairMeter(flairCapacity(engine.stats.total), flairRate(rules.gimmick));
+      this.widget = new FlairWidget(scene, setup.benched, () => undefined, { benched: true });
     } else {
       this.meter = null;
       this.widget = null;
@@ -102,14 +109,9 @@ export class BattleEffects {
 
     const firstNote = engine.notes.reduce((first, note) => Math.min(first, note.t), Number.POSITIVE_INFINITY);
     this.meltdowns = rules.gimmick === 'meltdown' ? meltdownWindows(setup.rivalNotes, setup.rivalPlan, chart.bpm, firstNote) : [];
-    const slides = rules.gimmick === 'slide' ? slidePlan(engine.notes, chart.id) : undefined;
+    this.slides = rules.gimmick === 'slide' ? slidePlan(engine.notes, chart.id) : undefined;
     // Eureka's own scramble can come from any backup chosen later, so Lemon's or not, keep it wired.
-    const scrambles = rules.gimmick === 'meltdown' || this.meter !== null;
-    field.setEffects({
-      slideFrom: slides,
-      slideProgress: slides ? slideProgress : undefined,
-      jitter: scrambles ? (id, time) => (this.scrambled(time) ? jitterOffset(id, time, setup.calm ? JITTER_CALM : JITTER) : 0) : undefined,
-    });
+    this.wireField(rules.gimmick === 'meltdown' || this.meter !== null);
 
     if (rules.gimmick === 'flash') {
       const left = PLAYER_LANES[0] - 55;
@@ -118,6 +120,35 @@ export class BattleEffects {
     } else {
       this.curtain = null;
     }
+  }
+
+  private wireField(scrambles: boolean): void {
+    const { field, calm } = this.setup;
+    const slides = this.slides;
+    field.setEffects({
+      slideFrom: slides,
+      slideProgress: slides ? slideProgress : undefined,
+      jitter: scrambles ? (id, time) => (this.scrambled(time) ? jitterOffset(id, time, calm ? JITTER_CALM : JITTER) : 0) : undefined,
+    });
+  }
+
+  /**
+   * Stop 8: the crew climbs back on mid-song. The first arrival switches the
+   * Flair meter on (empty) with their ability; later ones swap the backup.
+   */
+  switchOn(rules: BattleRules): void {
+    if (!rules.ability || !rules.abilityOwner) return;
+    if (this.meter && this.rules.ability) {
+      this.changeBackup(rules);
+      return;
+    }
+    const { engine } = this.setup;
+    this.rules = { ...this.rules, ability: rules.ability, abilityOwner: rules.abilityOwner };
+    this.meter ??= new FlairMeter(flairCapacity(engine.stats.total), flairRate(this.rules.gimmick));
+    this.widget?.destroy();
+    this.widget = this.makeWidget();
+    engine.mods.scoreFactor = (note, judgement, part) => this.scoreFactor(note, judgement, part);
+    this.wireField(true);
   }
 
   /** Swap the backup mid-song (from the pause menu). A running ability ends first; the meter keeps its charge. */

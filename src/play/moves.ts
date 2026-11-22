@@ -257,6 +257,10 @@ export const MOVE_FEELS: Record<string, MoveFeel> = {
   pineapple: feel('lite', 0.8, { finisherSmall: 'none', finisherBig: 'none', rise: 'none', power: 'none', drop: 'ground' }),
   // Banana: slips and slides.
   banana: feel('lite', 1, { finisherSmall: 'slide', finisherBig: 'slide', recovery: 'slide', shuffle: 'slide' }),
+  // Cranberry, the Bog Queen (the prologue's player): heavy and grounded like her Coach years, big stomps.
+  cranberry: feel('berry', 1, { finisherSmall: 'bounce', finisherBig: 'hop', power: 'hop' }),
+  // Strawberry, the Summer Legend: no bounce in the small finishes, all whirl in the big ones.
+  strawberry: feel('lite', 0.95, { finisherSmall: 'none', finisherBig: 'whirl', circle: 'whirl' }),
 };
 
 // ---------------------------------------------------------------------------
@@ -406,6 +410,21 @@ export const EXT_MOVES: Record<string, ExtMoves> = {
   orange: rivalExt('bounce', 'whirl', { groove: X(0, 1, 2, 1, 3, 4, 5, 4) }),
   // Pineapple: a ballroom waltz box step, then a tango promenade into a dip.
   pineapple: rivalExt('none', 'none', { groove: X(0, 1, 2, 3, 4, 5, 4, 3) }),
+  // Cranberry: Bog Stomp (plant, knee, two muddy stomps, roar, crown), then the finisher that ends on the clean freeze.
+  // The prologue's bar 84 shows moves frames 28 (the slip) and 29 (falling) on their own. Duo poses face right.
+  cranberry: { needs: 36, signatureA: sig('ground', 0, 1, 2, 3, 4, 5), signatureB: sig('whirl', 6, 7, 8, 9), duo: duoAt(12, 1) },
+  // Strawberry: Summer Flash (the finger-gun wink), then the Legend's Spin into the crown pose.
+  strawberry: rivalExt('none', 'whirl'),
+  // The trainers of battles A and B (archive/generated-sprites/story_v2/MANIFEST.md section 3).
+  lime: rivalExt('slide', 'hop'),
+  peach: rivalExt('none', 'none'),
+  cherries: rivalExt('bounce', 'none'),
+  grapefruit: rivalExt('none', 'hop'),
+  lychee: rivalExt('whirl', 'none'),
+  passion_fruit: rivalExt('shake', 'none'),
+  mango: rivalExt('hop', 'whirl'),
+  fig: rivalExt('bounce', 'none'),
+  quince: rivalExt('none', 'none'),
 };
 
 /** A character's extended moves, if their sheet has them. */

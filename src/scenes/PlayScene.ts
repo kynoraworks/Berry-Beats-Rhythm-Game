@@ -33,15 +33,16 @@ import { TouchLanes } from '../core/touchLanes';
 import { onBackGesture } from '../core/backGesture';
 import { SCHEME_INFO } from '../core/touchSchemes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { createPlayer, createRival, createSheetDancer, type Dancer } from '../play/characters';
+import { createPlayer, createRival, createSheetDancer, layoutOf, type Dancer } from '../play/characters';
 import { SCRIPTED_TURNS, ScriptedDirector, type ScriptedPlay } from '../play/scripted';
 import { actorArt } from '../cutscene/actors';
-import { staticSting, sustainedNote } from '../cutscene/audio';
+import { staticSting, sting, sustainedNote } from '../cutscene/audio';
+import { stingForLine } from '../story/stings';
 import { HoldToSkip, StaticScreen } from '../cutscene/fx';
 import { finishPrologue } from '../cutscene/flow';
 import { stripFrames } from '../cutscene/art';
 import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
-import { Hud } from '../play/Hud';
+import { Hud, type HudFace } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, PLAYER_FIELD_CENTER, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
@@ -59,7 +60,7 @@ import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
 import { cycleBackup, getBackup, listAvailable, setBackup } from '../story/crew';
 import { crewAt } from '../story/places';
-import type { FruitId } from '../story/types';
+import type { CharacterId, FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
 import { STOPS, battleForChart, rivalLevelFor, stopById, stopForChart } from '../story/stops';
 import { CREW_ROUNDS, checkpointSession, endSession, getSession, recordRound, setVerdict, type CrewRoundPlay, type RoundResult } from '../story/crewBattle';
@@ -165,6 +166,8 @@ export class PlayScene extends Phaser.Scene {
   private rivalEngine: Engine | null = null;
   private rivalDriver: PlannedPlayer | null = null;
   private rivalName = '';
+  /** The trainer danced against in battles A and B (bible 9.1), when this is one. */
+  private trainerWho: CharacterId | null = null;
   private rivalLook: RivalProfile = rivalProfile(undefined);
   private battle: Battle | null = null;
   private flawless: FlawlessTracker | null = null;
@@ -257,6 +260,7 @@ export class PlayScene extends Phaser.Scene {
     this.rivalEngine = null;
     this.rivalDriver = null;
     this.rivalName = '';
+    this.trainerWho = null;
     this.rivalLook = rivalProfile(undefined);
     this.battle = null;
     this.flawless = null;
@@ -317,7 +321,13 @@ export class PlayScene extends Phaser.Scene {
     this.rivalName = this.rivalLook.name;
     // A trainer's battle (A or B) is named for the trainer (bible 9.1), danced with their stop's gimmick.
     const trainerBattle = battleForChart(chart.id);
-    if (trainerBattle?.trainer && !this.playData.practice) this.rivalName = trainerBattle.versus;
+    const trainer = trainerBattle?.trainer && !this.playData.practice ? trainerBattle : null;
+    if (trainer) this.rivalName = trainer.versus;
+    // The trainer dances in their own sheet once it is drawn (public/assets/img/<sprite>.png); the fruit's stands in until then.
+    const trainerSheet = trainer?.sprite && this.textures.exists(trainer.sprite) && this.textures.get(trainer.sprite).frameTotal > 17 ? trainer.sprite : null;
+    this.trainerWho = trainer?.trainer ?? null;
+    // A trainer's colours and two words on the versus card and the bar; the gimmick stays the stop's.
+    if (this.trainerWho && this.trainerWho !== 'coach') this.rivalLook = rivalProfile(this.trainerWho);
     this.crewCues = this.playData.practice ? [] : crewCues(chart.id);
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
@@ -376,10 +386,15 @@ export class PlayScene extends Phaser.Scene {
     this.player.setSchedule(this.engine.notes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
     const session = crew ? getSession() : null;
+    // The prologue's legends have faces of their own (portraits_v2, or the cutscenes' legends sheet).
+    const legend = (v2: number, legends: number): HudFace | undefined =>
+      this.textures.exists('portraits_v2') ? { texture: 'portraits_v2', frame: v2, bold: v2 + 1 } : this.textures.exists('legends_portraits') ? { texture: 'legends_portraits', frame: legends, bold: legends + 1 } : undefined;
     this.hud = new Hud(this, {
       rivalScore: isBattle,
       rounds,
       rival: rivalKind,
+      rivalWho: scripted ? 'strawberry' : (this.trainerWho ?? undefined),
+      faces: scripted ? { player: legend(2, 0), rival: legend(4, 2) } : undefined,
       player: scripted ? 'coach' : (crew?.ally ?? 'berry'),
       crew: crew ? { round: crew.round, results: session?.results ?? [] } : null,
       gimmick: this.rules.gimmick,
@@ -394,6 +409,8 @@ export class PlayScene extends Phaser.Scene {
         this.rival = createSheetDancer(this, RIVAL_X, feetY(stageFloor, RIVAL_X), straw.texture, straw.layout === 'lite' ? 'lite' : 'berry', -1, { seed: chart.id, calm: settings.reduceMotion });
         if (straw.tint !== undefined) this.rival.sprite.setTint(straw.tint);
         this.rivalName = 'Strawberry';
+      } else if (trainerSheet) {
+        this.rival = createSheetDancer(this, RIVAL_X, feetY(stageFloor, RIVAL_X), trainerSheet, layoutOf(trainerSheet), -1, { seed: chart.id, calm: settings.reduceMotion });
       } else {
         this.rival = createRival(this, rivalKind, RIVAL_X, feetY(stageFloor, RIVAL_X), { seed: chart.id, calm: settings.reduceMotion });
       }
@@ -440,6 +457,8 @@ export class PlayScene extends Phaser.Scene {
         touch: isTouch(),
         // In the crew battle each ally fires their ability once in their round.
         maxFires: crew ? 1 : undefined,
+        // Stop 7's soloists: the follower is benched, greyed on the meter (BACKUP OFF).
+        benched: this.benchedBackup(),
         hooks: {
           callout: (text, color) => hud.callout(text, color),
           sfx: (name) => this.effectSfx(name),
@@ -453,7 +472,7 @@ export class PlayScene extends Phaser.Scene {
     }
 
     // The Flair meter sits first in the HUD's effect row.
-    this.hud.setFlair(!!(this.rules.ability && this.rules.abilityOwner));
+    this.hud.setFlair(!!(this.rules.ability && this.rules.abilityOwner) || (!!this.effects && !!this.benchedBackup()));
 
     // Hype: the player's streak reward in a battle (not in the Coach's lessons).
     if (this.rival && segment?.kind !== 'lesson') {
@@ -593,7 +612,7 @@ export class PlayScene extends Phaser.Scene {
     this.countText.setText('');
     this.startCountdown(startAt > 0 ? startAt : this.origin, startAt > 0 ? PRACTICE_LEAD_IN : LEAD_IN);
     if (this.introTime > 0) {
-      const texture = rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
+      const texture = (this.trainerWho ? this.rival?.sprite.texture.key : undefined) ?? rivalTexture(this, this.chart.rivalCharacter ?? 'raspberry') ?? Tex.raspberry;
       const gimmick = this.rules.gimmick;
       const look = gimmick ? { ...this.rivalLook, trait: GIMMICK_TRAITS[gimmick] } : this.rivalLook;
       const ability = this.rules.ability ? ABILITIES[this.rules.ability] : null;
@@ -652,15 +671,21 @@ export class PlayScene extends Phaser.Scene {
 
   /** Run a conversation over the stage, lighting whoever is speaking. */
   private startDialogue(lines: readonly Line[], onDone: () => void, hoodDown = false): void {
-    const onStage = this.crew ? this.chart.rivalCharacter : (battleForChart(this.chart.id)?.opponent ?? this.story?.stop.fruit);
+    const onStage = this.crew ? this.chart.rivalCharacter : (this.trainerWho ?? battleForChart(this.chart.id)?.opponent ?? this.story?.stop.fruit);
+    // Bing and Morello share one sprite: either of them speaking lights it.
+    const trainerSprite = this.trainerWho ? CAST[this.trainerWho]?.sprite : undefined;
+    const isOnStage = (who: string) => who === onStage || (!!trainerSprite && CAST[who as CharacterId]?.sprite === trainerSprite);
     const playerWho = this.crew?.ally ?? 'berry';
     this.dialogue = new Dialogue(this, {
       lines,
       hoodDown,
       depth: Depth.overlay + 6,
       onLine: (line) => {
+        // The bible's stings on this line (the crew walking out at the club, the PA at the Rooftop).
+        const cue = stingForLine(line.id);
+        if (cue) sting(this.game, cue);
         // Berry and the stop's fruit are on stage. Anyone else speaks from the wings.
-        const side = line.who === playerWho ? 'player' : this.rival && line.who === onStage ? 'rival' : null;
+        const side = line.who === playerWho ? 'player' : this.rival && isOnStage(line.who) ? 'rival' : null;
         this.stage.setTurn(side ?? 'both');
         this.player.sprite.setTint(side === 'player' ? 0xffffff : LISTENER_TINT);
         this.rival?.sprite.setTint(side === 'rival' ? 0xffffff : LISTENER_TINT);
@@ -806,6 +831,19 @@ export class PlayScene extends Phaser.Scene {
     this.hud.callout(`${name}: ${cue.line.text.replace(/\{[^}]*\}/g, '')}`, CAST[cue.ally]?.css ?? CSS.yellow);
     playSfx(this.game, 'crowdCheer');
     setBackup(cue.ally);
+    // The ally is back on the stage now: the Flair meter switches on with their ability (the next arrival swaps it).
+    const rules = battleRules(this.rules.gimmick, cue.ally);
+    if (this.effects && rules.ability && rules.abilityOwner) {
+      this.rules = rules;
+      this.effects.switchOn(rules);
+      this.hud.setFlair(true);
+    }
+  }
+
+  /** Stop 7's boss: the follower who would be the backup, benched for the soloists' battle. */
+  private benchedBackup(): FruitId | null {
+    if (this.playData.practice || !isSoloists(this.chart.id)) return null;
+    return getBackup(this.storyCrew());
   }
 
   /** The Coach's text after three losses, and the offer to dance this battle on Easy. */
@@ -1590,32 +1628,41 @@ export class PlayScene extends Phaser.Scene {
     this.state = 'ended';
     if (this.laneInput) this.laneInput.enabled = false;
     this.touchLanes?.setGuideVisible(false);
-    this.conductor?.pause();
+    // The real song carries its own frozen note up to the measured cut to static (prologue_cues.json);
+    // a stand-in stops dead here and a synthesised note holds instead.
+    const scripted = this.playData.scripted;
+    const cues = scripted && !scripted.standIn ? scripted.cues : null;
+    const ringFor = cues?.staticTime !== undefined && cues.freezeTime !== undefined && this.conductor ? Math.max(0.1, Math.min(3, cues.staticTime - cues.freezeTime)) : 0;
+    if (!ringFor) this.conductor?.pause();
     this.hypeAudio?.silence();
     this.tweens.pauseAll();
     this.hud.setScoreVisible(false);
     this.hud.endOfSong();
-    this.player.sprite.setFrame(28);
+    // Cranberry's slip (cranberry_moves 28) and Strawberry's reach (strawberry_poses 5), once drawn.
+    if (this.textures.exists('cranberry_moves') && this.player.sprite.texture.key.startsWith('cranberry')) this.player.sprite.setTexture('cranberry_moves', 28);
+    else this.player.sprite.setFrame(28);
     const rival = this.rival?.sprite;
-    if (rival) rival.setFlipX(!rival.flipX).setFrame(rival.texture.frameTotal > 20 ? 5 : 6);
+    if (rival && this.textures.exists('strawberry_poses') && rival.texture.key.startsWith('strawberry')) rival.setTexture('strawberry_poses', 5).setFlipX(false);
+    else if (rival) rival.setFlipX(!rival.flipX).setFrame(rival.texture.frameTotal > 20 ? 5 : 6);
     // The freeze still of bar 84, when it has landed, over the stage.
     if (this.textures.exists('prologue_freeze')) {
       const still = this.add.image(GAME_W / 2, GAME_H / 2, 'prologue_freeze').setScale(PX).setDepth(Depth.overlay + 2).setAlpha(0);
       this.tweens.resumeAll();
       this.tweens.add({ targets: still, alpha: 1, duration: 90, onComplete: () => this.tweens.pauseAll() });
     }
-    const note = sustainedNote(this.game, 196);
+    const note: { stop(fadeMs?: number): void } = ringFor ? { stop: () => this.conductor?.pause() } : sustainedNote(this.game, 196);
+    const hold = ringFor ? ringFor * 1000 : 1400;
     const flow = this.playData.scripted?.flow;
     if (flow?.complete) {
       // The complete tape: the eight recovered frames instead of the static.
-      this.time.delayedCall(1400, () => {
+      this.time.delayedCall(hold, () => {
         note.stop(400);
         this.tweens.resumeAll();
         this.completeTape(() => finishPrologue(this, flow, 800));
       });
       return;
     }
-    this.time.delayedCall(1400, () => {
+    this.time.delayedCall(hold, () => {
       note.stop(30);
       const hiss = staticSting(this.game);
       this.staticScreen = new StaticScreen(this, Depth.overlay + 3);

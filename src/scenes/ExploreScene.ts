@@ -28,6 +28,8 @@ import { chapterOf, type Chapter, type LookSpot, type ResidentSpot } from '../st
 import { storyState } from '../story/conditions';
 import { holds } from '../story/conditions';
 import { nodesOf } from '../story/lines';
+import { sting } from '../cutscene/audio';
+import { isConductorLine, stingForLine } from '../story/stings';
 import { POSTCARDS, RUMOURS, isRumourHeard, postcardFor, rumourForLine, secretsAt, syncRumours, truthRevealed } from '../story/mystery';
 import { MixtapeCard, Phone, PostcardCard, TapeViewer } from '../explore/StoryCards';
 import { playNodes } from '../explore/StoryPlayer';
@@ -161,6 +163,8 @@ export class ExploreScene extends Phaser.Scene {
   private near: Hotspot | null = null;
   /** Ignore pointer presses until this time (the tap that closed a conversation). */
   private quietUntil = 0;
+  /** The Conductor has spoken in this scene (her music-box sting plays once). */
+  private conductorHeard = false;
   private keys: Record<'left' | 'right' | 'a' | 'd', Phaser.Input.Keyboard.Key> | null = null;
   /** Berry is walking because a key is held (not because the floor was tapped). */
   private keyWalking = false;
@@ -213,6 +217,7 @@ export class ExploreScene extends Phaser.Scene {
     this.locked = false;
     this.near = null;
     this.quietUntil = 0;
+    this.conductorHeard = false;
     this.keys = null;
     this.keyWalking = false;
     this.leaving = false;
@@ -236,7 +241,7 @@ export class ExploreScene extends Phaser.Scene {
       want.add(this.room.bg);
       if (this.room.dark) want.add(`${this.room.bg}_dark`);
     }
-    if (this.place.kind === 'street' || this.place.kind === 'station') want.add(this.place.bg);
+    if (this.place.kind === 'street' || this.place.kind === 'station' || this.place.kind === 'room') want.add(this.place.bg);
     for (const battle of this.stop.battles) if (battle.stage) want.add(battle.stage);
     for (const key of want) if (!this.textures.exists(key) && hasImage(key)) this.load.image(key, `assets/img/${key}.png`);
     const sprites = new Set<string>();
@@ -853,7 +858,7 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   private showHint(): void {
-    const first = this.place.kind === 'room' ? 'The door is on the right.' : this.place.kind === 'station' ? `Talk to the ${this.clueLabel().toLowerCase()} to find the way out.` : '';
+    const first = this.place.kind === 'room' ? `The door is on the ${this.place.hotspots.some((h) => h.id === 'door' && h.x < 128) ? 'left' : 'right'}.` : this.place.kind === 'station' ? `Talk to the ${this.clueLabel().toLowerCase()} to find the way out.` : '';
     if (this.place.kind === 'station' && hasTalked(talkKey(this.stop.id))) return;
     if (first) this.say(first, 2600);
   }
@@ -1125,7 +1130,8 @@ export class ExploreScene extends Phaser.Scene {
       return;
     }
     if (look?.kind === 'radio') {
-      playSfx(this.game, 'djChirp');
+      // Juice FM: the station jingle under Orange's first line.
+      sting(this.game, 'sting_juicefm', 'djChirp', 0.8);
       this.talk(hotspot.lines, finish);
       return;
     }
@@ -1160,7 +1166,8 @@ export class ExploreScene extends Phaser.Scene {
       return;
     }
     const first = writePostcard(this.stop.number);
-    playSfx(this.game, first ? 'marker' : 'paperFlip');
+    if (first) sting(this.game, 'sting_postcard', 'marker');
+    else playSfx(this.game, 'paperFlip');
     this.openModal(
       new PostcardCard(this, {
         cards: [card],
@@ -1632,7 +1639,8 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   private taskDone(): void {
-    playSfx(this.game, 'unlock');
+    // The boss's padlock opens (SYSTEMS 10).
+    sting(this.game, 'sting_unlock', 'unlock');
     this.berry.speedScale = 1;
     this.refreshMarkers();
     const open = loopStatus(this.stop).bossOpen;
@@ -1757,10 +1765,15 @@ export class ExploreScene extends Phaser.Scene {
           }
         : undefined,
       onLine: (line) => {
+        // A sting the bible's directions put on this line; the Conductor's music box the first time she speaks here.
+        const cue = stingForLine(line.id);
+        if (cue) sting(this.game, cue);
+        else if (isConductorLine(line) && !this.conductorHeard) sting(this.game, 'sting_conductor', undefined, 0.8);
+        if (isConductorLine(line)) this.conductorHeard = true;
         // A rumour: the notebook gets its page.
         const page = rumourForLine(line.id);
         if (page && unlockRumour(page.stop)) {
-          playSfx(this.game, 'tapeInsert');
+          sting(this.game, 'sting_rumour', 'tapeInsert');
           this.say('WHO WON? A new page in the notebook.', 2400, CSS.yellow);
         }
         // A little hop from whoever on screen is speaking.

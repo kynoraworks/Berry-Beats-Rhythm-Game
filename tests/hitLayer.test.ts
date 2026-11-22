@@ -99,7 +99,9 @@ describe('lead stems', () => {
   it('ship for every generated stop song and nothing else', () => {
     for (const song of SONGS) {
       if (song.artist === 'Berry Beats (generated)') {
-        expect(song.lead, song.key).toBe(`assets/audio/stems/${song.key}_lead.mp3`);
+        // Story songs keep their stems under stems/story/, beside the story audio.
+        const dir = song.url.startsWith('assets/audio/story/') ? 'assets/audio/stems/story' : 'assets/audio/stems';
+        expect(song.lead, song.key).toBe(`${dir}/${song.key}_lead.mp3`);
         const size = statSync(`public/${song.lead}`).size;
         expect(size, song.key).toBeGreaterThan(200_000);
         // An MP3: a frame sync or an ID3 tag at the start.

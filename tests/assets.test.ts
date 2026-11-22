@@ -1,6 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { KNOWN_SHEETS, PRESENT_IMAGES, PRESENT_SHEETS } from '../src/core/assets';
+import { KNOWN_SHEETS, PRESENT_IMAGES, PRESENT_SHEETS, STORY_CHARACTER_SHEETS } from '../src/core/assets';
 import { STOPS } from '../src/story/stops';
 
 const IMG = 'public/assets/img/';
@@ -31,5 +31,27 @@ describe('optional art', () => {
     for (const key of KNOWN_IMAGES) {
       if (existsSync(`${IMG}${key}.png`)) expect(PRESENT_IMAGES, `add '${key}' to PRESENT_IMAGES in src/core/assets.ts`).toContain(key);
     }
+  });
+});
+
+describe('story v2 character sheets', () => {
+  it('cut into whole cells of their size (archive/generated-sprites/story_v2/MANIFEST.md)', () => {
+    for (const sheet of STORY_CHARACTER_SHEETS) {
+      const png = readFileSync(IMG + sheet.file);
+      const width = png.readUInt32BE(16);
+      const height = png.readUInt32BE(20);
+      expect(width % sheet.frameWidth, sheet.key).toBe(0);
+      expect(height % sheet.frameHeight, sheet.key).toBe(0);
+    }
+    const frames = (key: string) => {
+      const sheet = STORY_CHARACTER_SHEETS.find((s) => s.key === key)!;
+      const png = readFileSync(IMG + sheet.file);
+      return (png.readUInt32BE(16) / sheet.frameWidth) * (png.readUInt32BE(20) / sheet.frameHeight);
+    };
+    expect(frames('cranberry')).toBeGreaterThanOrEqual(51);
+    expect(frames('strawberry')).toBeGreaterThanOrEqual(18);
+    expect(frames('lime_moves')).toBe(36);
+    expect(frames('kid_berry')).toBe(9);
+    expect(frames('portraits_v2')).toBe(54);
   });
 });

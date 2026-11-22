@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { music } from '../core/music';
 import { getSettings } from '../core/settings';
-import { busInput } from '../core/sfx';
+import { busInput, playSfx, type SfxName } from '../core/sfx';
 import { getAudioContext } from '../core/songs';
 import { storyAudioUrl, storySong } from './storyFiles';
 
@@ -107,6 +107,15 @@ export function playStinger(game: Phaser.Game, key: string, fallback: () => Soun
       gain.gain.linearRampToValueAtTime(value * getSettings().sfxVolume, now + (ms ?? 200) / 1000);
     },
   };
+}
+
+/**
+ * A story sting (public/assets/audio/sfx/sting_*.mp3, MUSIC_LIST) at a story
+ * moment, at the effects volume; the game's own sound `fallback` until the file
+ * is there (or if it fails to load).
+ */
+export function sting(game: Phaser.Game, key: string, fallback?: SfxName, volume = 1): SoundHandle {
+  return playStinger(game, key, () => (fallback ? playSfx(game, fallback) : undefined), volume);
 }
 
 let noiseBuffer: AudioBuffer | null = null;

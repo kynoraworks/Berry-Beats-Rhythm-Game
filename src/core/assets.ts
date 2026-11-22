@@ -42,6 +42,27 @@ export const MOVERS_DRAWN: readonly (typeof MOVERS)[number][] = [
   'grape', 'dragonfruit', 'coconut', 'pineapple', 'banana', 'plum', 'orange', 'instructor', 'watermelon',
 ];
 
+/** The trainers of battles A and B (bible 9.1): a lite dance sheet and a moves sheet each, keyed by their cast `sprite`. */
+export const TRAINER_SHEETS = ['lime', 'peach', 'cherries', 'grapefruit', 'lychee', 'passion_fruit', 'mango', 'fig', 'quince'] as const;
+
+/** Named residents' street sprites (2 frames: idle, a gesture), keyed `npc_<MinorId>` as the cast's `sprite`. */
+export const RESIDENT_SHEETS = ['npc_gooseberry', 'npc_kumquat', 'npc_clerkDate', 'npc_elderberry', 'npc_seedless', 'npc_mrsDamson', 'npc_currant', 'npc_olive', 'npc_satsuma', 'npc_kiwi', 'npc_clementine', 'npc_chestnut'] as const;
+
+/**
+ * Story v2 characters (archive/generated-sprites/story_v2/MANIFEST.md): the
+ * prologue's legends and kids, the Conductor, the trainers, the residents,
+ * the cutscenes' extra poses and the portrait sheets. All 64x64 cells but
+ * the Conductor's seat (75x75, like the other seated sheets).
+ */
+export const STORY_CHARACTER_SHEETS: readonly OptionalSheet[] = [
+  ...['cranberry', 'cranberry_moves', 'cranberry_poses', 'strawberry', 'strawberry_moves', 'strawberry_poses', 'conductor', 'conductor_walk', 'kid_berry', 'kid_raspberry', 'kid_blueberry', 'berry_poses', 'blueberry_poses', 'coach_poses'].map((key) => ({ key, file: `${key}.png`, frameWidth: 64, frameHeight: 64 })),
+  { key: 'conductor_sit', file: 'conductor_sit.png', frameWidth: 75, frameHeight: 75 },
+  ...TRAINER_SHEETS.flatMap((key) => [key, `${key}_moves`]).map((key) => ({ key, file: `${key}.png`, frameWidth: 64, frameHeight: 64 })),
+  ...[...RESIDENT_SHEETS, 'orange_young', 'gerald', 'scarf_glimpse', 'banana_cap', 'grape_seedless'].map((key) => ({ key, file: `${key}.png`, frameWidth: 64, frameHeight: 64 })),
+  // Portraits: the master sheet of every v2 speaker, and the cutscenes' keyed sheets.
+  ...['portraits_v2', 'legends_portraits', 'kids_portraits', 'orange_young_portrait'].map((key) => ({ key, file: `${key}.png`, frameWidth: 64, frameHeight: 64 })),
+];
+
 /** Every optional sheet the game knows how to use, with its size. */
 export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   ...[Tex.banana, Tex.grape, Tex.plum, Tex.dragonfruit, Tex.watermelon, Tex.coconut, Tex.orange, Tex.pineapple, Tex.blueberry].map((key) => ({
@@ -65,6 +86,7 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   ...LEARN_STOPS.flatMap((stop) => [false, true].map((hype) => ({ key: learnSheet(stop, hype), file: `${learnSheet(stop, hype)}.png`, frameWidth: 64, frameHeight: 64 }))),
   // The people baked into the scenery: one column per piece, at rest and nodding. See tools/build_life.py.
   ...LIFE_THEMES.map((theme) => ({ key: `life_${theme}`, file: `life_${theme}.png`, frameWidth: LIFE_SHEETS[theme].cellW, frameHeight: LIFE_SHEETS[theme].cellH })),
+  ...STORY_CHARACTER_SHEETS,
 ];
 
 /** The optional sheets that are drawn and in public/assets/img. */
@@ -87,6 +109,8 @@ export const PRESENT_SHEETS: readonly string[] = [
   // Berry's learned moves, every stop drawn (tools/build_learn.py).
   ...LEARN_STOPS.flatMap((stop) => [learnSheet(stop, false), learnSheet(stop, true)]),
   ...LIFE_THEMES.map((theme) => `life_${theme}`),
+  // Story v2 characters, all delivered.
+  ...STORY_CHARACTER_SHEETS.map((sheet) => sheet.key),
 ];
 
 /**

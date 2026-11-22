@@ -66,6 +66,7 @@ export const SONGS: SongDef[] = [
   { key: 'pineapple_hall_b', title: 'Hall of Mirrors', artist: GENERATED, url: 'assets/audio/pineapple_hall_b.mp3', bpm: 158, offset: 0.409, lead: 'assets/audio/stems/pineapple_hall_b_lead.mp3' },
   { key: 'grand_stage_a', title: 'Set One Anthem', artist: GENERATED, url: 'assets/audio/grand_stage_a.mp3', bpm: 144, offset: 0.026, lead: 'assets/audio/stems/grand_stage_a_lead.mp3' },
   { key: 'grand_stage_b', title: 'Set Two Anthem', artist: GENERATED, url: 'assets/audio/grand_stage_b.mp3', bpm: 148, offset: 0.026, lead: 'assets/audio/stems/grand_stage_b_lead.mp3' },
+  { key: 'prologue_last_final', title: 'The Last Final', artist: GENERATED, url: 'assets/audio/story/prologue_last_final.mp3', bpm: 172, offset: 0.027, lead: 'assets/audio/stems/story/prologue_last_final_lead.mp3' },
 ];
 
 /**

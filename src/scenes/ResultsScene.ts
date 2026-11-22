@@ -15,6 +15,10 @@ import { teacherName, teacherPortrait } from '../story/moveBook';
 import { learnFromBattle } from '../story/moveset';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
+import { faceArt } from '../play/CrewScoreboard';
+import { sting } from '../cutscene/audio';
+import { CAST } from '../story/cast';
+import type { CharacterId } from '../story/types';
 import { DIFFICULTY_LABELS, scoreKey } from '../core/difficulty';
 import { segmentAt } from '../story/flow';
 import { isStopOpen } from '../story/progress';
@@ -263,14 +267,16 @@ export class ResultsScene extends Phaser.Scene {
     const name = addText(this, textX, top + 150, move.name, 44, { origin: [0, 0.5] });
     for (let size = 44; name.width > w / 2 + 40 && size > 24; size -= 4) name.setFontSize(size);
     const from = addBody(this, textX + 56, top + 210, line.slice(move.name.length + 1), 26, { origin: [0, 0.5], color: CSS.lilac, bold: true });
+    // The teacher's bold face: portraits.png, or their own bust in portraits_v2 (the trainers).
     const faceFrame = teacherPortrait(move.teacher, 'bold');
-    const face = this.add.image(textX + 22, top + 210, Tex.portraits, faceFrame !== null && this.textures.get(Tex.portraits).has(String(faceFrame)) ? faceFrame : 0).setDisplaySize(44, 44);
-    if (faceFrame === null) face.setVisible(false);
+    const own = move.teacher in CAST ? faceArt(this, move.teacher as CharacterId, 'bold') : null;
+    const face = own ? this.add.image(textX + 22, top + 210, own.texture, own.frame).setDisplaySize(44, 44) : this.add.image(textX + 22, top + 210, Tex.portraits, faceFrame !== null && this.textures.get(Tex.portraits).has(String(faceFrame)) ? faceFrame : 0).setDisplaySize(44, 44);
+    if (!own && (faceFrame === null || faceFrame < 0)) face.setVisible(false);
     const where = addBody(this, textX, top + 262, 'Equip it on the train: Moves (M)', 22, { origin: [0, 0.5], color: CSS.grey, wrapWidth: w / 2 + 40 });
     const ok = addUiButton(this, textX + 130, top + h - 56, 'Nice!', () => this.closeLearnedCard(), { width: 220, height: 56, size: 26, sfx: null }).setFocused(true);
     const card = this.add.container(0, 0, [dim, box, heading, pool, dancer, name, from, face, where, ok.container]).setDepth(50);
     this.learnedCard = card;
-    playSfx(this.game, 'bonus');
+    sting(this.game, 'sting_move_learned', 'bonus');
     // Berry dances the move on a loop, a beat apart.
     if (clip && clip.frames.length > 0) {
       let step = 0;

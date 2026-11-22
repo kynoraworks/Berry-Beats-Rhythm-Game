@@ -129,3 +129,51 @@ describe('the walk in the save', () => {
     expect(arrivalPlace('stop07')).toEqual({ stop: 'stop07', place: 'station' });
   });
 });
+
+describe('story v2 art in the places', () => {
+  it("puts Berry's room on room_berry.png: door on the left, each thing where the art draws it", () => {
+    const room = placeOf('stop01', 'room')!;
+    expect(room.bg).toBe('room_berry');
+    const door = room.hotspots.find((h) => h.id === 'door')!;
+    expect(door.x + door.w / 2).toBeLessThan(40);
+    const centre = (id: string) => {
+      const spot = room.hotspots.find((h) => h.id === id)!;
+      return spot.x + spot.w / 2;
+    };
+    expect(centre('wardrobe')).toBe(53);
+    expect(centre('window')).toBe(155);
+    expect(centre('photo')).toBeGreaterThan(100);
+    expect(centre('photo')).toBeLessThan(120);
+    for (const spot of room.hotspots) expect(spot.y + spot.h, spot.id).toBeLessThanOrEqual(floorAt('room_berry', spot.x) + 1);
+    // From the street's front door Berry comes in by his own door.
+    const home = placeOf('stop01', 'street')!.hotspots.find((h) => h.id === 'home')!;
+    expect(home.to).toEqual({ place: 'room', at: 39 });
+  });
+
+  it('stands everyone in the drawn rooms on their floors', async () => {
+    const { ROOMS, roomById } = await import('../src/story/rooms');
+    const { ROOM_ART } = await import('../src/story/chapters');
+    for (const room of ROOMS) {
+      const art = ROOM_ART[room.id];
+      expect(art, room.id).toBeDefined();
+      expect(room.floor, room.id).toBe(art.floor);
+      expect(room.exitX, room.id).toBe(art.exitX);
+    }
+    // Doors inside rooms sit where their parent's art has them: the PRIVATE door, the Studio's stairs.
+    expect(roomById('bakery_office')?.doorX).toBe(209);
+    expect(roomById('bakery_studio')?.doorX).toBe(241);
+    expect(roomById('slipnsip')?.people?.find((p) => p.id === 'kumquat')?.x).toBe(110);
+  });
+
+  it('gives the trainers their lite sheets and the speakers their portraits_v2 busts', () => {
+    for (const id of ['lime', 'peach', 'bing', 'morello', 'grapefruit', 'lychee', 'passionFruit', 'mango', 'fig', 'quince'] as const) {
+      expect(CAST[id].layout, id).toBe('lite');
+      expect(CAST[id].sheet, id).toBe(CAST[id].sprite);
+      expect(CAST[id].art?.key, id).toBe('portraits_v2');
+    }
+    for (const id of ['mrsDamson', 'gooseberry', 'currant', 'kumquat', 'clerkDate', 'olive', 'elderberry', 'seedless', 'satsuma', 'kiwi', 'clementine', 'chestnut', 'medlar'] as const) {
+      expect(CAST[id].art, id).toMatchObject({ key: 'portraits_v2', single: true });
+    }
+    expect(CAST.strawberry.sheet).toBe('strawberry');
+  });
+});

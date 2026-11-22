@@ -41,6 +41,8 @@ interface ExtraSpeaker {
   left?: boolean;
   /** No bold frame in the fallback (one frame for every mood). */
   single?: boolean;
+  /** No bold frame in `art` either (a resident's one bust in portraits_v2). */
+  artSingle?: boolean;
 }
 
 /** Speakers who are not (yet) cast members. Fallback frames are portraits.png (see Tex.portraits). */
@@ -51,13 +53,13 @@ export const EXTRA_SPEAKERS: Record<string, ExtraSpeaker> = {
   cranberry: { name: 'Cranberry', color: 0xc8102e, tag: 0x9a0c24, voices: ['cranberry', 'coach'], art: { key: 'legends_portraits', frame: 0 }, fallback: 4, left: true },
   strawberry: { name: 'Strawberry', color: 0xe8243c, tag: 0xc81830, voices: ['strawberry'], art: { key: 'legends_portraits', frame: 2 } },
   conductor: { name: 'The Conductor', color: 0x9a2030, tag: 0x6a1420, voices: ['conductor', 'strawberry'], art: { key: 'legends_portraits', frame: 4 } },
-  orangeYoung: { name: 'Orange (young)', color: 0xff9a2e, tag: 0xe8780f, voices: ['orange_young', 'orange'], art: { key: 'orange_young_portrait', frame: 0 }, fallback: 22 },
-  mc: { name: 'MC', color: 0xff9a2e, tag: 0xe8780f, voices: ['orange_young', 'orange', 'mc'], fallback: 22 },
+  orangeYoung: { name: 'Orange (young)', color: 0xff9a2e, tag: 0xe8780f, voices: ['orange_young', 'orange'], art: { key: 'orange_young_portrait', frame: 0 }, artSingle: true, fallback: 22 },
+  mc: { name: 'MC', color: 0xff9a2e, tag: 0xe8780f, voices: ['orange_young', 'orange', 'mc'], art: { key: 'orange_young_portrait', frame: 0 }, artSingle: true, fallback: 22 },
   crowd: { name: 'Crowd', color: 0x9a94b8, tag: 0x5a5478, voices: ['res_high', 'residentHigh'] },
-  mrsDamson: { name: 'Mrs. Damson', color: 0x6a3a7a, tag: 0x4a2a5a, voices: ['mrs_damson', 'residentOld'] },
-  currant: { name: 'Little Currant', color: 0xd81e3a, tag: 0xa8142a, voices: ['little_currant', 'residentHigh'] },
-  lychee: { name: 'Lychee', color: 0xf4d6dc, tag: 0xc89aa4, darkTag: true, voices: ['lychee', 'residentHigh'] },
-  fig: { name: 'Fig', color: 0x7a4a6a, tag: 0x5a3050, voices: ['fig', 'residentLow'] },
+  mrsDamson: { name: 'Mrs. Damson', color: 0x6a3a7a, tag: 0x4a2a5a, voices: ['mrs_damson', 'residentOld'], art: { key: 'portraits_v2', frame: 43 }, artSingle: true },
+  currant: { name: 'Little Currant', color: 0xd81e3a, tag: 0xa8142a, voices: ['little_currant', 'residentHigh'], art: { key: 'portraits_v2', frame: 44 }, artSingle: true },
+  lychee: { name: 'Lychee', color: 0xf4d6dc, tag: 0xc89aa4, darkTag: true, voices: ['lychee', 'residentHigh'], art: { key: 'portraits_v2', frame: 28 } },
+  fig: { name: 'Fig', color: 0x7a4a6a, tag: 0x5a3050, voices: ['fig', 'residentLow'], art: { key: 'portraits_v2', frame: 34 } },
 };
 
 /** First voice id in the list that exists. */
@@ -80,7 +82,8 @@ export function speakerLook(line: Line, textureHas: (key: string, frame: number)
   if (!extra) return undefined;
   const bold = line.mood === 'bold';
   let portrait: SpeakerLook['portrait'] = null;
-  if (extra.art && textureHas(extra.art.key, extra.art.frame + (bold ? 1 : 0))) portrait = { texture: extra.art.key, frame: extra.art.frame + (bold ? 1 : 0) };
+  const step = bold && !extra.artSingle ? 1 : 0;
+  if (extra.art && textureHas(extra.art.key, extra.art.frame + step)) portrait = { texture: extra.art.key, frame: extra.art.frame + step };
   else if (extra.art && textureHas(extra.art.key, extra.art.frame)) portrait = { texture: extra.art.key, frame: extra.art.frame };
   else if (extra.fallback !== undefined) {
     const frame = extra.fallback + (bold && !extra.single ? 1 : 0);

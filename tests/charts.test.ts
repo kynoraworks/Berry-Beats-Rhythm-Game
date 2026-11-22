@@ -55,6 +55,7 @@ const SONGS: Record<string, { duration: number; bpm: number; offset: number }> =
   pineapple_hall_b: { duration: 60.03, bpm: 158, offset: 0.409 },
   grand_stage_a: { duration: 75.05, bpm: 144, offset: 0.026 },
   grand_stage_b: { duration: 75.05, bpm: 148, offset: 0.026 },
+  prologue_last_final: { duration: 118.84, bpm: 172, offset: 0.027 },
 };
 
 /** Nicole Yazmin's six songs, each with exactly one Beat Maps chart. */

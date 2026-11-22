@@ -663,19 +663,69 @@ function followerOf(stop: StopKey): Chapter['follower'] {
   return { chosen, noPicker: lines.filter((l) => l.when !== 'chosen'), waiting };
 }
 
+/**
+ * Where things are in each drawn room (public/assets/img/room_<id>.png,
+ * archive/generated-sprites/story_v2_env/MANIFEST.md section 1, checked by eye):
+ * the feet row, the way out drawn on the left, each thing and person's x, and
+ * the x of a door inside it that leads on (the Studio's stairs, the PRIVATE door).
+ */
+interface RoomArt {
+  floor: number;
+  exitX: number;
+  at?: Record<string, number>;
+  doorX?: number;
+}
+
+export const ROOM_ART: Record<string, RoomArt> = {
+  bakery_shop: { floor: 151, exitX: 22, at: { cabinet: 74, tipjar: 124, classphotos: 104, raspberryCounter: 160 } },
+  bakery_studio: { floor: 146, exitX: 19, doorX: 241 },
+  bakery_office: { floor: 151, exitX: 20, doorX: 209, at: { poster: 128, drawer: 158 } },
+  slipnsip: { floor: 148, exitX: 20, at: { photo: 234, stool: 210, jukebox: 190, telly: 152, kumquat: 110 } },
+  stamp_office: { floor: 146, exitX: 20, at: { rack: 166, clock: 126, clerkDate: 70 } },
+  banana_storeroom: { floor: 148, exitX: 21, at: { ledger: 186 } },
+  cando_shop: { floor: 148, exitX: 17, at: { beige: 200, olive: 96 } },
+  cypher: { floor: 148, exitX: 34, at: { sketchbook: 185, tornpage: 220 } },
+  customs_booth: { floor: 148, exitX: 22, at: { shelf: 182, elderberry: 80 } },
+  vineyard_cafe: { floor: 150, exitX: 23, at: { receipts: 226, seedless: 190, cafeOwner: 140 } },
+  canteen: { floor: 148, exitX: 20, at: { fridge: 230, satsuma: 118 } },
+  archive: { floor: 146, exitX: 17, at: { tapeShelf: 225, finalTape: 125, chair: 78 } },
+  teahouse_front: { floor: 150, exitX: 16, at: { teapots: 145 } },
+  teahouse_back: { floor: 146, exitX: 17, doorX: 236, at: { photo: 54, cups: 145 } },
+  dumpling_house: { floor: 146, exitX: 21, at: { dumplingCook: 190 } },
+  coat_check: { floor: 146, exitX: 20, at: { hood: 172, kiwi: 110 } },
+  vip_lounge: { floor: 152, exitX: 19, at: { photos: 90, scarf: 135, notebook: 165 } },
+  watermelon_kitchen: { floor: 148, exitX: 24, at: { cookbook: 150, notes: 172, sauce: 188 } },
+  water_tower_hut: { floor: 150, exitX: 26, at: { icebox: 76 } },
+  workers_hut: { floor: 148, exitX: 17, at: { darts: 118, chestnut: 200 } },
+  echo_room: { floor: 146, exitX: 18 },
+  juicefm_booth: { floor: 148, exitX: 18, at: { switch: 120, photo: 50 } },
+  registration_tent: { floor: 150, exitX: 16, at: { entries: 60, board: 162, clementine: 200 } },
+  mirror_room: { floor: 144, exitX: 22, at: { scuffs: 120, mirror: 190, notebook: 216 } },
+  pineapple_study: { floor: 146, exitX: 23, at: { portrait: 140, ledger: 104 } },
+  dressing_room: { floor: 150, exitX: 19 },
+  broadcast_booth: { floor: 150, exitX: 18, at: { switch: 190 } },
+};
+
 function roomOf(stop: StopKey, plan: RoomPlan, looks: LookSpot[], residents: ResidentSpot[]): RoomDef {
   const where = `room:${plan.id}`;
+  const art = ROOM_ART[plan.id];
+  const place = <T extends { id: string; x: number }>(spot: T): T => (art?.at?.[spot.id] !== undefined ? { ...spot, x: art.at[spot.id] } : spot);
   const def: RoomDef = {
     id: plan.id,
     stop,
     label: plan.label,
-    doorX: plan.doorX,
+    // A door inside another room stands where that room's art draws it.
+    doorX: (plan.in ? art?.doorX : undefined) ?? plan.doorX,
     bg: `room_${plan.id}`,
     wall: plan.wall,
     floorColor: plan.floor,
-    looks: looks.filter((look) => look.where === where),
-    people: residents.filter((person) => person.where === where),
+    looks: looks.filter((look) => look.where === where).map(place),
+    people: residents.filter((person) => person.where === where).map(place),
   };
+  if (art) {
+    def.floor = art.floor;
+    def.exitX = art.exitX;
+  }
   if (plan.in) def.in = plan.in;
   if (plan.lock) def.lock = plan.lock;
   if (plan.dark) def.dark = true;

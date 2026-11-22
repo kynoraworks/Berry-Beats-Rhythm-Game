@@ -320,7 +320,8 @@ export function placeBackground(scene: Phaser.Scene, place: PlaceDef): string {
  * where they go, in art pixels.
  */
 export function placeProps(scene: Phaser.Scene, place: PlaceDef): { key: string; x: number; y: number }[] {
-  if (place.kind !== 'room') return [];
+  // The v2 room (room_berry.png) has the photo in its own frame.
+  if (place.kind !== 'room' || place.bg !== 'room') return [];
   // A drawn trio_photo.png (listed in core/assets.ts) is used as it is; until then one is painted here.
   const key = 'trio_photo';
   if (!scene.textures.exists(key)) {

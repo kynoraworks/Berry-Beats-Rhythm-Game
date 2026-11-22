@@ -4,10 +4,10 @@ import type { Battle, Side } from '../core/battle';
 import type { RivalKind } from '../core/chart';
 import { WINDOWS, accuracy, type Judgement, type Stats } from '../core/engine';
 import { addIcon, addText } from '../core/ui';
-import { CAST, portraitFrame } from '../story/cast';
+import { CAST } from '../story/cast';
 import { ROUND_POINTS, type RoundResult } from '../story/crewBattle';
 import type { CharacterId, GimmickId } from '../story/types';
-import { addFace } from './CrewScoreboard';
+import { addFace, faceArt } from './CrewScoreboard';
 import { HUD, LOW_HEALTH, PLAYER_BAR_X, RIVAL_BAR_RIGHT, battleStars, chipX, crewStars, readDuel, roundClock, type EffectChip, type StarRows } from './fighterCard';
 import { chipIconTexture } from './hudIcons';
 import { HYPE_PINK } from './HypeMode';
@@ -68,12 +68,23 @@ export interface HudOptions {
   rival?: RivalKind;
   /** Who dances for the player: Berry, or a crew ally in the crew battle. */
   player?: CharacterId;
+  /** Whose face is on the rival's side, when not the rival kind's own (a trainer in battles A and B). */
+  rivalWho?: CharacterId;
+  /** Faces drawn from a sheet of their own (the prologue's legends), neutral frame and bold frame. */
+  faces?: { player?: HudFace; rival?: HudFace };
   /** The crew battle's points so far, when this is one of its rounds. */
   crew?: CrewInfo | null;
   /** The enemy's gimmick (Pineapple's double miss damage tints the HP bar). */
   gimmick?: GimmickId | null;
   /** Reduced motion: the score, turn label and combo keep still on the beat. */
   calm?: boolean;
+}
+
+/** A face for the HUD from a portrait sheet that is not the cast's. */
+export interface HudFace {
+  texture: string;
+  frame: number;
+  bold?: number;
 }
 
 /** What the HUD needs each frame besides the two engines' stats. */
@@ -185,7 +196,7 @@ export class Hud {
     this.rivalColor = look.color;
     this.rivalCss = look.css;
     this.playerWho = options.player ?? 'berry';
-    this.rivalWho = rivalCharacter(rivalKind);
+    this.rivalWho = rivalKind === 'none' ? null : (options.rivalWho ?? rivalCharacter(rivalKind));
     this.scored = options.rounds > 0 || !!options.crew;
     this.calm = options.calm ?? false;
     const hud = <T extends Phaser.GameObjects.Components.Depth>(object: T): T => object.setDepth(Depth.hud);
@@ -194,8 +205,8 @@ export class Hud {
     // One slim dark strip behind the card keeps it readable over any stage.
     hud(scene.add.rectangle(HUD.left - 6, 2, HUD.right - HUD.left + 12, HUD.face + 14, COLORS.ink, 0.72).setOrigin(0));
 
-    this.playerFace = hud(this.addFaceBox(P_FACE_X, this.playerWho, CAST[this.playerWho].color));
-    this.rivalFace = this.rivalWho ? hud(this.addFaceBox(R_FACE_X, this.rivalWho, look.color)) : null;
+    this.playerFace = hud(this.addFaceBox(P_FACE_X, this.playerWho, options.faces?.player ? COLORS.cream : CAST[this.playerWho].color, options.faces?.player));
+    this.rivalFace = this.rivalWho ? hud(this.addFaceBox(R_FACE_X, this.rivalWho, look.color, options.faces?.rival)) : null;
     if (this.rivalFace) this.rivalParts.push(this.rivalFace);
 
     // This round's accuracy duel: the bars fill toward the ring; the leader's is the bright one.
@@ -439,11 +450,14 @@ export class Hud {
     text.setX(PLAYER_FIELD_CENTER).setScale(this.comboScale * (1 + pop + 0.06 * beatPulse + 0.25 * kick));
   }
 
-  private addFaceBox(x: number, who: CharacterId, color: number): Phaser.GameObjects.Container {
+  private addFaceBox(x: number, who: CharacterId, color: number, own?: HudFace): Phaser.GameObjects.Container {
     const size = HUD.face;
     const frame = this.scene.add.rectangle(0, 0, size, size, COLORS.ink).setStrokeStyle(3, color);
-    const face = addFace(this.scene, 0, 0, who, size - 6);
-    return this.scene.add.container(x + size / 2, HUD.faceY + size / 2, [frame, face]);
+    const drawn = own && this.scene.textures.exists(own.texture) && this.scene.textures.get(own.texture).has(String(own.frame));
+    const face = drawn ? this.scene.add.container(0, 0, [this.scene.add.image(0, 0, own.texture, own.frame).setDisplaySize(size - 6, size - 6)]) : addFace(this.scene, 0, 0, who, size - 6);
+    const container = this.scene.add.container(x + size / 2, HUD.faceY + size / 2, [frame, face]);
+    if (drawn) container.setData('face', own);
+    return container;
   }
 
   /** Swap a face to its bold portrait for a moment, if that frame is drawn. */
@@ -452,11 +466,12 @@ export class Hud {
     const face = container.list[1] as Phaser.GameObjects.Container | undefined;
     const image = face?.list[0];
     if (!(image instanceof Phaser.GameObjects.Image)) return;
-    const bold = portraitFrame({ who, mood: 'bold' });
-    if (!this.scene.textures.get(Tex.portraits).has(String(bold))) return;
-    const neutral = portraitFrame({ who, mood: 'neutral' });
-    image.setFrame(bold);
-    this.scene.time.delayedCall(1200, () => image.active && image.setFrame(neutral));
+    const own = container.getData('face') as HudFace | undefined;
+    const neutralArt = own ? { texture: own.texture, frame: own.frame } : faceArt(this.scene, who, 'neutral');
+    const boldArt = own ? (own.bold !== undefined ? { texture: own.texture, frame: own.bold } : null) : faceArt(this.scene, who, 'bold');
+    if (!neutralArt || !boldArt || boldArt.texture !== image.texture.key || !this.scene.textures.get(boldArt.texture).has(String(boldArt.frame))) return;
+    image.setFrame(boldArt.frame);
+    this.scene.time.delayedCall(1200, () => image.active && image.setFrame(neutralArt.frame));
   }
 
   private addPip(x: number, big: boolean): PipView {

@@ -1,3 +1,4 @@
+import { learnPostGameMove } from '../story/moveset';
 import { getProgress, hasSeen, markSeen } from '../story/progress';
 import type { ConditionState } from './conditions';
 import { readCount, readFlags } from './saveRead';
@@ -86,4 +87,20 @@ export function prologueSeen(): boolean {
 
 export function markPrologueSeen(): void {
   markSeen('prologue');
+}
+
+/** The epilogue's flags for its two moves, and the moves they teach (story/moveBook.ts POSTGAME_MOVES). */
+export const POSTGAME_FLAGS: Readonly<Record<string, string>> = {
+  learnedBogQueenStomp: 'mv_bog_queen_stomp',
+  learnedSummerCatch: 'mv_summer_catch',
+};
+
+/**
+ * Learn the post-game moves whose epilogue flags are set (a save from before
+ * the epilogue taught them through the moves API). Returns the moves learned now.
+ */
+export function syncPostGameMoves(): string[] {
+  const learned: string[] = [];
+  for (const [flag, id] of Object.entries(POSTGAME_FLAGS)) if (endingFlag(flag) && learnPostGameMove(id)) learned.push(id);
+  return learned;
 }

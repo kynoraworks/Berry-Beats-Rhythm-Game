@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
-import { COLORS, Tex } from '../core/config';
-import { addBox } from '../core/ui';
+import { COLORS, CSS, Tex } from '../core/config';
+import { addBox, addText } from '../core/ui';
 import { CAST } from '../story/cast';
 import type { FruitId } from '../story/types';
 import { HUD } from './fighterCard';
@@ -20,6 +20,8 @@ const TRACK_H = 14;
 export interface FlairWidgetOptions {
   /** Coconut's hard shell: Flair charges slower, shown as a shell on the meter. */
   hardShell?: boolean;
+  /** Stop 7's soloists: the backup is benched, face greyed and `BACKUP OFF`; the meter fills with nothing to fire. */
+  benched?: boolean;
 }
 
 /**
@@ -34,9 +36,10 @@ export class FlairWidget {
   private readonly face: Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle;
   private readonly fill: Phaser.GameObjects.Rectangle;
   private readonly layer: Phaser.GameObjects.Container;
-  private readonly color: number;
+  private color: number;
   private shownLevel = 0;
   private pulse = 0;
+  private readonly benched: boolean;
 
   constructor(scene: Phaser.Scene, owner: FruitId, onFire: () => void, options: FlairWidgetOptions = {}) {
     this.scene = scene;
@@ -53,6 +56,15 @@ export class FlairWidget {
     this.fill = scene.add.rectangle(TRACK_X + 2, TRACK_Y, 0, TRACK_H - 4, character.color).setOrigin(0, 0.5);
     const parts: Phaser.GameObjects.GameObject[] = [box, this.glow, this.face, track, this.fill];
     if (options.hardShell) parts.push(scene.add.image(TRACK_X + TRACK_W - 2, TRACK_Y - 12, chipIconTexture(scene, 'shell', 0x8a5a34)).setScale(2));
+    this.benched = !!options.benched;
+    if (this.benched) {
+      // Greyed out, as the follower walks to the bar (bible, stop 7): the meter still fills, in grey.
+      if (this.face instanceof Phaser.GameObjects.Image) this.face.setTint(0x6a6a7a).setAlpha(0.7);
+      else this.face.setFillStyle(0x6a6a7a);
+      this.color = 0x8a8a9a;
+      this.fill.setFillStyle(this.color);
+      parts.push(addText(scene, TRACK_X + TRACK_W / 2, TRACK_Y - 1, 'BACKUP OFF', 14, { color: CSS.cream }));
+    }
     this.layer = scene.add.container(0, 0, parts).setDepth(Depth.hud);
     box.setInteractive({ useHandCursor: true });
     box.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
@@ -77,6 +89,11 @@ export class FlairWidget {
 
   /** `level` 0..1 while charging; `active` is the share of the ability left (null when not running). */
   update(level: number, full: boolean, active: number | null, _beatsLeft: number, dt: number): void {
+    if (this.benched) {
+      this.shownLevel += (level - this.shownLevel) * Math.min(1, dt * 10);
+      this.fill.width = (TRACK_W - 4) * Phaser.Math.Clamp(this.shownLevel, 0, 1);
+      return;
+    }
     if (active !== null) {
       this.shownLevel = 0;
       this.glow.setAlpha(0);

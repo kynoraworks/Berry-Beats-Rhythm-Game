@@ -8,7 +8,7 @@ import { getAudioContext } from './songs';
  * Pixel voices: every speaker "talks" in short synthesised blips while their
  * words type out, the way Undertale does it. No audio files: each blip is one
  * oscillator (or a puff of filtered noise) with a quick envelope, played on
- * the talk bus (sfx.ts) under the music and scaled by the Sound volume.
+ * the talk bus (sfx.ts) under the music and scaled by the Voices volume.
  *
  * The table below has a voice for everyone in the cast and some spares for
  * people who are not in it yet. docs/story_v2/VOICES.md, when it exists, is
@@ -42,7 +42,7 @@ export interface VoiceDef {
   blipMs: number;
   /** One blip every this many letters. */
   every: number;
-  /** 0 to 1, before the talk bus and the Sound volume. */
+  /** 0 to 1, before the talk bus and the Voices volume. */
   volume: number;
   pattern?: VoicePattern;
   /** Semitones the last blips of a question climb. Defaults to 3; 0 for none. */
@@ -481,7 +481,7 @@ export function scheduleBlip(ctx: BaseAudioContext, out: AudioNode, wave: VoiceW
 
 /** Square and saw waves sound much louder than sines at the same gain. */
 const WAVE_GAIN: Record<VoiceWave, number> = { sine: 1, triangle: 0.9, square: 0.45, sawtooth: 0.45, noise: 0.8 };
-/** Overall blip level at volume 1, before the bus and the Sound volume. */
+/** Overall blip level at volume 1, before the bus and the Voices volume. */
 const BLIP_GAIN = 0.16;
 
 /**
@@ -543,7 +543,7 @@ export class Voicer {
 
   private play(wave: VoiceWave, hz: number, ms: number, share: number): boolean {
     if (this.thisFrame >= 1) return false;
-    const volume = getSettings().sfxVolume * this.voice.volume * share;
+    const volume = getSettings().voiceVolume * this.voice.volume * share;
     if (volume <= 0) return false;
     const ctx = getAudioContext(this.game);
     if (ctx.state !== 'running') return false;

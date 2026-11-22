@@ -4,7 +4,7 @@ import { music } from '../../core/music';
 import { getSettings } from '../../core/settings';
 import { preloadSamples } from '../../core/sfx';
 import { addBody, addText, goTo } from '../../core/ui';
-import { addActor, pose } from '../../cutscene/actors';
+import { addActor, pose, posesFrame } from '../../cutscene/actors';
 import { GLOW_COLOURS, artOr, crowdRowKey, pixelKey, puffKey, spotKey, stripFrames } from '../../cutscene/art';
 import { kick, preloadStingers } from '../../cutscene/audio';
 import { Cutscene, type CutShot } from '../../cutscene/Cutscene';
@@ -343,7 +343,8 @@ export class PrologueScene extends Phaser.Scene {
     const lift = this.cut.get<Phaser.GameObjects.Rectangle>('lift');
     straw.setVisible(true);
     lift.setVisible(true);
-    pose(straw, 'victory');
+    // Rising on the lift, arms in a V (strawberry_poses 1).
+    if (!posesFrame(straw, 'strawberry_poses', 1)) pose(straw, 'victory');
     this.tweens.add({ targets: [straw], y: FLOOR, duration: 1300, ease: 'Cubic.easeOut' });
     this.tweens.add({ targets: [lift], y: FLOOR + 10, duration: 1300, ease: 'Cubic.easeOut' });
   }
@@ -360,11 +361,14 @@ export class PrologueScene extends Phaser.Scene {
   private knuckles(): void {
     const cran = this.cut.get<Phaser.GameObjects.Sprite>('cran');
     const straw = this.cut.get<Phaser.GameObjects.Sprite>('straw');
-    pose(cran, 'right');
-    pose(straw, 'left');
+    // The knuckle touch: Cranberry's fist to the right, Strawberry's to the left (their poses sheets, 0 and 2).
+    if (!posesFrame(cran, 'cranberry_poses', 0)) pose(cran, 'right');
+    // Her poses are drawn facing Cranberry already.
+    if (posesFrame(straw, 'strawberry_poses', 2)) straw.setFlipX(false);
+    else pose(straw, 'left');
     this.time.delayedCall(260, () => {
       pose(cran, 'victory');
-      pose(straw, 'victory');
+      pose(straw.setFlipX(true), 'victory');
     });
     this.time.delayedCall(700, () => {
       pose(cran, 'idle');

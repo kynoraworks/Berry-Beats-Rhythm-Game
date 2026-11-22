@@ -201,8 +201,20 @@ describe('extended moves sheets', () => {
         expect(frame - MOVES_BASE, texture).toBeLessThan(ext.needs);
       }
       expect(ext.signatureA.frames.length, texture).toBe(6);
-      expect(ext.signatureB.frames.length, texture).toBe(6);
+      // Cranberry's finisher ends on its clean freeze (frame 27): the slip and the fall (28, 29) are the prologue's bar 84 only.
+      expect(ext.signatureB.frames.length, texture).toBe(texture === 'cranberry' ? 4 : 6);
     }
+  });
+
+  it('gives the story v2 dancers their manifest moves', () => {
+    for (const texture of ['cranberry', 'strawberry', 'lime', 'peach', 'cherries', 'grapefruit', 'lychee', 'passion_fruit', 'mango', 'fig', 'quince']) {
+      expect(EXT_MOVES[texture], texture).toBeDefined();
+      expect(extMoves(texture, 36), texture).not.toBeNull();
+    }
+    // Duo poses face the partner: Cranberry's to her right, everyone else's to the left.
+    expect(EXT_MOVES.cranberry.duo.facing).toBe(1);
+    expect(EXT_MOVES.lime.duo.facing).toBe(-1);
+    expect(EXT_MOVES.cranberry.signatureB.frames.map((f) => f - MOVES_BASE)).toEqual([24, 25, 26, 27]);
   });
 
   it("smooths Berry's lane hits with more than one frame each and faces his duo poses at the rival", () => {

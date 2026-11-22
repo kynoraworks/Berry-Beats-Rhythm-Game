@@ -4,7 +4,7 @@ import { music } from '../../core/music';
 import { getSettings } from '../../core/settings';
 import { goTo } from '../../core/ui';
 import type { Line } from '../../story/types';
-import { addActor, pose, type Pose } from '../../cutscene/actors';
+import { addActor, hasOwnKidArt, pose, type Pose } from '../../cutscene/actors';
 import { SHED_SCREEN, STATIC_FRAMES, artOr, gardenKey, pixelKey, shedKey, staticKeys, stripFrames } from '../../cutscene/art';
 import { staticSting, type SoundHandle } from '../../cutscene/audio';
 import { Cutscene, type CutShot } from '../../cutscene/Cutscene';
@@ -41,6 +41,8 @@ export class KidsGardenScene extends Phaser.Scene {
   private tvFrame = 0;
   private tvClock = 0;
   private kids: Record<keyof typeof SEATS, Phaser.GameObjects.Sprite> | null = null;
+  /** The kids' pose between lines: sitting on the blanket in the shed, standing on the grass. */
+  private rest: Pose = 'sit';
 
   constructor() {
     super(SceneKeys.KidsGarden);
@@ -50,6 +52,7 @@ export class KidsGardenScene extends Phaser.Scene {
     this.flow = data?.flow ?? readFlow(data);
     this.hiss = data?.hiss ?? null;
     this.kids = null;
+    this.rest = 'sit';
     this.pending = null;
     this.tvFrame = 0;
     this.tvClock = 0;
@@ -122,9 +125,9 @@ export class KidsGardenScene extends Phaser.Scene {
     const seats = generated ? GENERATED_SEATS : SEATS;
     const feet = generated ? 141 * PX : FEET - 10;
     this.kids = {
-      kidBerry: cut.add('kidBerry', addActor(this, 'kidBerry', seats.kidBerry, feet, 'idle')),
-      kidRaspberry: cut.add('kidRaspberry', addActor(this, 'kidRaspberry', seats.kidRaspberry, feet + 4, 'idle')),
-      kidBlueberry: cut.add('kidBlueberry', addActor(this, 'kidBlueberry', seats.kidBlueberry, feet, 'idle').setFlipX(true)),
+      kidBerry: cut.add('kidBerry', addActor(this, 'kidBerry', seats.kidBerry, feet, this.rest)),
+      kidRaspberry: cut.add('kidRaspberry', addActor(this, 'kidRaspberry', seats.kidRaspberry, feet + 4, this.rest)),
+      kidBlueberry: cut.add('kidBlueberry', addActor(this, 'kidBlueberry', seats.kidBlueberry, feet, this.rest).setFlipX(true)),
     };
     // A paper cracker crown, too big, for Kid Blueberry.
     const crown = this.add.triangle(0, 0, 0, 18, 9, 0, 18, 18, 0xffd84a).setStrokeStyle(2, 0x1a1028);
@@ -151,8 +154,11 @@ export class KidsGardenScene extends Phaser.Scene {
     const kid = id ? this.kids?.[id] : undefined;
     if (kid) {
       this.tweens.add({ targets: kid, y: kid.y - 10, duration: 90, yoyo: true });
-      pose(kid, line.mood === 'bold' ? 'up' : 'idle2');
-      this.time.delayedCall(260, () => kid.active && pose(kid, 'idle'));
+      // On the blanket the kids' own sheets talk sitting down (frame 3); on the grass they stand.
+      const seated = this.rest === 'sit' && hasOwnKidArt(kid);
+      pose(kid, seated ? 'talk' : line.mood === 'bold' ? 'up' : 'idle2');
+      const rest = this.rest;
+      this.time.delayedCall(seated ? 700 : 260, () => kid.active && pose(kid, rest));
     }
     // "I'm on it." He thumps the telly.
     if (line.text.includes('thumps the telly') && this.kids) {
@@ -168,7 +174,8 @@ export class KidsGardenScene extends Phaser.Scene {
     const kid = this.kids?.[who];
     if (!kid) return;
     kid.setFlipX(toX < kid.x);
-    const steps: Pose[] = ['left', 'right'];
+    // The kids' own sheets have a run frame; the stand-ins step left and right.
+    const steps: Pose[] = hasOwnKidArt(kid) ? ['run', 'idle2'] : ['left', 'right'];
     let i = 0;
     const timer = this.time.addEvent({ delay: 120, loop: true, callback: () => kid.active && pose(kid, steps[i++ % 2]) });
     this.tweens.add({ targets: kid, x: toX, duration: ms, ease: 'Sine.easeInOut', onComplete: () => { timer.remove(); pose(kid, 'idle'); } });
@@ -185,6 +192,7 @@ export class KidsGardenScene extends Phaser.Scene {
     for (const name of ['tv', 'tvGlow', 'wire', ...Array.from({ length: 18 }, (_, i) => `bulb${i}`)]) if (cut.has(name)) cut.get<Phaser.GameObjects.Image>(name).setVisible(false);
     cut.get<Phaser.GameObjects.Image>('garden').setVisible(true);
     cut.look(700, FEET - 10, 1.3);
+    this.rest = 'idle';
     const kids = this.kids;
     if (!kids) return;
     kids.kidBerry.setPosition(-80, FEET + 40);
@@ -210,7 +218,17 @@ export class KidsGardenScene extends Phaser.Scene {
     if (!kid) return () => true;
     const done = { v: false };
     let flips = 0;
-    const timer = this.time.addEvent({ delay: 90, repeat: 9, callback: () => kid.setFlipX(++flips % 2 === 0) });
+    // The Trio Turn's spin: kid_raspberry 4 and 5 (side, back) as she whirls, then the hedge (6).
+    const own = hasOwnKidArt(kid);
+    const timer = this.time.addEvent({
+      delay: 90,
+      repeat: 9,
+      callback: () => {
+        ++flips;
+        if (own) pose(kid, flips % 2 ? 'spin1' : 'spin2');
+        else kid.setFlipX(flips % 2 === 0);
+      },
+    });
     void timer;
     this.tweens.add({
       targets: kid,
@@ -226,8 +244,10 @@ export class KidsGardenScene extends Phaser.Scene {
           this.tweens.add({ targets: leaf, y: leaf.y + Phaser.Math.Between(40, 160), x: leaf.x + Phaser.Math.Between(-80, 80), angle: 200, alpha: 0, duration: 1200 });
         }
         this.cameras.main.shake(getSettings().reduceMotion ? 0 : 140, 0.006);
+        if (own) pose(kid.setAngle(0), 'hedge');
         this.time.delayedCall(500, () => {
-          this.tweens.add({ targets: kid, angle: 0, x: 900, y: FEET + 40, duration: 500, onComplete: () => (done.v = true) });
+          if (own) pose(kid, 'run');
+          this.tweens.add({ targets: kid, angle: 0, x: 900, y: FEET + 40, duration: 500, onComplete: () => ((done.v = true), own && pose(kid, 'idle')) });
         });
       },
     });
@@ -240,17 +260,22 @@ export class KidsGardenScene extends Phaser.Scene {
     if (!kids) return () => true;
     const done = { v: false };
     const blue = kids.kidBlueberry;
+    // kid_blueberry 4, 5, 6: the drop, the wobble, over backwards. His own frames lean, so the sprite tilts less.
+    const own = hasOwnKidArt(blue);
     pose(blue, 'down');
     this.tweens.add({ targets: blue, angle: -12, duration: 160, yoyo: true, repeat: 2 });
+    if (own) this.time.delayedCall(420, () => pose(blue, 'wobble'));
     this.time.delayedCall(800, () => {
       pose(blue, 'stumble');
-      this.tweens.add({ targets: blue, angle: -78, y: FEET + 10, duration: 600, ease: 'Quad.easeIn' });
-      // Kid Berry dives under him; Raspberry runs in, hair full of leaves.
-      this.tweens.add({ targets: kids.kidBerry, x: blue.x - 70, duration: 380, ease: 'Quad.easeOut', onComplete: () => pose(kids.kidBerry, 'hold') });
-      this.tweens.add({ targets: kids.kidRaspberry, x: blue.x + 60, duration: 560, ease: 'Quad.easeOut', onComplete: () => pose(kids.kidRaspberry, 'up') });
+      this.tweens.add({ targets: blue, angle: own ? -24 : -78, y: FEET + 10, duration: 600, ease: 'Quad.easeIn' });
+      // Kid Berry dives under him (the catch, 6); Raspberry runs in, hair full of leaves, and grabs them both (7).
+      if (hasOwnKidArt(kids.kidRaspberry)) pose(kids.kidRaspberry, 'run');
+      this.tweens.add({ targets: kids.kidBerry, x: blue.x - 70, duration: 380, ease: 'Quad.easeOut', onComplete: () => pose(kids.kidBerry, hasOwnKidArt(kids.kidBerry) ? 'catch' : 'hold') });
+      this.tweens.add({ targets: kids.kidRaspberry, x: blue.x + 60, duration: 560, ease: 'Quad.easeOut', onComplete: () => pose(kids.kidRaspberry, hasOwnKidArt(kids.kidRaspberry) ? 'grab' : 'up') });
       this.time.delayedCall(560, () => {
         this.tweens.killTweensOf(blue);
-        this.tweens.add({ targets: blue, angle: -40, y: FEET - 10, duration: 200, ease: 'Back.easeOut' });
+        if (own) pose(blue, 'caught');
+        this.tweens.add({ targets: blue, angle: own ? 0 : -40, y: FEET - 10, duration: 200, ease: 'Back.easeOut' });
         flash(this, 0xffffff, 120, 0.2);
         this.time.delayedCall(500, () => (done.v = true));
       });

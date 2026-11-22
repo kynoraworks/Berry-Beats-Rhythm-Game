@@ -3,6 +3,7 @@ import { COLORS, CSS, GAME_H, GAME_W } from '../core/config';
 import { isTouch } from '../core/mobile';
 import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
+import { sting } from '../cutscene/audio';
 import { Voicer, voiceFor } from '../core/voice';
 import { addBody, addBox, addText } from '../core/ui';
 import { stripTags } from '../play/textFx';
@@ -281,7 +282,9 @@ export class TapeViewer extends Overlay {
       for (const line of this.lines) scene.tweens.add({ targets: line, y: `+=${280 - 20}`, duration: 2400 + Math.random() * 800, repeat: -1 });
     }
     this.show();
-    playSfx(scene.game, this.playing ? 'tapePlay' : 'pageTurn');
+    // A rumour tape starts with its sting (the VHS clunk and warble).
+    if (this.playing) sting(scene.game, 'sting_rumour', 'tapePlay');
+    else playSfx(scene.game, 'pageTurn');
   }
 
   private show(): void {
@@ -316,7 +319,8 @@ export class TapeViewer extends Overlay {
     const entry = this.options.pages[this.index];
     if (!entry?.heard) return true;
     this.playing = !this.playing;
-    playSfx(this.scene.game, this.playing ? 'tapePlay' : 'tapeEject');
+    if (this.playing) sting(this.scene.game, 'sting_rumour', 'tapePlay');
+    else playSfx(this.scene.game, 'tapeEject');
     this.show();
     return true;
   }

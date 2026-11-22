@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, CSS, FONT, Tex } from '../core/config';
 import { addBox, addText } from '../core/ui';
-import { CAST, portraitFrame } from '../story/cast';
+import { CAST, portraitArt, portraitFrame } from '../story/cast';
 import { CREW_ROUNDS, ROUND_POINTS, tally, type Dancer, type RoundResult } from '../story/crewBattle';
 import type { CharacterId, Mood } from '../story/types';
 
@@ -10,16 +10,29 @@ import type { CharacterId, Mood } from '../story/types';
  * initial while that frame is not drawn yet.
  */
 export function addFace(scene: Phaser.Scene, x: number, y: number, who: CharacterId, size: number, mood: Mood = 'neutral'): Phaser.GameObjects.Container {
-  const frame = portraitFrame({ who, mood });
-  const sheet = scene.textures.exists(Tex.portraits) ? scene.textures.get(Tex.portraits) : null;
+  const face = faceArt(scene, who, mood);
   const parts: Phaser.GameObjects.GameObject[] = [];
-  if (sheet?.has(String(frame))) {
-    parts.push(scene.add.image(0, 0, Tex.portraits, frame).setDisplaySize(size, size));
+  if (face) {
+    parts.push(scene.add.image(0, 0, face.texture, face.frame).setDisplaySize(size, size));
   } else {
     parts.push(scene.add.rectangle(0, 0, size, size, CAST[who].color));
     parts.push(scene.add.text(0, 0, CAST[who].name.charAt(0), { fontFamily: FONT, fontSize: `${Math.round(size * 0.55)}px`, color: CSS.ink }).setOrigin(0.5));
   }
   return scene.add.container(x, y, parts);
+}
+
+/**
+ * A face for the HUD and the scoreboards: the frame in portraits.png, else
+ * the speaker's own portrait sheet (the trainers' and residents' busts in
+ * portraits_v2, Strawberry's), when loaded. Null: draw a stand-in.
+ */
+export function faceArt(scene: Phaser.Scene, who: CharacterId, mood: Mood = 'neutral'): { texture: string; frame: number } | null {
+  const frame = portraitFrame({ who, mood });
+  const sheet = scene.textures.exists(Tex.portraits) ? scene.textures.get(Tex.portraits) : null;
+  if (frame >= 0 && sheet?.has(String(frame))) return { texture: Tex.portraits, frame };
+  const own = portraitArt({ who, mood });
+  if (own && scene.textures.exists(own.key) && scene.textures.get(own.key).has(String(own.frame))) return { texture: own.key, frame: own.frame };
+  return null;
 }
 
 const SLOT = 48;

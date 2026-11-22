@@ -42,6 +42,8 @@ import { storySong } from '../cutscene/storyFiles';
 import { ChoiceBox } from '../explore/ChoiceBox';
 import { Phone, PostcardCard, TapeViewer } from '../explore/StoryCards';
 import { playNodes } from '../explore/StoryPlayer';
+import { sting } from '../cutscene/audio';
+import { stingForLine } from '../story/stings';
 import { Dialogue } from '../play/Dialogue';
 import { CHAPTERS } from '../story/chapters';
 import { holds, storyState } from '../story/conditions';
@@ -201,7 +203,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
     fadeIn(this);
     syncRumours();
-    music.play('level_select');
+    music.play(trainSong());
     this.train = this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
     // Made straight after the train so it lies under the map and card at the same depth.
     this.light = new TrainLight(this, this.train, STOPS[this.index].time);
@@ -670,7 +672,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const chapter = CHAPTERS[latest - 1];
     if (!chapter || chapter.interlude.length === 0) return;
     this.overlay = true;
-    music.play(storySong(latest === 7 ? 'train_between_alone' : 'train_between', 'level_select'));
+    music.play(trainSong());
     const state = () => storyState(null, latest);
     playNodes(
       {
@@ -684,7 +686,7 @@ export class LevelSelectScene extends Phaser.Scene {
         // Raspberry knows the Bog Queen after the Lantern Market ride in every case (bible 9.2).
         if (latest === 6) setFlag('knowsBogQueen');
         this.overlayDone();
-        music.play('level_select');
+        music.play(trainSong());
       },
     );
   }
@@ -705,7 +707,25 @@ export class LevelSelectScene extends Phaser.Scene {
       new Phone(this, { lines: visible, depth: 900, onDone: done });
       return;
     }
-    new Dialogue(this, { lines: visible, depth: 900, onLine: () => undefined, onDone: done });
+    new Dialogue(this, {
+      lines: visible,
+      depth: 900,
+      onLine: (line) => {
+        // The Conductor's music box under her hum, and any other sting the bible puts on a line of the ride.
+        const cue = stingForLine(line.id);
+        if (cue) sting(this.game, cue);
+      },
+      onDone: done,
+    });
   }
 }
 
+/**
+ * The train's own loop (MUSIC_LIST: train_between), once it has landed. From
+ * the club walk-out until the Rooftop is won, Berry rides alone: the same loop
+ * without its drums and wheels (train_between_alone).
+ */
+export function trainSong(): string {
+  const alone = isCleared('stop07') && !isCleared('stop08');
+  return storySong(alone ? 'train_between_alone' : 'train_between', 'level_select');
+}

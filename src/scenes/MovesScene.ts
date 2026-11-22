@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { syncPostGameMoves } from '../cutscene/storyState';
 import { COLORS, CSS, GAME_W, LANE_COLORS, SceneKeys, Tex } from '../core/config';
 import { music } from '../core/music';
 import { getSettings } from '../core/settings';
@@ -109,6 +110,8 @@ export class MovesScene extends Phaser.Scene {
   create(): void {
     fadeIn(this);
     if (!music.current) music.play('level_select');
+    // The epilogue's two moves, from a save whose ending flags were set before they reached the moves API.
+    syncPostGameMoves();
     const moveset = getMoveset();
     this.learned = moveset.learned;
     this.fresh = moveset.fresh;

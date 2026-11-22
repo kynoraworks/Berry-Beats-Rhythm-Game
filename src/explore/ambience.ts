@@ -200,6 +200,12 @@ export const AMBIENCE: Record<string, AmbienceDef> = {
     sky: sky(30, { clouds: 3 }),
   }),
 
+  // Story v2: Berry's room in November, curtains drawn: cold light round them, dust in it (story_v2_env MANIFEST).
+  room_berry: def({
+    particles: [area('dust', r(130, 50, 50, 60), 0.5, 4)],
+    lights: [light(155, 72, 30, 0xb8c8ff, 0.06, 'breathe')],
+  }),
+
   // Story v2: Berry Town's own street, and the streets of stops 3, 5 and 7 (simple mixes until tuned).
   street_berry_town: def({
     particles: [area('leaves', r(470, 0, 120, 30), 0.9, 6), area('leaves', r(80, 0, 120, 20), 0.6, 4), area('dust', r(40, 70, 560, 60), 1, 10)],

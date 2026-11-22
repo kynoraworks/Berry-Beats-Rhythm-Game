@@ -34,7 +34,7 @@ const DESC: Bounds = { x: 40, y: 576, w: 624, h: 60 };
 const ROW_H = 48;
 const ROW_DY = 52;
 /** The left panel's rows sit a little closer, to make room for Difficulty. */
-const LEFT_DY = 46;
+const LEFT_DY = 40;
 const KEY_DY = 54;
 const SLOT_W = 112;
 const SLOT_H = 48;
@@ -112,24 +112,27 @@ export class OptionsScene extends Phaser.Scene {
     this.addSlider(LEFT, leftY(0), 'Music volume', 'How loud the songs and the menu music are.', (s) => percent(s.musicVolume), (s) => s.musicVolume, (s, d) => ({
       musicVolume: step(s.musicVolume, d, 0.05, 0, 1),
     }));
-    this.addSlider(LEFT, leftY(1), 'Sound volume', 'How loud menu sounds, hit sounds and the crowd are.', (s) => percent(s.sfxVolume), (s) => s.sfxVolume, (s, d) => ({
+    this.addSlider(LEFT, leftY(1), 'Effects volume', 'How loud menu sounds, hit sounds, the crowd and the story\'s stings are.', (s) => percent(s.sfxVolume), (s) => s.sfxVolume, (s, d) => ({
       sfxVolume: step(s.sfxVolume, d, 0.05, 0, 1),
     }));
-    this.addToggle(LEFT, leftY(2), 'Hit sounds', 'Play a sound each time you hit a note.', 'hitSounds');
-    this.addToggle(LEFT, leftY(3), 'Announcer', 'The MC calls out rounds, hype and wins. The crowd follows Sound volume.', 'announcer');
+    this.addSlider(LEFT, leftY(2), 'Voices volume', 'How loud the voices are as the speech box types.', (s) => percent(s.voiceVolume), (s) => s.voiceVolume, (s, d) => ({
+      voiceVolume: step(s.voiceVolume, d, 0.05, 0, 1),
+    }));
+    this.addToggle(LEFT, leftY(3), 'Hit sounds', 'Play a sound each time you hit a note.', 'hitSounds');
+    this.addToggle(LEFT, leftY(4), 'Announcer', 'The MC calls out rounds, hype and wins. The crowd follows Effects volume.', 'announcer');
 
-    addSectionTitle(this, LEFT.x + 32, leftY(3) + 48, LEFT.w - 64, 'Difficulty and timing');
-    this.addDifficultyRow(leftY(3) + 94);
+    addSectionTitle(this, LEFT.x + 32, leftY(4) + 44, LEFT.w - 64, 'Difficulty and timing');
+    this.addDifficultyRow(leftY(4) + 88);
     this.addSlider(
       LEFT,
-      leftY(3) + 140,
+      leftY(4) + 132,
       'Audio offset',
       'Raise it if your hits keep landing late, lower it if they land early.',
       (s) => `${s.audioOffsetMs > 0 ? '+' : ''}${Math.round(s.audioOffsetMs)} ms`,
       (s) => (s.audioOffsetMs + 500) / 1000,
       (s, d) => ({ audioOffsetMs: step(s.audioOffsetMs, d, 5, -500, 500) }),
     );
-    this.addAction(LEFT, leftY(3) + 186, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
+    this.addAction(LEFT, leftY(4) + 176, 'Measure offset', 'Start', 'Tap along to a click and the audio offset is set for you.', () => this.startTest());
 
     const rightY = (i: number) => RIGHT.y + 88 + i * ROW_DY;
     addSectionTitle(this, RIGHT.x + 32, RIGHT.y + 36, RIGHT.w - 64, 'Gameplay');

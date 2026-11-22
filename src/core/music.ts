@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { getSettings, onSettingsChange } from './settings';
+import { fitLoop, loopPointsFor } from './loopPoints';
 import { getAudioContext, loadSongBuffer } from './songs';
 
 /**
@@ -98,6 +99,12 @@ export const music = {
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.loop = true;
+        // A measured loop plays its intro once, then loops between its points (core/loopPoints.ts).
+        const points = fitLoop(loopPointsFor(key), (buffer as Partial<AudioBuffer>).duration);
+        if (points) {
+          source.loopStart = points.start;
+          source.loopEnd = points.end;
+        }
         const now = ctx.currentTime;
         gain.gain.setValueAtTime(fadeMs > 0 ? 0 : 1, now);
         gain.gain.linearRampToValueAtTime(1, now + fadeMs / 1000);

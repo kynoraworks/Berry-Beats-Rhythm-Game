@@ -5,7 +5,7 @@ import type { PlayNote } from '../core/engine';
 import { getSettings } from '../core/settings';
 import { Bark, VhsOverlay, confettiBurst } from '../cutscene/fx';
 import type { PrologueFlow } from '../cutscene/flow';
-import { BOG_STOMP, PROLOGUE_BARS, barAt, chartBars, prologueEvents, scaleBar, tugAt, type PrologueCues, type PrologueEvent } from '../cutscene/prologueCues';
+import { BOG_STOMP, PROLOGUE_BARS, barAt, bibleBarOf, chartBars, prologueEvents, scaleBar, songBar, tugAt, type PrologueCues, type PrologueEvent } from '../cutscene/prologueCues';
 import type { Chart } from '../core/chart';
 import { Depth } from './layout';
 
@@ -78,6 +78,8 @@ export class ScriptedDirector {
 
   /** The bible bar at a chart beat (stretched back for a stand-in chart, for the tug curve). */
   private bibleBar(bar: number): number {
+    // The real song: its drops are not on the bible's bars, so the curve is read through the cue file's anchors.
+    if (this.play.cues.source === 'file') return bibleBarOf(this.play.cues, bar);
     if (this.play.cues.source !== 'density') return bar;
     return 1 + ((bar - 1) * (PROLOGUE_BARS - 1)) / Math.max(1, this.bars - 1);
   }
@@ -163,7 +165,7 @@ export class ScriptedDirector {
 
   /** Where a stand-in's script is stretched: the bar at which the bible's bar falls. */
   barFor(bibleBar: number): number {
-    return this.play.cues.source === 'density' ? scaleBar(bibleBar, this.bars) : bibleBar;
+    return this.play.cues.source === 'density' ? scaleBar(bibleBar, this.bars) : songBar(this.play.cues, bibleBar);
   }
 }
 

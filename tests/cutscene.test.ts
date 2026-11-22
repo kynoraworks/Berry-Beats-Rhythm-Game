@@ -416,4 +416,52 @@ describe('the music agent cue file', () => {
     expect(hypeAt(cues.hype, 35)).toBe(true);
     expect(hypeAt(cues.hype, 45)).toBe(false);
   });
+
+  it('follows the shipped song: its chart, its cue file, the measured freeze and static', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { parseChart } = await import('../src/core/chart');
+    const { prologueEvents, songBar, bibleBarOf, sectionStart } = await import('../src/cutscene/prologueCues');
+    const file = JSON.parse(readFileSync('archive/music/story_v2/prologue_cues.json', 'utf8'));
+    for (const name of ['prologue.easy', 'prologue', 'prologue.hard']) {
+      const chart = parseChart(JSON.parse(readFileSync(`public/charts/${name}.json`, 'utf8')));
+      expect(chart.song).toBe('prologue_last_final');
+      const cues = resolveCues(chart, file);
+      expect(cues.source).toBe('file');
+      // Hype on at the drops (9, 34, 51) and off at 17, 43 and 81; Bog Stomp on the slam back in at 34.
+      expect(cues.hype.map((c) => [c.bar, c.on])).toEqual([[9, true], [17, false], [34, true], [43, false], [51, true], [81, false]]);
+      expect(cues.freezeTime).toBeCloseTo(116.713, 3);
+      expect(cues.staticTime).toBeCloseTo(117.236, 3);
+      expect(sectionStart(cues, 'break')).toBe(43);
+      const events = prologueEvents(cues);
+      expect(events.find((e) => e.kind === 'stomp')?.bar).toBe(34);
+      expect(events.find((e) => e.kind === 'halfTime')?.bar).toBe(43);
+      expect(events.find((e) => e.kind === 'finisher')?.bar).toBe(81);
+      // The bible's callouts land on the song's drops: "HYPE!" on the first, the crowd losing it on the last.
+      const callout = (text: string) => events.find((e) => e.kind === 'callout' && e.callout.text.includes(text))?.bar;
+      expect(callout('HYPE!')).toBe(9);
+      expect(callout('LOSING IT')).toBe(51);
+      expect(callout('takes the lead')).toBe(43);
+      // The tug of war reads its bible curve through the same anchors, both ways.
+      expect(songBar(cues, 29)).toBeCloseTo(34);
+      expect(bibleBarOf(cues, 34)).toBeCloseTo(29);
+      expect(bibleBarOf(cues, songBar(cues, 66))).toBeCloseTo(66);
+    }
+  });
+});
+
+describe('story loops', () => {
+  it('loop between the measured points, never the whole file', async () => {
+    const { fitLoop, loopPointsFor, parseLoops } = await import('../src/core/loopPoints');
+    const { readFileSync } = await import('node:fs');
+    const raw = JSON.parse(readFileSync('archive/music/story_v2/loops.json', 'utf8'));
+    const points = parseLoops(raw);
+    for (const key of ['town_berry_town', 'town_rooftop_alone', 'town_rooftop_full', 'train_between', 'train_between_alone']) expect(points[key], key).toBeDefined();
+    expect(loopPointsFor('town_berry_town')).toEqual({ start: 2.7922, end: 68.5065 });
+    expect(loopPointsFor('berry_town')).toBeUndefined();
+    // A point past the decoded buffer's end would loop the whole file: dropped.
+    expect(fitLoop({ start: 1, end: 60 }, 59)).toBeNull();
+    expect(fitLoop({ start: 1, end: 60 }, 60.5)).toEqual({ start: 1, end: 60 });
+    expect(fitLoop({ start: 1, end: 60 }, undefined)).toBeNull();
+    expect(parseLoops({ loops: { a: { loopStart: 2, loopEnd: 1 }, b: { loop: false, loopStart: 0, loopEnd: 9 } } })).toEqual({});
+  });
 });

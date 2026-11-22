@@ -47,8 +47,19 @@ export interface PrologueCues {
   bar1Beat: number;
   /** Bars the cue file moves from the bible's (the song's real moments): Bog Stomp, Strawberry's flash, the burst. */
   marks?: { stomp?: number; flash?: number; burst?: number };
+  /** The song's sections as the music agent measured them (intro, drop1, break, finisher...). */
+  sections?: CueSection[];
+  /** Seconds into the song of the freeze (the music stops dead) and of the hard cut to static, when measured. */
+  freezeTime?: number;
+  staticTime?: number;
   /** Where the cues came from, for the dev overlay and tests. */
   source: 'file' | 'bible' | 'density';
+}
+
+export interface CueSection {
+  name: string;
+  fromBar: number;
+  toBar: number;
 }
 
 /** Hype is on at `bar` (fractional bars allowed). */
@@ -148,6 +159,20 @@ export function parseCues(raw: unknown, chart: Pick<Chart, 'bpm' | 'offset'>): P
   }
   if (hype.length === 0) return null;
   hype.sort((a, b) => a.bar - b.bar);
+  const sections: CueSection[] = [];
+  if (Array.isArray(root.sections)) {
+    for (const item of root.sections) {
+      if (typeof item !== 'object' || item === null) continue;
+      const record = item as Record<string, unknown>;
+      const fromBar = num(record.fromBar) ?? num(record.from_bar) ?? num(record.bar);
+      const toBar = num(record.toBar) ?? num(record.to_bar) ?? fromBar;
+      if (fromBar === null || toBar === null) continue;
+      sections.push({ name: String(record.name ?? ''), fromBar, toBar });
+    }
+  }
+  const timeOf = (v: unknown): number | undefined => (typeof v === 'object' && v !== null ? (num((v as Record<string, unknown>).time) ?? undefined) : undefined);
+  const freezeTime = timeOf(root.freeze);
+  const staticTime = timeOf(root.static);
   // The music agent's marks for the battle's set pieces, when given ({bogStomp: {bar}}, {rivalFlash: {bar}}, {burst: {fromBar}}).
   const markBar = (v: unknown): number | undefined => {
     if (typeof v !== 'object' || v === null) return num(v) ?? undefined;
@@ -156,7 +181,16 @@ export function parseCues(raw: unknown, chart: Pick<Chart, 'bpm' | 'offset'>): P
   };
   const marks = { stomp: markBar(root.bogStomp ?? root.bog_stomp ?? root.stomp), flash: markBar(root.rivalFlash ?? root.rival_flash ?? root.flash), burst: markBar(root.burst) };
   const anyMark = marks.stomp !== undefined || marks.flash !== undefined || marks.burst !== undefined;
-  return { hype, freeze, bar1Beat, source: 'file', ...(anyMark ? { marks } : {}) };
+  return {
+    hype,
+    freeze,
+    bar1Beat,
+    source: 'file',
+    ...(anyMark ? { marks } : {}),
+    ...(sections.length ? { sections } : {}),
+    ...(freezeTime !== undefined ? { freezeTime } : {}),
+    ...(staticTime !== undefined && (freezeTime === undefined || staticTime > freezeTime) ? { staticTime } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -202,6 +236,53 @@ export function deriveHype(density: readonly number[], windows = 3): HypeCue[] {
       { bar: w.from + 1, on: true },
       { bar: w.to + 1, on: false },
     ]);
+}
+
+// ---------------------------------------------------------------------------
+// The bible's bars on the real song
+// ---------------------------------------------------------------------------
+
+/**
+ * Pairs of (bible bar, song bar) that the music fixes: bar 1, each hype switch
+ * (the bible's six against the song's six, in order) and the freeze. The
+ * script's other moments (callouts, the tug of war's swings) sit between
+ * them, so they land on the music's drops rather than on the bible's table.
+ * Identity when the cues are not the music agent's or do not pair up.
+ */
+export function barAnchors(cues: PrologueCues): [number, number][] {
+  const freezeBar = (cues.freeze.bar + (cues.freeze.beat - 1) / BEATS_PER_BAR);
+  const bibleFreeze = BIBLE_FREEZE.bar + (BIBLE_FREEZE.beat - 1) / BEATS_PER_BAR;
+  const same = cues.hype.length === BIBLE_HYPE.length && cues.hype.every((cue, i) => cue.on === BIBLE_HYPE[i].on);
+  if (cues.source !== 'file' || !same) return [[1, 1], [bibleFreeze, bibleFreeze]];
+  const pairs: [number, number][] = [[1, 1], ...BIBLE_HYPE.map((cue, i): [number, number] => [cue.bar, cues.hype[i].bar]), [bibleFreeze, freezeBar]];
+  // Keep only pairs that rise on both sides (a malformed file must not fold the script back on itself).
+  return pairs.filter((pair, i) => i === 0 || (pair[0] > pairs[i - 1][0] && pair[1] > pairs[i - 1][1]));
+}
+
+function piecewise(anchors: readonly [number, number][], x: number, from: 0 | 1): number {
+  const to = from === 0 ? 1 : 0;
+  if (anchors.length < 2) return x;
+  let i = 1;
+  while (i < anchors.length - 1 && x > anchors[i][from]) i++;
+  const a = anchors[i - 1];
+  const b = anchors[i];
+  const span = b[from] - a[from];
+  return span === 0 ? a[to] : a[to] + ((x - a[from]) * (b[to] - a[to])) / span;
+}
+
+/** The song's bar for a bible bar. */
+export function songBar(cues: PrologueCues, bibleBar: number): number {
+  return piecewise(barAnchors(cues), bibleBar, 0);
+}
+
+/** The bible's bar for a song bar (the tug of war's curve is written in bible bars). */
+export function bibleBarOf(cues: PrologueCues, bar: number): number {
+  return piecewise(barAnchors(cues), bar, 1);
+}
+
+/** Where a section of the song starts, if the cue file names it. */
+export function sectionStart(cues: PrologueCues, name: string): number | undefined {
+  return cues.sections?.find((section) => section.name === name)?.fromBar;
 }
 
 /** Stretch the bible's bars over a chart that has `bars` bars instead of 84. */
@@ -329,8 +410,10 @@ export const PROLOGUE_CALLOUTS: readonly BarCallout[] = [
 
 /** The callouts for a chart: the bible's bars, stretched over a stand-in chart's own length. */
 export function calloutsFor(cues: PrologueCues, bars: number): BarCallout[] {
-  if (cues.source !== 'density') return [...PROLOGUE_CALLOUTS];
-  return PROLOGUE_CALLOUTS.map((c) => ({ ...c, bar: Math.round(scaleBar(c.bar, bars)) }));
+  if (cues.source === 'density') return PROLOGUE_CALLOUTS.map((c) => ({ ...c, bar: Math.round(scaleBar(c.bar, bars)) }));
+  // On the real song each callout keeps its place against the music's drops, on a whole bar.
+  if (cues.source === 'file') return PROLOGUE_CALLOUTS.map((c) => ({ ...c, bar: Math.round(songBar(cues, c.bar)) }));
+  return [...PROLOGUE_CALLOUTS];
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +525,7 @@ const EVENT_ORDER: Record<PrologueEvent['kind'], number> = { hype: 0, stomp: 1, 
  * stretched over `bars`.
  */
 export function prologueEvents(cues: PrologueCues, bars: number = PROLOGUE_BARS): PrologueEvent[] {
-  const at = (bar: number) => (cues.source === 'density' ? scaleBar(bar, bars) : bar);
+  const at = (bar: number) => (cues.source === 'density' ? scaleBar(bar, bars) : songBar(cues, bar));
   const freezeBar = cues.freeze.bar + (cues.freeze.beat - 1) / BEATS_PER_BAR;
   const events: PrologueEvent[] = [
     ...cues.hype.map((cue) => ({ bar: cue.bar, kind: 'hype' as const, on: cue.on })),
@@ -450,8 +533,8 @@ export function prologueEvents(cues: PrologueCues, bars: number = PROLOGUE_BARS)
     { bar: cues.marks?.stomp ?? at(BOG_STOMP.bar), kind: 'stomp' },
     { bar: cues.marks?.flash ?? at(RIVAL_FLASH_BAR), kind: 'flash' },
     { bar: cues.marks?.burst ?? at(BURST_BARS[0]), kind: 'burst' },
-    { bar: at(45), kind: 'halfTime' },
-    { bar: at(81), kind: 'finisher' },
+    { bar: sectionStart(cues, 'break') ?? at(45), kind: 'halfTime' },
+    { bar: sectionStart(cues, 'finisher') ?? at(81), kind: 'finisher' },
     { bar: freezeBar, kind: 'freeze' },
   ];
   return events.filter((event) => event.kind === 'freeze' || event.bar < freezeBar).sort((a, b) => a.bar - b.bar || EVENT_ORDER[a.kind] - EVENT_ORDER[b.kind]);

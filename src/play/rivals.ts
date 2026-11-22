@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { COLORS, CSS, Tex } from '../core/config';
 import type { FruitId, RivalKind } from '../core/chart';
 import { CAST, type IconShape } from '../story/cast';
+import type { CharacterId } from '../story/types';
 import { characterSheet } from '../story/placeholders';
 
 export type Rival = Exclude<RivalKind, 'none'>;
@@ -88,7 +89,7 @@ const ICON_OUTLINE = '#14182e';
 const ICON_RIM = '#f4ffe6';
 
 /** How each rival looks. Built from the cast list, with the hand-drawn bar icons where there are any. */
-function profileFor(kind: Rival): RivalProfile {
+function profileFor(kind: Rival | CharacterId): RivalProfile {
   if (kind === 'dancer') {
     // The Coach only demonstrates: her turns keep the default rival colour, only her name tag is her own.
     const coach = CAST.coach;
@@ -108,16 +109,16 @@ function profileFor(kind: Rival): RivalProfile {
     trait: character.trait,
     // Raspberry keeps the original pink bar art and berry icon.
     bar: kind === 'raspberry' ? undefined : character.bar,
-    icon: kind === 'raspberry' ? undefined : (hand ?? drawnIcon(kind)),
+    icon: kind === 'raspberry' ? undefined : (hand ?? drawnIcon(kind as FruitId)),
     iconColors: hand ? undefined : { B: character.css, A: character.accent, H: '#fff6e0' },
   };
 }
 
-const PROFILES = new Map<Rival, RivalProfile>();
+const PROFILES = new Map<Rival | CharacterId, RivalProfile>();
 
-/** Charts without a rival character are Raspberry's. */
-export function rivalProfile(kind: RivalKind | undefined): RivalProfile {
-  const key: Rival = kind === undefined || kind === 'none' ? 'raspberry' : kind;
+/** Charts without a rival character are Raspberry's. A trainer (any cast id) works the same way. */
+export function rivalProfile(kind: RivalKind | CharacterId | undefined): RivalProfile {
+  const key: Rival | CharacterId = kind === undefined || kind === 'none' ? 'raspberry' : kind;
   let profile = PROFILES.get(key);
   if (!profile) {
     profile = profileFor(key);

@@ -119,7 +119,14 @@ describe('speakers, moods and voices', () => {
     for (const mood of ['bold', 'happy', 'angry', 'shocked', 'smug'] as const) expect(portraitFrame({ who: 'raspberry', mood })).toBe(3);
     expect(portraitFrame({ who: 'berry', mood: 'soft' }, true)).toBe(HOOD_DOWN_FRAME);
     expect(portraitFrame({ who: 'lime', mood: 'bold' })).toBe(-1);
-    expect(portraitArt({ who: 'strawberry', mood: 'neutral', role: 'The Conductor' })).toEqual({ key: 'legends_portraits', frame: 4 });
+    // The v2 speakers' busts are in portraits_v2 (archive/generated-sprites/story_v2/MANIFEST.md section 7).
+    expect(portraitArt({ who: 'strawberry', mood: 'neutral', role: 'The Conductor' })).toEqual({ key: 'portraits_v2', frame: 6 });
+    expect(portraitArt({ who: 'strawberry', mood: 'bold', role: 'The Conductor' })).toEqual({ key: 'portraits_v2', frame: 7 });
+    expect(portraitArt({ who: 'strawberry', mood: 'smug' })).toEqual({ key: 'portraits_v2', frame: 5 });
+    expect(portraitArt({ who: 'lime', mood: 'bold' })).toEqual({ key: 'portraits_v2', frame: 19 });
+    expect(portraitArt({ who: 'morello', mood: 'neutral' })).toEqual({ key: 'portraits_v2', frame: 24 });
+    // A resident has one bust for every mood.
+    expect(portraitArt({ who: 'mrsDamson', mood: 'bold' })).toEqual({ key: 'portraits_v2', frame: 43 });
   });
 
   it('names cast members in a role by the role, and residents by theirs', () => {
