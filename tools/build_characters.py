@@ -59,6 +59,12 @@ of her sheets was converted with an explicit pixel size so her head stays the
 same size from sheet to sheet:
   a 12.15  b 12.2  c 12.47  d 18.5  e 12.08  f 10.85  g 11.66  h 10.76  i 12.24
 
+For story v2 (November 2026) the Coach was redrawn as a Cranberry (red bob with
+a stalk, red jumper, flour-dusted apron, jeans, a black knee brace on her left
+knee) in the same poses: instructor_a..i now hold those cells, and the first
+design's sources are in archive/generated-sprites/story_v2/old/sources. See
+tools/story_v2_build.py and archive/generated-sprites/story_v2/MANIFEST.md.
+
 The Pear (pear.png) and the Lemon (lemon.png) are rivals made the same way,
 from a design sheet instead of an original sprite. Their palettes
 (palette_pear.png, palette_lemon.png, 14 colours each) were picked by hand from

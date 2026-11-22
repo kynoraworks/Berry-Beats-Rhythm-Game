@@ -9,3 +9,15 @@ batch 7: ycoach md me mf, lime_a peach_a cherries_a grapefruit_a lychee_a = 10.0
 batch 8: passionfruit_a mango_a fig_a quince_a portraits_legends portraits_conductor coach_ma coach_mb = 10.0 (total 60.0)
 batch 9: coach mc md me mf sitwalk walk, conductor_walk, res_1 = 10.0 (total 70.0)
 batch 10: res_2-5, lime b md me mf = 10.0 (total 80.0)
+batch 11: peach b md me mf, cherries b md me mf = 10.0 (total 90.0)
+batch 12: grapefruit b md me mf, lychee b md me mf = 10.0 (total 100.0)
+batch 13: portraits_t1 portraits_t2, passionfruit b md me mf, mango b md = 10.0 (total 110.0)
+batch 14: mango me mf, fig b md me mf, quince b md = 10.0 (total 120.0)
+batch 15: quince me mf, portraits_t3 r1 r2 r3, res_6, strawberry_ma = 10.0 (total 130.0)
+batch 16: strawberry mb mc = 2.5 (total 132.5)
+
+TOTAL (this agent): 106 generations x 1.25 = 132.5 credits (cap 200). No rerolls were needed;
+the rejected submissions (8-concurrent limit) were not charged. Every job is in jobs.txt.
+Balance after: 1238.70. The account is shared with the other art and music agents working at the
+same time, so the drop from 1809.87 (571 credits) is mostly theirs; the transactions list shows
+this agent's 1.25-credit charges batch by batch.

@@ -19,3 +19,7 @@ coach_oldmoves_e a44eecd3-7e5a-44b7-88b6-cbcaec02c099
 coach_oldmoves_f 61941f7e-1d40-40df-bb45-bd94df9d1f53
 portrait_style d135854d-3a2a-4d80-b944-d412cb1166d3
 coach_old_sit_walk 50c2355a-0e8a-4425-bd16-03f01ded5fce
+blackberry_ref e2635b38-d503-4bfa-a9aa-fd798e382980
+blueberry_ref da286ced-23bf-4d31-8a51-1f530acdeb89
+banana_ref 0ac611e7-3bea-451c-b97a-308273a7166c
+grape_ref dec633e8-1f68-4360-8ce3-0a2cfd4215a8

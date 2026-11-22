@@ -1,0 +1,144 @@
+{
+ "portraits_r1": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "d135854d-3a2a-4d80-b944-d412cb1166d3",
+    "role": "image_references"
+   },
+   {
+    "value": "67f9c6e1-9e9a-4ae6-9040-f82a69f524c3",
+    "role": "image_references"
+   },
+   {
+    "value": "e03b046c-c680-4ea3-996c-3914933e4352",
+    "role": "image_references"
+   },
+   {
+    "value": "fceb2f79-0fa6-4804-9f01-4deea9b74f1a",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), in EXACTLY the style, size and crop of the portrait busts in the FIRST reference image: head and shoulders, a big chibi head filling most of the cell, the bust standing on the bottom edge of its cell, facing the viewer, chunky 1-pixel dark navy outline, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges. Transparent background, no text, no grid lines. The characters are drawn EXACTLY like the sprites in the other references: Quince the butler (second reference), and from the third and fourth references Postmaster Gooseberry, Kumquat, Clerk Date and Officer Elderberry. In reading order: 1 Quince, neutral: very proper, tiny round glasses; 2 Quince, bold: one eyebrow raised, a gloved fist at his mouth (ahem); 3 Postmaster Gooseberry: fuzzy green hair, post office cap, friendly; 4 Kumquat: small round orange girl, cheerful; 5 Clerk Date: wrinkled, grey cardigan, stern; 6 Officer Elderberry: berry-cluster hair, peaked customs cap, stern."
+ },
+ "portraits_r2": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "d135854d-3a2a-4d80-b944-d412cb1166d3",
+    "role": "image_references"
+   },
+   {
+    "value": "fceb2f79-0fa6-4804-9f01-4deea9b74f1a",
+    "role": "image_references"
+   },
+   {
+    "value": "62350a8a-4fe3-45d2-9f98-e3e63a4d38b2",
+    "role": "image_references"
+   },
+   {
+    "value": "fdb68aa0-3148-42f2-a664-eeaaba9fcf68",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), in EXACTLY the style, size and crop of the portrait busts in the FIRST reference image: head and shoulders, a big chibi head filling most of the cell, the bust standing on the bottom edge of its cell, facing the viewer, chunky 1-pixel dark navy outline, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges. Transparent background, no text, no grid lines. The characters are drawn EXACTLY like the sprites in the other references (second, third and fourth): Seedless, Mrs. Damson, Little Currant, young Orange, Mr. Olive and Mrs. Satsuma. In reading order: 1 Seedless: one tiny green grape kid, teary eyes; 2 Mrs. Damson: elderly, grey-purple bun, glasses on a chain, kind; 3 Little Currant: red bobble hair, chalk on her nose, grinning; 4 Orange as a skinny teen MC: tall leafy orange quiff, giant headphones, mid-shout into a microphone; 5 Mr. Olive: old, bald with a little olive-green tuft, sleepy smile; 6 Mrs. Satsuma: orange hair in a hairnet, cheerful."
+ },
+ "portraits_r3": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "d135854d-3a2a-4d80-b944-d412cb1166d3",
+    "role": "image_references"
+   },
+   {
+    "value": "fdb68aa0-3148-42f2-a664-eeaaba9fcf68",
+    "role": "image_references"
+   },
+   {
+    "value": "cad722aa-8f75-4838-bfa7-0832e63fe7ce",
+    "role": "image_references"
+   },
+   {
+    "value": "5fb9be22-6c5e-4d8f-ac8a-c251d05fee96",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), in EXACTLY the style, size and crop of the portrait busts in the FIRST reference image: head and shoulders, a big chibi head filling most of the cell, the bust standing on the bottom edge of its cell, facing the viewer, chunky 1-pixel dark navy outline, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges. Transparent background, no text, no grid lines. The characters are drawn EXACTLY like the sprites in the other references: Kiwi and Ms. Clementine and Foreman Chestnut (second and third references), and the Conductor (fourth reference). In reading order: 1 Kiwi: fuzzy brown hair, chewing gum, bored; 2 Ms. Clementine: neat orange hair, a lanyard, brisk; 3 Foreman Chestnut: yellow hard hat, hi-vis vest, friendly; 4 the Conductor with her cap OFF, held against her chest: still in her dark-red railway coat with brass buttons, her bright pink hair flattened and messy from the cap, her eyes visible at last, tired and moved; 5 Lord Medlar: an old brown man who is a MEDLAR, a velvet jacket, a monocle, haughty; 6 Banana (the yellow banana boy of the cast) wearing a railway conductor's cap far too big for him, slipping over his eyes, grinning."
+ },
+ "res_6": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   },
+   {
+    "value": "0ac611e7-3bea-451c-b97a-308273a7166c",
+    "role": "image_references"
+   },
+   {
+    "value": "dec633e8-1f68-4360-8ce3-0a2cfd4215a8",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), in reading order. The FIRST reference image shows the cast's art style and size; the SECOND shows Banana; the THIRD shows Grape. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Dragon Fruit (the pink and green spiky-haired dragon fruit dancer of the first reference) seen from directly BEHIND: we see the back of the head and a very long flame-print scarf hanging down the back, standing still; 2 the same, seen from BEHIND, walking away, the long scarf whipping out to one side; 3 Banana, drawn EXACTLY like the second reference, wearing a dark red railway conductor's cap far too big for him, standing proudly; 4 the same Banana, the big cap slipping down over his eyes; 5 Grape, the bunch of grapes drawn EXACTLY like the third reference, with ONE tiny extra green grape perched on top of the bunch; 6 the same, the tiny grape waving."
+ },
+ "strawberry_ma": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "72dcb4cb-df63-4958-b7a8-71fcd78f9757",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The reference image shows the character's design. Draw Strawberry, the Summer Legend, drawn EXACTLY like the woman in the reference image (same face, long bright pink high ponytail, leafy green collar, strawberry-red bodice with tiny gold seed dots, white and rose stage jacket with a short white cape, white trousers, white gloves with tiny gold studs, red and white boots, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 winding up with a hair flick; 2 a sharp hip pop; 3 an accent: one arm thrown up, a wink; 4 settling, a hand on her hip; 5 wobbling, off balance; 6 catching herself with a smug smile."
+ },
+ "strawberry_mb": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "72dcb4cb-df63-4958-b7a8-71fcd78f9757",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The reference image shows the character's design. Draw Strawberry, the Summer Legend, drawn EXACTLY like the woman in the reference image (same face, long bright pink high ponytail, leafy green collar, strawberry-red bodice with tiny gold seed dots, white and rose stage jacket with a short white cape, white trousers, white gloves with tiny gold studs, red and white boots, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: her big showstopper: 1 a dramatic crouch; 2 springing up into a split leap; 3 landing into a spin; 4 spinning seen from behind, the cape flaring; 5 dropping to one knee, arms wide; 6 rising into a star pose, one arm high."
+ },
+ "strawberry_mc": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "72dcb4cb-df63-4958-b7a8-71fcd78f9757",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The reference image shows the character's design. Draw Strawberry, the Summer Legend, drawn EXACTLY like the woman in the reference image (same face, long bright pink high ponytail, leafy green collar, strawberry-red bodice with tiny gold seed dots, white and rose stage jacket with a short white cape, white trousers, white gloves with tiny gold studs, red and white boots, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a shuffle step to the LEFT; 2 a shuffle step to the RIGHT; 3 a small hop; 4 the peak of a jump, arms up in a V; 5 dropping low; 6 springing back up."
+ }
+}

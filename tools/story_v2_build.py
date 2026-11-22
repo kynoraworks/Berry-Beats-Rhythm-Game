@@ -48,10 +48,35 @@ COLS = 9
 
 
 def cells(tag: str, cols: int = 3) -> list[Image.Image]:
-    """The 64x64 cells of a pixelized sheet, in reading order."""
+    """The 64x64 cells of a pixelized sheet, in reading order (with the hand fixes in PATCHES)."""
     sheet = Image.open(CELLS / f"{tag}.png").convert("RGBA")
     rows = sheet.height // CELL
-    return [sheet.crop((c * CELL, r * CELL, (c + 1) * CELL, (r + 1) * CELL)) for r in range(rows) for c in range(sheet.width // CELL)]
+    out = [sheet.crop((c * CELL, r * CELL, (c + 1) * CELL, (r + 1) * CELL)) for r in range(rows) for c in range(sheet.width // CELL)]
+    for (patch_tag, k), fix in PATCHES.items():
+        if patch_tag == tag:
+            out[k] = fix(out[k])
+    return out
+
+
+def flat_afterimage(right_edge: int, colour: tuple[int, int, int]):
+    """Turn the speckled afterimage left of column `right_edge` into one flat silhouette colour."""
+    from scipy import ndimage
+
+    def fix(cell: Image.Image) -> Image.Image:
+        px = np.array(cell)
+        region = np.zeros(px.shape[:2], bool)
+        region[:, :right_edge] = True
+        mask = (px[..., 3] > 0) & region
+        mask = ndimage.binary_fill_holes(ndimage.binary_closing(mask, np.ones((3, 3)))) & region
+        mask = ndimage.binary_opening(mask, np.ones((2, 2)))
+        px[region] = 0
+        px[mask] = (*colour, 255)
+        return Image.fromarray(px)
+    return fix
+
+
+# Hand fixes on pixelized cells: Strawberry's spin afterimage came out as noise; make it a flat pink copy.
+PATCHES = {("strawberry_b", 7): flat_afterimage(20, (0xE3, 0x3E, 0x6D))}
 
 
 def blank(frames: int) -> Image.Image:
@@ -232,24 +257,34 @@ def build_portraits(picks: list[tuple[str, int]], out_name: str) -> None:
 # --- the characters ---------------------------------------------------------------
 
 def coach() -> None:
+    """Coach, present day (a Cranberry): replaces instructor*.png and coach_sit.png, same layouts."""
     base = build_berry("coach", "instructor")
     build_moves("coach", "instructor_moves", base, "berry", {})
     build_walk("coach_walk", "instructor_walk")
     build_sit("coach_sitwalk", (0, 1, 2), "coach_sit")
+    # 0 muffin tin, 1 counting beats, 2 laughing, 3 rubbing the knee brace, 4 pointing (bold), 5 waving goodbye
+    build_poses([("coach_d", 3), ("coach_d", 4), ("coach_d", 5), ("coach_sitwalk", 3), ("coach_sitwalk", 4), ("coach_sitwalk", 5)], "coach_poses")
 
 
 def coach_young() -> None:
-    base = build_berry("ycoach", "coach_young")
-    build_moves("ycoach", "coach_young_moves", base, "berry", {})
+    """Cranberry, the Bog Queen (Coach eight years ago): the player's dancer in the prologue.
+    Named `cranberry` because src/cutscene/actors.ts and storyFiles.ts already ask for that key."""
+    base = build_berry("ycoach", "cranberry")
+    build_moves("ycoach", "cranberry_moves", base, "berry", {35: 4})
+    # 0 knuckle touch (to the right), 1 wiping her brow, 2 challenger's stance
+    build_poses([("ycoach_d", 3), ("ycoach_d", 4), ("ycoach_d", 5)], "cranberry_poses")
 
 
 def strawberry() -> None:
     base = build_lite("strawberry", "strawberry", {8: 5, 13: 6})
     build_moves("strawberry", "strawberry_moves", base, "lite", {35: 3})
+    # 0 arms folded, 1 rising on the lift, 2 knuckle touch (to the left), 3 signature pose (facing right),
+    # 4 turning away from it, 5 the reach (to the left)
     build_poses([("strawberry_mg", k) for k in range(6)], "strawberry_poses")
 
 
 def conductor() -> None:
+    # 0 standing, hands behind her back; 1 punching a ticket; 2 humming, head tilted
     build_poses([("conductor_a", k) for k in range(3)], "conductor")
     build_walk("conductor_walk", "conductor_walk")
     build_sit("conductor_a", (3, 4, 5), "conductor_sit")
@@ -260,12 +295,93 @@ def kids() -> None:
         build_poses([(f"{kid}_a", k) for k in range(9)], name)
 
 
+def extras() -> None:
+    # Blueberry: 0-1 the July walk away (looking back), 2 the drop, 3 the slip, 4 falling backwards, 5 sitting, eyes wet
+    build_poses([("bluex_a", k) for k in range(6)], "blueberry_poses")
+    # Berry: 0 phone face down, 1-2 writing a postcard, 3 karaoke mic, 4-6 the catch dive, 7-8 the hood falling mid-spin
+    build_poses([("berryx_a", k) for k in range(9)], "berry_poses", lift={4: 6, 5: 12})
+
+
+TRAINER_LIFT = {"lite": {8: 5, 13: 6}, "ext": {35: 3}}
+TRAINERS = ["lime", "peach", "cherries", "grapefruit", "lychee", "passionfruit", "mango", "fig", "quince"]
+# Output names: the sprite keys src/story/cast.ts gives the trainers.
+TRAINER_FILE = {"passionfruit": "passion_fruit"}
+
+
+def trainers() -> None:
+    for name in TRAINERS:
+        if not all((CELLS / f"{name}_{t}.png").exists() for t in ("a", "b", "md", "me", "mf")):
+            print(f"skip {name}: not all sheets drawn")
+            continue
+        out = TRAINER_FILE.get(name, name)
+        base = build_lite(name, out, TRAINER_LIFT["lite"])
+        build_moves(name, f"{out}_moves", base, "lite", TRAINER_LIFT["ext"])
+
+
+# Residents: each res_N sheet holds three characters, two frames each. The model laid some sheets out
+# one character per column (idle on the top row, the second frame below: "col") and others in
+# reading-order pairs ("pairs"). Each character is written to its own 2-frame sheet (128x64), named
+# after the sprite key src/story/cast.ts gives it (npc_<MinorId>), or a plain name for the others.
+RESIDENTS = [
+    ("res_1", "col", ["npc_gooseberry", "npc_kumquat", "npc_clerkDate"]),
+    ("res_2", "pairs", ["npc_elderberry", "npc_seedless", "npc_mrsDamson"]),
+    ("res_3", "pairs", ["npc_currant", "orange_young", None]),  # its third figure (the scarf seen from the front) was redone in res_6
+    ("res_4", "col", ["npc_olive", "npc_satsuma", "npc_kiwi"]),
+    ("res_5", "pairs", ["npc_clementine", "gerald", "npc_chestnut"]),
+    ("res_6", "pairs", ["scarf_glimpse", "banana_cap", "grape_seedless"]),
+]
+
+
+def residents() -> None:
+    for tag, layout, names in RESIDENTS:
+        for k, name in enumerate(names):
+            if name:
+                picks = [(tag, k), (tag, k + 3)] if layout == "col" else [(tag, 2 * k), (tag, 2 * k + 1)]
+                build_poses(picks, name)
+
+
+# Portraits: portraits_v2.png, one row of 64x64 busts in this order (see MANIFEST.md).
+PORTRAITS = [
+    ("portraits_legends", range(6)),    # 0-1 Coach (Cranberry), 2-3 Bog Queen, 4-5 Strawberry
+    ("portraits_conductor", range(6)),  # 6-8 Conductor (neutral, bold, soft), 9 cap off, 10 Blueberry cracked, 11 Blueberry crying
+    ("portraits_kids", range(6)),       # 12-13 kid Berry, 14-15 kid Raspberry, 16-17 kid Blueberry
+    ("portraits_t1", range(6)),         # 18-19 Lime, 20-21 Peach, 22-23 Bing
+    ("portraits_t2", range(6)),         # 24-25 Morello, 26-27 Grapefruit, 28-29 Lychee
+    ("portraits_t3", range(6)),         # 30-31 Passion Fruit, 32-33 Mango, 34-35 Fig
+    ("portraits_r1", range(6)),         # 36-37 Quince, 38 Gooseberry, 39 Kumquat, 40 Clerk Date, 41 Officer Elderberry
+    ("portraits_r2", range(6)),         # 42 Seedless, 43 Mrs. Damson, 44 Little Currant, 45 young Orange, 46 Mr. Olive, 47 Mrs. Satsuma
+    ("portraits_r3", range(6)),         # 48 Kiwi, 49 Ms. Clementine, 50 Foreman Chestnut, 51 Conductor cap off (in her coat), 52 Lord Medlar, 53 Banana in the cap
+]
+
+
+def portraits() -> None:
+    picks = []
+    for tag, ks in PORTRAITS:
+        if not (CELLS / f"{tag}.png").exists():
+            print(f"portraits: {tag} missing, stopping the row there")
+            break
+        picks += [(tag, k) for k in ks]
+    build_portraits(picks, "portraits_v2")
+    # The keyed sheets the cutscenes already ask for (src/cutscene/speakers.ts, src/story/cast.ts):
+    # legends_portraits: 0-1 Cranberry (Bog Queen), 2-3 Strawberry, 4-5 the Conductor, 6 the Conductor
+    # soft, 7 the Conductor cap off (in her coat), 8 cap off (stage look, alternative).
+    build_portraits([("portraits_legends", k) for k in (2, 3, 4, 5)] + [("portraits_conductor", k) for k in (0, 1, 2)]
+                    + [("portraits_r3", 3), ("portraits_conductor", 3)], "legends_portraits")
+    # kids_portraits: 0-1 Kid Berry, 2-3 Kid Raspberry, 4-5 Kid Blueberry (neutral, bold).
+    build_portraits([("portraits_kids", k) for k in range(6)], "kids_portraits")
+    build_portraits([("portraits_r2", 3)], "orange_young_portrait")
+
+
 BUILDERS = {
     "coach": coach,
     "coach_young": coach_young,
     "strawberry": strawberry,
     "conductor": conductor,
     "kids": kids,
+    "extras": extras,
+    "trainers": trainers,
+    "residents": residents,
+    "portraits": portraits,
 }
 
 

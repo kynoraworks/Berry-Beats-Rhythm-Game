@@ -1,0 +1,183 @@
+{
+  "about": "Prologue battle cues for 'The Last Final' (public/assets/audio/story/prologue_last_final.mp3, chart public/charts/prologue.json). Bars are 4 beats, bar 1 starts at firstDownbeat (the chart's offset, beat 0). Seconds are in the decoded MP3. The music was measured, not assumed: hype switches follow the song's real drops, which differ from the bible's bar table (bible ON at 13, 29, 57 and OFF at 17, 41, 81; the music's drops are at 9, 34 and 51 and its breakdown at 43 to 48). Tempo is locked at 172.0 BPM for the whole song (librosa beat track and the charter's grid fit agree, drift under a few ms).",
+  "song": "prologue_last_final",
+  "chart": "prologue",
+  "bpm": 172.0,
+  "offset": 0.027,
+  "firstDownbeat": 0.027,
+  "bar1Beat": 0,
+  "bars": 84,
+  "sections": [
+    {
+      "name": "intro",
+      "fromBar": 1,
+      "toBar": 6,
+      "start": 0.027,
+      "end": 8.399,
+      "note": "Stomp-and-clap intro: drums and sub bass only, no melody (the 'other' stem is silent)."
+    },
+    {
+      "name": "build",
+      "fromBar": 7,
+      "toBar": 8,
+      "start": 8.399,
+      "end": 11.19,
+      "note": "Pre-drop: the lead riff enters in bar 7, the bass drops out in bar 8, a fill into drop 1."
+    },
+    {
+      "name": "drop1",
+      "fromBar": 9,
+      "toBar": 16,
+      "start": 11.19,
+      "end": 22.353,
+      "note": "Drop 1: the full groove and hook come in (+4 dB in the mids). Bar 16 is a fill."
+    },
+    {
+      "name": "groove",
+      "fromBar": 17,
+      "toBar": 32,
+      "start": 22.353,
+      "end": 44.678,
+      "note": "Main groove, steady; accents (fills) on bars 24 and 32."
+    },
+    {
+      "name": "stop",
+      "fromBar": 33,
+      "toBar": 33,
+      "start": 44.678,
+      "end": 46.074,
+      "note": "A one-bar stop: the drums drop out, a sub boom rings. Bar 34 slams back in."
+    },
+    {
+      "name": "drop1b",
+      "fromBar": 34,
+      "toBar": 42,
+      "start": 46.074,
+      "end": 58.632,
+      "note": "Back in after the stop, hi-hats up: the Bog Stomp moment."
+    },
+    {
+      "name": "break",
+      "fromBar": 43,
+      "toBar": 48,
+      "start": 58.632,
+      "end": 67.004,
+      "note": "Breakdown: beat 1 of bar 43 is the last hit, a held pad decays to near silence by bar 48."
+    },
+    {
+      "name": "build2",
+      "fromBar": 49,
+      "toBar": 50,
+      "start": 67.004,
+      "end": 69.794,
+      "note": "Riser from silence (bar 49), the beat builds back in (bar 50)."
+    },
+    {
+      "name": "drop2",
+      "fromBar": 51,
+      "toBar": 58,
+      "start": 69.794,
+      "end": 80.957,
+      "note": "Drop 2: everything back at full stack."
+    },
+    {
+      "name": "final",
+      "fromBar": 59,
+      "toBar": 80,
+      "start": 80.957,
+      "end": 111.655,
+      "note": "The biggest section: in 59 to 65 the lead (the hook) is loudest against the mix (other stem 3 to 4 dB above anywhere else), then everything at once to bar 80."
+    },
+    {
+      "name": "finisher",
+      "fromBar": 81,
+      "toBar": 83,
+      "start": 111.655,
+      "end": 115.841,
+      "note": "Three single hits, one per bar (step, spin, drop), each the song's final hit and its ring."
+    },
+    {
+      "name": "cut",
+      "fromBar": 84,
+      "toBar": 84,
+      "start": 115.841,
+      "end": 117.236,
+      "note": "The hook's opening (from bar 59) starts on beat 1 and stops dead on beat 3 and a half; a frozen sustained note rings to the bar 85 downbeat; then digital silence (static)."
+    }
+  ],
+  "hype": [
+    {
+      "bar": 9,
+      "on": true,
+      "time": 11.19
+    },
+    {
+      "bar": 17,
+      "on": false,
+      "time": 22.353
+    },
+    {
+      "bar": 34,
+      "on": true,
+      "time": 46.074
+    },
+    {
+      "bar": 43,
+      "on": false,
+      "time": 58.632
+    },
+    {
+      "bar": 51,
+      "on": true,
+      "time": 69.794
+    },
+    {
+      "bar": 81,
+      "on": false,
+      "time": 111.655
+    }
+  ],
+  "bogStomp": {
+    "bar": 34,
+    "time": 46.074,
+    "note": "Suggested: the slam back in after the one-bar stop (bible bar 29 has no musical event)."
+  },
+  "rivalFlash": {
+    "bar": 26,
+    "time": 34.911
+  },
+  "burst": {
+    "fromBar": 49,
+    "toBar": 50,
+    "start": 67.004,
+    "end": 69.794,
+    "note": "The riser into drop 2, charted as sixteenths."
+  },
+  "finisherHits": [
+    {
+      "bar": 81,
+      "time": 111.655
+    },
+    {
+      "bar": 82,
+      "time": 113.05
+    },
+    {
+      "bar": 83,
+      "time": 114.446
+    }
+  ],
+  "freeze": {
+    "bar": 84,
+    "beatInBar": 3.5,
+    "time": 116.713,
+    "note": "The music stops dead here (freeze frame); a held frozen note rings until static."
+  },
+  "static": {
+    "bar": 85,
+    "beatInBar": 1,
+    "time": 117.236,
+    "note": "Hard cut to static: play sting_static here. The file is silent from here."
+  },
+  "duration": null
+}

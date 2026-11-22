@@ -26,6 +26,9 @@ thirty 64x64 cells in a row, each bust centred and standing on the bottom edge.
  28 station NPC (a kiwi commuter), neutral only
  29 Blackberry, hood down and eyes showing (bold), for the last scene only
 
+Frames 4-5 (Coach) were replaced for story v2 by her Cranberry redesign, copied
+from frames 0-1 of public/assets/img/portraits_v2.png (tools/story_v2_build.py);
+the previous pair is in archive/generated-sprites/story_v2/old/portraits.png.
 Frames 0-3 (Blackberry and Raspberry) and 29 were regenerated in November
 2026 for their redesign (Berry with his hood half up, Raspberry in sporty
 streetwear), from their design sheets and frames 4-9 and 26-27 as a style

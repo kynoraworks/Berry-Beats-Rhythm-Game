@@ -162,12 +162,16 @@ def to_level(x: np.ndarray, target: float, peak_db: float = TRUE_PEAK) -> np.nda
 
 def level_encode(x: np.ndarray, target: float, dest: Path, peak_db: float = TRUE_PEAK) -> np.ndarray:
     """to_level, encode, and once more if the MP3 came out off target (LAME loses about 0.4 dB)."""
-    y = to_level(x, target, peak_db)
-    encode(y, dest)
-    got, _ = loudness(dest)
-    if abs(got - target) > 0.05:
-        y = to_level(x, target + (target - got), peak_db)
+    aim, ceiling = target, peak_db
+    for _ in range(3):
+        y = to_level(x, aim, ceiling)
         encode(y, dest)
+        got, tp = loudness(dest)
+        if abs(got - target) <= 0.05 and tp <= peak_db:
+            break
+        aim += target - got
+        if tp > peak_db:
+            ceiling -= tp - peak_db + 0.2  # inter-sample peaks of the MP3 over the limit
     return y
 
 
@@ -316,15 +320,15 @@ def choose_loop(x: np.ndarray, bpm_guess: float) -> dict:
     for s in range(0, min(4, nbars)):
         if levels[s] < med - 6:
             continue  # a quiet intro bar is no loop start
-        for e in range(s + 8, last_ok + 1):
+        for e in range(s + 8, last_ok + 2):
             # The loop ends at the downbeat of bar e (its first bar after the loop); the
             # crossfade needs a little audio after it.
             end_t = starts[e] if e < nbars else first + e * bar
-            if end_t + XFADE + 0.05 > duration:
+            if end_t + XFADE + 0.15 > duration:
                 continue
             sim = float(feats[e] @ feats[s]) if e < nbars else 0.0
             sim_before = float(feats[e - 1] @ feats[s - 1]) if s > 0 else sim
-            score = sim + 0.5 * sim_before + (0.04 if (e - s) % 4 == 0 else 0) + (0.02 if (e - s) % 8 == 0 else 0) + 0.012 * (e - s) - 0.03 * s
+            score = sim + 0.5 * sim_before + (0.04 if (e - s) % 4 == 0 else 0) + (0.02 if (e - s) % 8 == 0 else 0) + 0.015 * (e - s) - 0.03 * s
             if best is None or score > best[0]:
                 best = (score, s, e, sim)
     _, s, e, sim = best
@@ -393,17 +397,18 @@ def seam_test(dec: np.ndarray, ls: int, le: int, period: float) -> dict:
         jump = float(d[s - 1])
         around = np.concatenate([d[s - SR // 4 : s - 2], d[s + 1 : s + SR // 4]])
         clicks.append(round(jump / (np.percentile(around, 99.9) + 1e-9), 2))
-    # High-frequency burst at the seam: energy above 6 kHz in 3 ms against the 200 ms around it.
+    # A click is a broadband spike right at the junction: the largest high-passed (above
+    # 6 kHz) sample within 0.5 ms of the seam over the 99th percentile within 50 ms around it
+    # (the junction itself left out). Under about 1 means no spike stands out.
     from scipy import signal
 
     sos = signal.butter(4, 6000, btype="high", fs=SR, output="sos")
-    hf = signal.sosfilt(sos, y.mean(axis=1)) ** 2
+    hf = np.abs(signal.sosfiltfilt(sos, y.mean(axis=1)))
+    near, far = int(0.0005 * SR), int(0.05 * SR)
     bursts = []
     for s in seams:
-        w = int(0.003 * SR)
-        here = hf[s - w : s + w].mean()
-        ref = np.percentile([hf[i : i + 2 * w].mean() for i in range(s - SR // 5, s + SR // 5, w)], 90)
-        bursts.append(round(float(here / (ref + 1e-12)), 2))
+        around = np.concatenate([hf[s - far : s - near], hf[s + near : s + far]])
+        bursts.append(round(float(hf[s - near : s + near].max() / (np.percentile(around, 99) + 1e-12)), 2))
     env, fps = onset_env(y)
     hitch = []
     for s in seams:
@@ -411,7 +416,7 @@ def seam_test(dec: np.ndarray, ls: int, le: int, period: float) -> dict:
         before = local_phase(env, fps, period / 4, t - 6.0, 6.0)
         after = local_phase(env, fps, period / 4, t + 6.0, 6.0)
         hitch.append(round(wrap(after - before, period / 4) * 1000, 1))
-    return {"click_ratio": clicks, "hf_burst_ratio": bursts, "phase_shift_ms": hitch}
+    return {"click_ratio": clicks, "hf_spike_ratio": bursts, "phase_shift_ms": hitch}
 
 
 # ---------------------------------------------------------------------------
@@ -419,7 +424,9 @@ def seam_test(dec: np.ndarray, ls: int, le: int, period: float) -> dict:
 # ---------------------------------------------------------------------------
 
 PROLOGUE_BPM = 172
-PROLOGUE_FIRST_BEAT = 0.058  # fitted on the raw take (librosa beat track and onset phase)
+# Bar 1's downbeat in seconds, as tools/analyze_audio.py measures it (its grid and the first
+# sound agree within 1 ms; librosa's onset times run about 30 ms late on this song).
+PROLOGUE_FIRST_BEAT = 0.027
 
 
 def prologue_edit(x: np.ndarray, first: float) -> tuple[np.ndarray, dict]:
@@ -444,12 +451,17 @@ def prologue_edit(x: np.ndarray, first: float) -> tuple[np.ndarray, dict]:
     a = s(t(84)) - 64
     y[a : a + len(src)] += src
     cut = s(t(84, 3.5))
-    # The freeze: the spectrum of the last 46 ms before the cut, held (random phases) to the
-    # bar 85 downbeat, a little quieter and fading, then nothing.
+    # The freeze: one spectrum held (random phases) from the cut to the bar 85 downbeat, a
+    # little quieter and fading, then nothing.
     end = s(t(85))
     n_fft = 2048
     win = np.hanning(n_fft)
-    grain = y[cut - n_fft : cut]
+    # The grain: the loudest 46 ms of the beat before the cut, so the held note is the last
+    # note that rang, not the quiet gap before beat 3 and a half.
+    hop_g = n_fft // 8
+    cands = range(cut - s(beat), cut - n_fft + 1, hop_g)
+    g0 = max(cands, key=lambda i: float(np.mean(y[i : i + n_fft] ** 2)))
+    grain = y[g0 : g0 + n_fft]
     mag = np.abs(np.fft.rfft(grain * win[:, None], axis=0))
     hop = n_fft // 4
     length = end - cut + n_fft
@@ -459,8 +471,8 @@ def prologue_edit(x: np.ndarray, first: float) -> tuple[np.ndarray, dict]:
         ph = np.exp(2j * np.pi * rng.random(mag.shape))
         frz[i : i + n_fft] += np.fft.irfft(mag * ph, n=n_fft, axis=0) * win[:, None]
     frz = frz[n_fft // 2 : n_fft // 2 + (end - cut)]
-    frz *= (np.sqrt(np.mean(grain**2)) / (np.sqrt(np.mean(frz**2)) + 1e-12)) * 0.6
-    env = np.linspace(1.0, 0.5, len(frz))
+    frz *= (np.sqrt(np.mean(grain**2)) / (np.sqrt(np.mean(frz**2)) + 1e-12)) * 0.8
+    env = np.linspace(1.0, 0.6, len(frz))
     env[-int(0.004 * SR) :] *= np.linspace(1, 0, int(0.004 * SR))
     frz *= env[:, None]
     stop = int(0.003 * SR)
@@ -569,7 +581,7 @@ def ship_music(key: str, loops: dict) -> dict:
 
 
 def main() -> int:
-    if len(sys.argv) < 2 or sys.argv[1] not in ("ship", "montage", "cues"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("ship", "montage", "cues", "test"):
         print(__doc__)
         return 2
     cmd, keys = sys.argv[1], sys.argv[2:]
@@ -577,6 +589,8 @@ def main() -> int:
         return montage()
     if cmd == "cues":
         return write_cues()
+    if cmd == "test":
+        return retest_loops()
     keys = keys or [*MUSIC, *[k for k in STINGS if (RAW / f"{k}.mp3").exists()]]
     loops_path = ARCHIVE / "loops.json"
     loops = json.loads(loops_path.read_text()).get("loops", {}) if loops_path.exists() else {}
@@ -588,16 +602,30 @@ def main() -> int:
         info = ship_sting(key) if key in STINGS else ship_music(key, loops)
         report.append(info)
         print(json.dumps(info))
+    if not any(MUSIC.get(k, ("",))[0] == "loop" for k in keys):
+        return 0
     loops_path.write_text(json.dumps({
         "about": "Loop points of the story v2 town and train loops (seconds and samples at 44.1 kHz, in the decoded MP3). "
         "Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loopStart/loopEnd, or Phaser "
         "sound markers. The file ends exactly at loopEnd, so where loopStart is 0 a plain whole-file loop is seamless too "
         "(when the decoder honours the MP3's gapless header, as Chrome and Firefox do). seam: three loops rendered back to "
         "back from the decoded MP3; click_ratio is the sample jump at each seam over the 99.9th percentile of jumps within "
-        "250 ms (under 1 means no click), hf_burst_ratio the energy above 6 kHz in 6 ms at the seam over the 90th percentile "
-        "around it, phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",
+        "250 ms (under 1 means no click), hf_spike_ratio the largest high-passed (above 6 kHz) sample within 0.5 ms of the seam "
+        "over the 99th percentile within 50 ms around it (about 1 or under means no spike), phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",
         "loops": dict(sorted(loops.items())),
     }, indent=2) + "\n")
+    return 0
+
+
+def retest_loops() -> int:
+    """Run the seam test again on the shipped loops (three loops of the decoded MP3)."""
+    path = ARCHIVE / "loops.json"
+    data = json.loads(path.read_text())
+    for key, lp in data["loops"].items():
+        dec = decode(OUT_MUSIC / f"{key}.mp3")
+        lp["seam"] = seam_test(dec, lp["loopStartSample"], lp["loopEndSample"], 60 / lp["bpm"])
+        print(key, json.dumps(lp["seam"]))
+    path.write_text(json.dumps(data, indent=2) + "\n")
     return 0
 
 

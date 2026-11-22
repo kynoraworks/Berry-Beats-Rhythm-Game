@@ -220,3 +220,35 @@ R3["portraits_t3"] = portraits("The characters are drawn EXACTLY like the sprite
     "5 Fig, neutral: a kind old face, flat cap; 6 Fig, bold: a wink and a grin")
 (HERE / "requests3.json").write_text(json.dumps(R3, indent=1))
 print(len(R3), "requests in wave 3")
+
+# ---- wave 4: residents' portraits and a few extras (requests4.json) ----
+R4 = {}
+R4["portraits_r1"] = portraits("The characters are drawn EXACTLY like the sprites in the other references: Quince the butler (second reference), and from the third and fourth references Postmaster Gooseberry, Kumquat, Clerk Date and Officer Elderberry.",
+    ["quince_a", "res_1", "res_2"],
+    "1 Quince, neutral: very proper, tiny round glasses; 2 Quince, bold: one eyebrow raised, a gloved fist at his mouth (ahem); 3 Postmaster Gooseberry: fuzzy green hair, post office cap, friendly; "
+    "4 Kumquat: small round orange girl, cheerful; 5 Clerk Date: wrinkled, grey cardigan, stern; 6 Officer Elderberry: berry-cluster hair, peaked customs cap, stern")
+R4["portraits_r2"] = portraits("The characters are drawn EXACTLY like the sprites in the other references (second, third and fourth): Seedless, Mrs. Damson, Little Currant, young Orange, Mr. Olive and Mrs. Satsuma.",
+    ["res_2", "res_3", "res_4"],
+    "1 Seedless: one tiny green grape kid, teary eyes; 2 Mrs. Damson: elderly, grey-purple bun, glasses on a chain, kind; 3 Little Currant: red bobble hair, chalk on her nose, grinning; "
+    "4 Orange as a skinny teen MC: tall leafy orange quiff, giant headphones, mid-shout into a microphone; 5 Mr. Olive: old, bald with a little olive-green tuft, sleepy smile; 6 Mrs. Satsuma: orange hair in a hairnet, cheerful")
+R4["portraits_r3"] = portraits("The characters are drawn EXACTLY like the sprites in the other references: Kiwi and Ms. Clementine and Foreman Chestnut (second and third references), and the Conductor (fourth reference).",
+    ["res_4", "res_5", "conductor_a"],
+    "1 Kiwi: fuzzy brown hair, chewing gum, bored; 2 Ms. Clementine: neat orange hair, a lanyard, brisk; 3 Foreman Chestnut: yellow hard hat, hi-vis vest, friendly; "
+    "4 the Conductor with her cap OFF, held against her chest: still in her dark-red railway coat with brass buttons, her bright pink hair flattened and messy from the cap, her eyes visible at last, tired and moved; "
+    "5 Lord Medlar: an old brown man who is a MEDLAR, a velvet jacket, a monocle, haughty; 6 Banana (the yellow banana boy of the cast) wearing a railway conductor's cap far too big for him, slipping over his eyes, grinning")
+R4["res_6"] = params(
+    "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), in reading order. The FIRST reference image shows the cast's art style and size; the SECOND shows Banana; the THIRD shows Grape. "
+    f"{STYLE} Poses in reading order: 1 Dragon Fruit (the pink and green spiky-haired dragon fruit dancer of the first reference) seen from directly BEHIND: we see the back of the head and a very long flame-print scarf hanging down the back, standing still; "
+    "2 the same, seen from BEHIND, walking away, the long scarf whipping out to one side; 3 Banana, drawn EXACTLY like the second reference, wearing a dark red railway conductor's cap far too big for him, standing proudly; "
+    "4 the same Banana, the big cap slipping down over his eyes; 5 Grape, the bunch of grapes drawn EXACTLY like the third reference, with ONE tiny extra green grape perched on top of the bunch; 6 the same, the tiny grape waving.",
+    ["style_lineup", "banana_ref", "grape_ref"])
+STRAW = ("Strawberry, the Summer Legend, drawn EXACTLY like the woman in the reference image (same face, long bright pink high ponytail, leafy green collar, strawberry-red bodice with tiny gold seed dots, "
+         "white and rose stage jacket with a short white cape, white trousers, white gloves with tiny gold studs, red and white boots, the same palette, proportions and size)")
+for k, poses in {
+    "a": "1 winding up with a hair flick; 2 a sharp hip pop; 3 an accent: one arm thrown up, a wink; 4 settling, a hand on her hip; 5 wobbling, off balance; 6 catching herself with a smug smile",
+    "b": "her big showstopper: 1 a dramatic crouch; 2 springing up into a split leap; 3 landing into a spin; 4 spinning seen from behind, the cape flaring; 5 dropping to one knee, arms wide; 6 rising into a star pose, one arm high",
+    "c": "1 a shuffle step to the LEFT; 2 a shuffle step to the RIGHT; 3 a small hop; 4 the peak of a jump, arms up in a V; 5 dropping low; 6 springing back up",
+}.items():
+    R4[f"strawberry_m{k}"] = sheet6(STRAW, ["strawberry_a"], poses, "The reference image shows the character's design.")
+(HERE / "requests4.json").write_text(json.dumps(R4, indent=1))
+print(len(R4), "requests in wave 4")
