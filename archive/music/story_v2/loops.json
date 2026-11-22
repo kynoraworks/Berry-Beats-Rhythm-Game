@@ -1,5 +1,5 @@
 {
-  "about": "Loop points of the story v2 town and train loops (seconds and samples at 44.1 kHz, in the decoded MP3). Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loopStart/loopEnd, or Phaser sound markers. The file ends exactly at loopEnd, so where loopStart is 0 a plain whole-file loop is seamless too (when the decoder honours the MP3's gapless header, as Chrome and Firefox do). seam: three loops rendered back to back from the decoded MP3; click_ratio is the sample jump at each seam over the 99.9th percentile of jumps within 250 ms (under 1 means no click), hf_burst_ratio the energy above 6 kHz in the 6 ms around the seam over the same 6 ms of the song's own continuation through loopEnd (about 1 means the seam sounds like the song carrying on), phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",
+  "about": "Loop points of the story v2 town and train loops (seconds and samples at 44.1 kHz, in the decoded MP3). Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loop with loopStart/loopEnd. The file runs 0.5 s past loopEnd (the song's own continuation, faded out) so the MP3's end-of-file edge never touches the seam: use the loop points, not a whole-file loop. Times assume the decoder honours the MP3's gapless header (Chrome and Firefox do; decodeLag 0 is ffmpeg's decode against the pre-encode audio). seam: three loops rendered back to back from the decoded MP3; click_ratio is the sample jump at each seam over the 99.9th percentile of jumps within 250 ms (under 1 means no click), hf_spike_ratio the largest high-passed (above 6 kHz) sample within 0.5 ms of the seam over the 99th percentile within 50 ms around it (about 1 or under means no spike), phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",
   "loops": {
     "town_berry_town": {
       "file": "assets/audio/story/town_berry_town.mp3",
@@ -10,22 +10,23 @@
       "loopEnd": 68.5065,
       "loopStartSample": 123136,
       "loopEndSample": 3021136,
-      "fileSamples": 3021136,
+      "fileSamples": 3043186,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.2,
-          0.2
+          0.05,
+          0.05
         ],
         "hf_spike_ratio": [
-          1.19,
-          1.19
+          1.32,
+          1.32
         ],
         "phase_shift_ms": [
           -1.7,
           -1.6
         ]
       },
+      "seam_offset_ms": 0.0,
       "drift_correction_ms": 0.0,
       "self_match": 0.033,
       "continuation_offset_ms": 2.9,
@@ -36,26 +37,27 @@
       "bpm": 110.0,
       "bpm_fit": 109.996,
       "bars": 16,
-      "loopStart": 0.0277,
-      "loopEnd": 34.936,
-      "loopStartSample": 1220,
-      "loopEndSample": 1540676,
-      "fileSamples": 1540676,
+      "loopStart": 0.2493,
+      "loopEnd": 35.1576,
+      "loopStartSample": 10992,
+      "loopEndSample": 1550448,
+      "fileSamples": 1572527,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.28,
-          0.28
+          0.0,
+          0.0
         ],
         "hf_spike_ratio": [
-          3.1,
-          3.1
+          0.23,
+          0.23
         ],
         "phase_shift_ms": [
-          -0.0,
-          -0.0
+          -0.2,
+          -0.2
         ]
       },
+      "seam_offset_ms": 221.6,
       "drift_correction_ms": -0.8,
       "self_match": 0.776,
       "continuation_offset_ms": 0.0,
@@ -66,26 +68,27 @@
       "bpm": 90.0,
       "bpm_fit": 89.97,
       "bars": 20,
-      "loopStart": 2.6602,
-      "loopEnd": 55.9935,
-      "loopStartSample": 117314,
-      "loopEndSample": 2469314,
-      "fileSamples": 2469314,
+      "loopStart": 2.681,
+      "loopEnd": 56.0144,
+      "loopStartSample": 118233,
+      "loopEndSample": 2470233,
+      "fileSamples": 2492283,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.05,
-          0.05
+          0.14,
+          0.14
         ],
         "hf_spike_ratio": [
-          0.79,
-          0.79
+          0.26,
+          0.26
         ],
         "phase_shift_ms": [
           0.2,
           0.2
         ]
       },
+      "seam_offset_ms": 20.8,
       "drift_correction_ms": 0.0,
       "self_match": 0.676,
       "continuation_offset_ms": 0.0,
@@ -96,26 +99,27 @@
       "bpm": 100.0,
       "bpm_fit": 100.002,
       "bars": 24,
-      "loopStart": 2.2387,
-      "loopEnd": 59.8416,
-      "loopStartSample": 98728,
-      "loopEndSample": 2639016,
-      "fileSamples": 2639016,
+      "loopStart": 2.7075,
+      "loopEnd": 60.3104,
+      "loopStartSample": 119400,
+      "loopEndSample": 2659688,
+      "fileSamples": 2681738,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.2,
-          0.2
+          0.29,
+          0.29
         ],
         "hf_spike_ratio": [
-          12.72,
-          12.72
+          0.83,
+          0.83
         ],
         "phase_shift_ms": [
-          2.2,
-          2.2
+          2.3,
+          2.3
         ]
       },
+      "seam_offset_ms": 468.8,
       "drift_correction_ms": 2.9,
       "self_match": 0.413,
       "continuation_offset_ms": 0.0,
@@ -126,26 +130,27 @@
       "bpm": 80.0,
       "bpm_fit": 80.006,
       "bars": 16,
-      "loopStart": 0.0135,
-      "loopEnd": 48.015,
-      "loopStartSample": 596,
-      "loopEndSample": 2117460,
-      "fileSamples": 2117460,
+      "loopStart": 0.7401,
+      "loopEnd": 48.7415,
+      "loopStartSample": 32637,
+      "loopEndSample": 2149501,
+      "fileSamples": 2171567,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.16,
-          0.16
+          0.13,
+          0.13
         ],
         "hf_spike_ratio": [
-          0.22,
-          0.22
+          0.15,
+          0.15
         ],
         "phase_shift_ms": [
-          0.8,
-          0.8
+          0.5,
+          0.5
         ]
       },
+      "seam_offset_ms": 726.6,
       "drift_correction_ms": 1.5,
       "self_match": 0.571,
       "continuation_offset_ms": 0.0,
@@ -156,26 +161,27 @@
       "bpm": 124.0,
       "bpm_fit": 123.99,
       "bars": 28,
-      "loopStart": 1.9027,
-      "loopEnd": 56.101,
-      "loopStartSample": 83909,
-      "loopEndSample": 2474053,
-      "fileSamples": 2474053,
+      "loopStart": 1.9178,
+      "loopEnd": 56.1161,
+      "loopStartSample": 84576,
+      "loopEndSample": 2474720,
+      "fileSamples": 2496770,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.18,
-          0.18
+          0.08,
+          0.08
         ],
         "hf_spike_ratio": [
-          1.01,
-          1.01
+          0.5,
+          0.5
         ],
         "phase_shift_ms": [
           0.4,
           0.4
         ]
       },
+      "seam_offset_ms": 15.1,
       "drift_correction_ms": 4.7,
       "self_match": 0.639,
       "continuation_offset_ms": -2.9,
@@ -186,26 +192,27 @@
       "bpm": 100.0,
       "bpm_fit": 100.022,
       "bars": 23,
-      "loopStart": 0.0006,
-      "loopEnd": 55.2003,
-      "loopStartSample": 28,
-      "loopEndSample": 2434332,
-      "fileSamples": 2434332,
+      "loopStart": 0.4881,
+      "loopEnd": 55.6878,
+      "loopStartSample": 21526,
+      "loopEndSample": 2455830,
+      "fileSamples": 2477880,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
+          0.03,
+          0.03
+        ],
+        "hf_spike_ratio": [
           0.06,
           0.06
         ],
-        "hf_spike_ratio": [
-          0.07,
-          0.07
-        ],
         "phase_shift_ms": [
-          0.0,
-          0.0
+          0.1,
+          0.1
         ]
       },
+      "seam_offset_ms": 487.5,
       "drift_correction_ms": -0.4,
       "self_match": 0.614,
       "continuation_offset_ms": 0.0,
@@ -216,26 +223,27 @@
       "bpm": 92.0,
       "bpm_fit": 91.996,
       "bars": 16,
-      "loopStart": 10.3704,
-      "loopEnd": 52.1112,
-      "loopStartSample": 457336,
-      "loopEndSample": 2298104,
-      "fileSamples": 2298104,
+      "loopStart": 10.4316,
+      "loopEnd": 52.1723,
+      "loopStartSample": 460032,
+      "loopEndSample": 2300800,
+      "fileSamples": 2322850,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.01,
-          0.01
+          0.03,
+          0.03
         ],
         "hf_spike_ratio": [
-          1.0,
-          1.0
+          0.03,
+          0.03
         ],
         "phase_shift_ms": [
-          1.1,
-          1.1
+          1.5,
+          1.5
         ]
       },
+      "seam_offset_ms": 61.1,
       "drift_correction_ms": 1.6,
       "self_match": 0.639,
       "continuation_offset_ms": -2.9,
@@ -250,22 +258,23 @@
       "loopEnd": 63.1878,
       "loopStartSample": 1430,
       "loopEndSample": 2786582,
-      "fileSamples": 2786582,
+      "fileSamples": 2808632,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.34,
-          0.34
+          0.27,
+          0.27
         ],
         "hf_spike_ratio": [
-          0.82,
-          0.82
+          0.76,
+          0.76
         ],
         "phase_shift_ms": [
-          4.7,
-          4.7
+          4.8,
+          4.8
         ]
       },
+      "seam_offset_ms": 0.0,
       "drift_correction_ms": -2.5,
       "self_match": 0.303,
       "continuation_offset_ms": 5.8,
@@ -276,26 +285,27 @@
       "bpm": 76.0,
       "bpm_fit": 75.998,
       "bars": 18,
-      "loopStart": 0.0066,
-      "loopEnd": 56.849,
-      "loopStartSample": 290,
-      "loopEndSample": 2507042,
-      "fileSamples": 2507042,
+      "loopStart": 0.7714,
+      "loopEnd": 57.6138,
+      "loopStartSample": 34018,
+      "loopEndSample": 2540770,
+      "fileSamples": 2562820,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.36,
-          0.36
+          0.14,
+          0.14
         ],
         "hf_spike_ratio": [
-          0.88,
-          0.88
+          0.32,
+          0.32
         ],
         "phase_shift_ms": [
-          -3.1,
-          -3.1
+          -2.5,
+          -2.5
         ]
       },
+      "seam_offset_ms": 764.8,
       "drift_correction_ms": 0.3,
       "self_match": 0.662,
       "continuation_offset_ms": 0.0,
@@ -306,26 +316,27 @@
       "bpm": 120.0,
       "bpm_fit": 119.99,
       "bars": 28,
-      "loopStart": 1.7171,
-      "loopEnd": 57.7207,
-      "loopStartSample": 75724,
-      "loopEndSample": 2545484,
-      "fileSamples": 2545484,
+      "loopStart": 1.7484,
+      "loopEnd": 57.752,
+      "loopStartSample": 77103,
+      "loopEndSample": 2546863,
+      "fileSamples": 2568913,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.08,
-          0.08
+          0.06,
+          0.06
         ],
         "hf_spike_ratio": [
-          1.66,
-          1.66
+          0.04,
+          0.04
         ],
         "phase_shift_ms": [
-          3.3,
-          3.3
+          3.4,
+          3.4
         ]
       },
+      "seam_offset_ms": 31.2,
       "drift_correction_ms": 3.6,
       "self_match": 0.422,
       "continuation_offset_ms": 0.0,
@@ -336,26 +347,27 @@
       "bpm": 70.0,
       "bpm_fit": 69.988,
       "bars": 15,
-      "loopStart": 3.4226,
-      "loopEnd": 54.8512,
-      "loopStartSample": 150936,
-      "loopEndSample": 2418936,
-      "fileSamples": 2418936,
+      "loopStart": 3.8512,
+      "loopEnd": 55.2797,
+      "loopStartSample": 169836,
+      "loopEndSample": 2437836,
+      "fileSamples": 2459886,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.06,
-          0.06
+          0.05,
+          0.05
         ],
         "hf_spike_ratio": [
-          0.76,
-          0.76
+          0.01,
+          0.01
         ],
         "phase_shift_ms": [
-          -6.0,
-          -5.6
+          -5.2,
+          -4.6
         ]
       },
+      "seam_offset_ms": 428.6,
       "drift_correction_ms": 0.0,
       "self_match": 0.062,
       "continuation_offset_ms": -20.3,
@@ -366,11 +378,11 @@
       "bpm": 96.0,
       "bpm_fit": 96.008,
       "bars": 23,
-      "loopStart": 0.0253,
-      "loopEnd": 57.5266,
-      "loopStartSample": 1117,
-      "loopEndSample": 2536925,
-      "fileSamples": 2536925,
+      "loopStart": 0.2988,
+      "loopEnd": 57.8001,
+      "loopStartSample": 13175,
+      "loopEndSample": 2548983,
+      "fileSamples": 2571033,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
@@ -378,14 +390,15 @@
           0.12
         ],
         "hf_spike_ratio": [
-          1.04,
-          1.04
+          0.4,
+          0.4
         ],
         "phase_shift_ms": [
-          -6.5,
-          -6.5
+          -7.2,
+          -7.2
         ]
       },
+      "seam_offset_ms": 273.4,
       "drift_correction_ms": 1.3,
       "self_match": 0.503,
       "continuation_offset_ms": 0.0,
@@ -396,26 +409,27 @@
       "bpm": 88.0,
       "bpm_fit": 87.99,
       "bars": 16,
-      "loopStart": 2.7124,
-      "loopEnd": 46.3485,
-      "loopStartSample": 119617,
-      "loopEndSample": 2043969,
-      "fileSamples": 2043969,
+      "loopStart": 3.309,
+      "loopEnd": 46.9451,
+      "loopStartSample": 145926,
+      "loopEndSample": 2070278,
+      "fileSamples": 2092328,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.06,
-          0.06
+          0.08,
+          0.08
         ],
         "hf_spike_ratio": [
-          1.55,
-          1.55
+          1.51,
+          1.51
         ],
         "phase_shift_ms": [
-          1.1,
-          1.1
+          2.3,
+          2.3
         ]
       },
+      "seam_offset_ms": 596.6,
       "drift_correction_ms": -0.3,
       "self_match": 0.567,
       "continuation_offset_ms": 2.9,
@@ -426,26 +440,27 @@
       "bpm": 88.0,
       "bpm_fit": 88.004,
       "bars": 15,
-      "loopStart": 0.0165,
-      "loopEnd": 40.9271,
-      "loopStartSample": 727,
-      "loopEndSample": 1804887,
-      "fileSamples": 1804887,
+      "loopStart": 0.677,
+      "loopEnd": 41.5877,
+      "loopStartSample": 29856,
+      "loopEndSample": 1834016,
+      "fileSamples": 1856066,
       "decodeLag": 0,
       "seam": {
         "click_ratio": [
-          0.62,
-          0.62
+          0.16,
+          0.16
         ],
         "hf_spike_ratio": [
-          8.05,
-          8.05
+          2.69,
+          2.69
         ],
         "phase_shift_ms": [
-          3.4,
-          3.4
+          1.4,
+          1.4
         ]
       },
+      "seam_offset_ms": 660.5,
       "drift_correction_ms": 1.6,
       "self_match": 0.515,
       "continuation_offset_ms": -2.9,

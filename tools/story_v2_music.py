@@ -66,6 +66,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from stretch_songs import loudness  # noqa: E402
 
 TRUE_PEAK = -1.0
+MP3_LOSS = 0.4  # LAME at 160 kbps comes out this much quieter (EBU R128) than its input
 # key: (kind, bpm asked, target LUFS)
 MUSIC = {
     "prologue_last_final": ("battle", 172, -13.3),
@@ -542,13 +543,39 @@ def ship_music(key: str, loops: dict) -> dict:
     info: dict = {"key": key, "kind": kind}
     if kind == "loop":
         lp = choose_loop(x, bpm)
-        y = make_loop(x, lp)
         dest = OUT_MUSIC / f"{key}.mp3"
-        y = level_encode(y, target, dest)
-        dec = decode(dest)
+        period = 60 / lp["bpm"]
+        # Level the song from its loop (the limiter moves nothing in time), then place the seam.
+        a0, b0 = int(lp["loopStart"] * SR), int(lp["loopEnd"] * SR)
+        for _ in range(2):
+            got, _ = lufs_of(x[a0:b0])
+            x = limit(x * 10 ** ((target + MP3_LOSS - got) / 20), TRUE_PEAK - 0.3)
+        # The MP3's coding error differs at the two ends of the loop, so a seam right on a
+        # downbeat hit can tick once decoded. Both loop points may move by the same amount
+        # within the first beat: try the five quietest moments and keep the one whose decoded
+        # seam is cleanest.
+        cands = []
+        for d in np.arange(0, period, period / 32):
+            a, b = int((lp["loopStart"] + d) * SR), int((lp["loopEnd"] + d) * SR)
+            if a < 441 or b + int((TAIL + 0.05) * SR) > len(x):
+                continue
+            cands.append((float(np.mean(x[a - 441 : a + 441] ** 2) + np.mean(x[b - 441 : b + 441] ** 2)), float(d)))
+        best = None
+        with tempfile.TemporaryDirectory() as tmp:
+            for _, d in sorted(cands)[:5] or [(0.0, 0.0)]:
+                ls, le = int(round((lp["loopStart"] + d) * SR)), int(round((lp["loopEnd"] + d) * SR))
+                y = make_loop(x, {"loopStart": ls / SR, "loopEnd": le / SR})
+                trial = Path(tmp) / f"{d:.4f}.mp3"
+                encode(y, trial)
+                dec = decode(trial)
+                test = seam_test(dec, ls, le, period)
+                score = max(test["click_ratio"]) + 0.2 * max(test["hf_spike_ratio"])
+                if best is None or score < best[0]:
+                    best = (score, d, ls, le, y, dec, test, trial.read_bytes())
+            _, d, ls, le, y, dec, test, data = best
+            dest.write_bytes(data)
         shift = lag(y, dec)
-        ls, le = int(round(lp["loopStart"] * SR)), int(round(lp["loopEnd"] * SR))
-        test = seam_test(dec, ls, le, 60 / lp["bpm"])
+        lp["seam_offset_ms"] = round(d * 1000, 1)
         loops[key] = {
             "file": f"assets/audio/story/{key}.mp3",
             "bpm": lp["bpm"],
@@ -561,6 +588,7 @@ def ship_music(key: str, loops: dict) -> dict:
             "fileSamples": int(len(dec)),
             "decodeLag": shift,
             "seam": test,
+            "seam_offset_ms": lp["seam_offset_ms"],
             "drift_correction_ms": lp["drift_correction_ms"],
             "self_match": lp["self_match"],
             "continuation_offset_ms": lp["continuation_offset_ms"],
