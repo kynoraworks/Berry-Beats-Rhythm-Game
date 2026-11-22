@@ -837,7 +837,7 @@ Lose:
 
 - **Lime** (neutral): Yo. New guy. Hoodie: seven out of ten. Shoes: four. Vibe: pending.
 - **Lime** (neutral): Going after Banana? Bold. He slides everything. Notes too.
-- **Lime** (neutral): Arrows start in one lane and land in the next. Watch where they land, not where they start.
+- **Lime** (neutral): Arrows start in one lane and land in the next. Watch where they land.
 - **Lime** (bold): Small slides first. Let's see your feet.
 
 Win:
@@ -1284,7 +1284,7 @@ Lose:
 - **Bing** (bold): Round two: pairs across the lanes! Left and right at once!
 - **Morello** (neutral): Split yourself in half. Not literally.
 - **Pear** (neutral) [if follower=pear]: {slow}Man... these two argue more than my nan's radio.{/slow}
-- **Bing** (happy): We were born on the night of the big final! Mum says the telly went off and everyone cried.
+- **Bing** (happy): We were born the night of the big final! Mum says the telly went off and everyone cried.
 - **Morello** (smug): Mum says I cried first. I'm very proud of it.
 
 **Mini B: "Across the bridge"** (battle B, chart `stop04b`, pairs across lanes)
