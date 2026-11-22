@@ -10,7 +10,8 @@ import { getSettings, updateSettings } from '../core/settings';
 import { DIFFICULTIES, DIFFICULTY_LABELS, chartUrlFor, scoreKey } from '../core/difficulty';
 import { playSfx } from '../core/sfx';
 import { stopPitch } from '../core/pitches';
-import { UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { HEADER_H, UiButton, addBody, addBox, addHeader, addHints, addIcon, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
+import { getMoveset } from '../story/moveset';
 import { formatScore } from '../menus/kit';
 import { Doors } from '../explore/doors';
 import { rivalIcon } from '../play/rivals';
@@ -198,7 +199,8 @@ export class LevelSelectScene extends Phaser.Scene {
       goTo(this, SceneKeys.Menu);
     };
     addHeader(this, 'The Line', toMenu);
-    addHints(this, 'Left / Right: stop   Up / Down: battle   D: difficulty   Enter: ride   B: backup   Esc: back', 'Tap a stop, pick a battle, then Ride');
+    addHints(this, 'Left / Right: stop   Up / Down: battle   D: difficulty   Enter: ride   B: backup   M: moves   Esc: back', 'Tap a stop, pick a battle, then Ride');
+    this.addMovesButton();
 
     this.buildMap();
     this.buildCard();
@@ -225,6 +227,24 @@ export class LevelSelectScene extends Phaser.Scene {
     });
     this.input.keyboard?.on('keydown-B', () => this.changeBackup());
     this.input.keyboard?.on('keydown-D', () => this.cycleDifficulty());
+    this.input.keyboard?.on('keydown-M', () => this.openMoves());
+  }
+
+  /** Berry's moves (src/scenes/MovesScene.ts), top right, with a "new" tag when a move was learned since. */
+  private addMovesButton(): void {
+    const x = GAME_W - 108;
+    const y = HEADER_H / 2 - 2;
+    addUiButton(this, x, y, 'Moves', () => this.openMoves(), { width: 176, height: 56, size: 24, icon: 'icon_star', sfx: null });
+    if (getMoveset().fresh.length > 0) {
+      const tag = addText(this, x + 78, y - 26, 'NEW', 16, { color: CSS.yellow });
+      if (!getSettings().reduceMotion) this.tweens.add({ targets: tag, scale: 1.15, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+  }
+
+  private openMoves(): void {
+    if (this.busy || isLeaving(this)) return;
+    playSfx(this.game, 'confirm');
+    goTo(this, SceneKeys.Moves, { returnTo: SceneKeys.LevelSelect });
   }
 
   // -------------------------------------------------------------------------

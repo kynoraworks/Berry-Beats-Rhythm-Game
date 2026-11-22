@@ -63,6 +63,7 @@ export const SceneKeys = {
   BeatMaps: 'BeatMaps',
   Composer: 'Composer',
   UiKit: 'UiKit',
+  Moves: 'Moves',
 } as const;
 
 /** Texture keys. Frame sizes are noted where the texture is a spritesheet. */

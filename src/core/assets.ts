@@ -1,6 +1,10 @@
 import { Tex } from './config';
 import { LIFE_SHEETS, type LifeTheme } from '../explore/lifePieces';
 
+/** Stops whose learned moves can have real art (stop01 to stop12), and the name of their sheets. */
+const LEARN_STOPS = Array.from({ length: 12 }, (_, i) => `stop${String(i + 1).padStart(2, '0')}`);
+const learnSheet = (stop: string, hype: boolean): string => `${hype ? 'berry_hype_learn' : 'berry_learn'}_${stop}`;
+
 /**
  * Art that is drawn bit by bit. The game runs without any of it (generated
  * stand-ins take its place), so a file is only requested once it is listed
@@ -56,6 +60,9 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   ...MOVERS.map((id) => ({ key: `${id}_moves`, file: `${id}_moves.png`, frameWidth: 64, frameHeight: 64 })),
   // Hype Berry: the pack Berry swaps into while hype mode is on (36 frames, see HYPE_BERRY in src/play/characters.ts).
   { key: 'berry_hype', file: 'berry_hype.png', frameWidth: 64, frameHeight: 64 },
+  // Real art for the moves Berry learns (src/story/moveBook.ts): one pair of sheets per stop, normal and Hype Berry,
+  // 9 cells of 64x64 a row, a row per battle (A, B, C). Not drawn yet: the moves dance on placeholder frames until then.
+  ...LEARN_STOPS.flatMap((stop) => [false, true].map((hype) => ({ key: learnSheet(stop, hype), file: `${learnSheet(stop, hype)}.png`, frameWidth: 64, frameHeight: 64 }))),
   // The people baked into the scenery: one column per piece, at rest and nodding. See tools/build_life.py.
   ...LIFE_THEMES.map((theme) => ({ key: `life_${theme}`, file: `life_${theme}.png`, frameWidth: LIFE_SHEETS[theme].cellW, frameHeight: LIFE_SHEETS[theme].cellH })),
 ];

@@ -27,6 +27,8 @@ export interface ResultsFacts {
   meanErrorMs?: number;
   flairUsed?: number;
   abilityName?: string;
+  /** A move this win taught Berry for the first time (src/story/moveset.ts). */
+  learnedMove?: { name: string; teacher: string };
 }
 
 export type ButtonId = 'retry' | 'back' | 'next';
@@ -48,6 +50,8 @@ export interface ResultsPlan {
   unsavedNote?: string;
   /** The timing hint, only when the player was clearly early or late. */
   timing?: { ms: number; late: boolean };
+  /** The "Move learned" card, after a won battle that taught a new move. */
+  learned?: { title: string; line: string };
 }
 
 /** The back button names where it goes. */
@@ -94,6 +98,9 @@ export function planResults(facts: ResultsFacts): ResultsPlan {
   }
   if (facts.practice) plan.unsavedNote = 'Test play: not saved';
   else if (facts.autoplay) plan.unsavedNote = 'Autoplay: not saved';
+  if (facts.learnedMove && !failed && battle?.won !== false && !facts.practice) {
+    plan.learned = { title: 'Move learned!', line: `${facts.learnedMove.name} from ${facts.learnedMove.teacher}` };
+  }
   if (facts.meanErrorMs !== undefined && Math.abs(facts.meanErrorMs) >= TIMING_HINT_MS) {
     plan.timing = { ms: Math.round(Math.abs(facts.meanErrorMs)), late: facts.meanErrorMs > 0 };
   }

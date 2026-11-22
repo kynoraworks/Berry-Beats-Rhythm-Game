@@ -21,8 +21,12 @@ export type SequenceKind = 'power' | 'circle' | 'shuffle' | 'rise' | 'rock' | 'd
 export type FinisherKind = 'finisherSmall' | 'finisherBig' | 'recovery';
 export type MoveKind = SequenceKind | FinisherKind;
 
-/** What the body does while a move plays. */
-export type MoveFx = 'hop' | 'ground' | 'whirl' | 'shake' | 'slide' | 'bounce' | 'none';
+/**
+ * What the body does while a move plays. The last four give learned moves on
+ * borrowed frames a feel of their own: a paper turn (spin), a lean (tilt), a
+ * stretch up, and a long backwards glide.
+ */
+export type MoveFx = 'hop' | 'ground' | 'whirl' | 'shake' | 'slide' | 'bounce' | 'none' | 'spin' | 'tilt' | 'stretch' | 'glide';
 
 export interface Hit {
   lane: Lane;
@@ -141,6 +145,8 @@ export function nextAfter(schedule: readonly number[], beat: number): number | n
 export interface MoveSpec {
   frames: number[];
   fx: MoveFx;
+  /** A learned move's own frame timing on top of the character's (above 1 is slower). */
+  tempo?: number;
 }
 
 export type MoveTable = Record<MoveKind, MoveSpec>;
@@ -428,4 +434,169 @@ export function moveTimings(frames: number, beats: number, secondsPerBeat: numbe
   // The moving frames take about 60% of the time (slower for heavy characters), the landing the rest.
   const moving = Math.min(0.85, 0.6 * tempo);
   return { frameTime: (duration * moving) / (frames - 1), duration };
+}
+
+// ---------------------------------------------------------------------------
+// Learned moves: Berry's loadout
+// ---------------------------------------------------------------------------
+
+/**
+ * Berry's six move slots: a move per lane, the phrase finisher he dances in
+ * his normal form and the one he dances as Hype Berry. The registry of moves
+ * is src/story/moveBook.ts, the save (learned moves and the loadout) is
+ * src/story/moveset.ts.
+ */
+export type SlotId = 'left' | 'down' | 'up' | 'right' | 'finisher' | 'hypeFinisher';
+export type LaneSlot = 'left' | 'down' | 'up' | 'right';
+export type SlotKind = 'lane' | 'finisher' | 'hypeFinisher';
+
+/** In the order the Moves screen lists them. */
+export const SLOT_IDS: readonly SlotId[] = ['left', 'down', 'up', 'right', 'finisher', 'hypeFinisher'];
+export const LANE_SLOTS: readonly LaneSlot[] = ['left', 'down', 'up', 'right'];
+
+export const SLOT_KIND: Record<SlotId, SlotKind> = { left: 'lane', down: 'lane', up: 'lane', right: 'lane', finisher: 'finisher', hypeFinisher: 'hypeFinisher' };
+
+/** The game's lane for each lane slot (lanes are left, up, down, right). */
+export const SLOT_LANE: Record<LaneSlot, Lane> = { left: 0, up: 1, down: 2, right: 3 };
+
+/** Which way a lane slot points: the side a directional pose should face in it. */
+export const SLOT_SIDE: Record<LaneSlot, -1 | 0 | 1> = { left: -1, down: 0, up: 0, right: 1 };
+
+export type Loadout = Record<SlotId, string>;
+
+/** Real art for a move: frames of its own sheet (64x64 cells, 9 a row, feet on row 62). */
+export interface MoveArt {
+  sheet: string;
+  frames: number[];
+}
+
+/**
+ * A move Berry can dance. Until real art exists for a learned move it is a
+ * placeholder: Berry's closest existing frames (`normal` on his own sheets in
+ * the Dancer's frame numbering, `hype` on the Hype Berry pack) with a timing
+ * and a body flavour of its own, so each still feels different.
+ */
+export interface MoveDef {
+  id: string;
+  name: string;
+  /** One line for the Moves screen. */
+  description: string;
+  /** Character id of who teaches it ('berry' for his own moves). */
+  teacher: string;
+  /** Display name when the teacher is not (or no longer) in the cast. */
+  teacherName?: string;
+  /** The battle whose win teaches it (stop01a, stop01b, stop01...), or null for Berry's own. */
+  battle: string | null;
+  /** Slot kinds it fits. */
+  fits: readonly SlotKind[];
+  /** Frames on Berry's normal sheets: base frames as they are, moves sheet frames from MOVES_BASE. */
+  normal: number[];
+  /** Frames on the Hype Berry pack, or null when it has none (the default hype move stands in). */
+  hype: number[] | null;
+  /** What the body does while it plays. */
+  fx: MoveFx;
+  /** Frame timing: above 1 is slower and heavier, below 1 snappier. */
+  tempo: number;
+  /** Which way a directional pose points (-1 left, 1 right, 0 neither): mirrored in a lane slot on the other side. */
+  facing: -1 | 0 | 1;
+  /** Index into the frames of the pose used as its thumbnail. */
+  key?: number;
+  /** True while it dances on borrowed frames. */
+  placeholder: boolean;
+  /**
+   * The real frames, used as soon as their sheet is loaded and holds them.
+   * `hypeMatches`: the normal art reads right on Hype Berry too (no hood in it), so it stands in for missing hype art.
+   */
+  art?: { normal: MoveArt; hype?: MoveArt; hypeMatches?: boolean };
+  /** The slot this is Berry's own default for: there the Dancer keeps his usual, richer behaviour. */
+  defaultFor?: SlotId;
+}
+
+/** A move ready to dance in one form: its frames on Berry's sheets, or on `sheet` when it is real art. */
+export interface MoveClip {
+  id: string;
+  frames: number[];
+  sheet: string | null;
+  fx: MoveFx;
+  tempo: number;
+  /** Mirror the pose (a directional move in the slot on the other side). */
+  flip: boolean;
+}
+
+/** The custom moves of one form. Null entries keep the Dancer's built-in moves. */
+export interface FormMoves {
+  /** By game lane: left, up, down, right. */
+  lanes: [MoveClip | null, MoveClip | null, MoveClip | null, MoveClip | null];
+  finisher: MoveClip | null;
+}
+
+export type Form = 'normal' | 'hype';
+
+/** True when a sheet is loaded and holds the given frames. */
+export type ArtCheck = (art: MoveArt) => boolean;
+
+/**
+ * A move's frames in one form, or null when that form has none. Real art wins
+ * over the placeholder frames; Hype Berry uses his own art, then the normal
+ * art if it matches, then the placeholder hype frames.
+ */
+export function moveClip(def: MoveDef, form: Form, has: ArtCheck, flip = false): MoveClip | null {
+  const clip = (frames: number[], sheet: string | null): MoveClip => ({ id: def.id, frames, sheet, fx: def.fx, tempo: def.tempo, flip });
+  const art = def.art;
+  if (form === 'normal') return art && has(art.normal) ? clip(art.normal.frames, art.normal.sheet) : clip(def.normal, null);
+  if (art?.hype && has(art.hype)) return clip(art.hype.frames, art.hype.sheet);
+  if (art?.hypeMatches && has(art.normal)) return clip(art.normal.frames, art.normal.sheet);
+  return def.hype ? clip(def.hype, null) : null;
+}
+
+/** True when a move may go in a slot. */
+export function fitsSlot(def: MoveDef, slot: SlotId): boolean {
+  return def.fits.includes(SLOT_KIND[slot]);
+}
+
+/** Mirror a directional move placed in the lane slot on the other side. */
+export function flipFor(def: MoveDef, slot: SlotId): boolean {
+  const side = slot in SLOT_SIDE ? SLOT_SIDE[slot as LaneSlot] : 0;
+  return def.facing !== 0 && side !== 0 && def.facing !== side;
+}
+
+/**
+ * What the Dancer dances in one form for a loadout. A slot holding its own
+ * default (or anything unknown, or a move without frames for this form) is
+ * left null, so the Dancer keeps its built-in moves there: the richer lane
+ * hits with alternates and Berry's usual mix of phrase finishers.
+ */
+export function resolveLoadout(loadout: Loadout, form: Form, book: (id: string) => MoveDef | undefined, has: ArtCheck): FormMoves {
+  const pick = (slot: SlotId): MoveClip | null => {
+    const def = book(loadout[slot]);
+    if (!def || def.defaultFor === slot || !fitsSlot(def, slot)) return null;
+    return moveClip(def, form, has, flipFor(def, slot));
+  };
+  const lanes: FormMoves['lanes'] = [null, null, null, null];
+  for (const slot of LANE_SLOTS) lanes[SLOT_LANE[slot]] = pick(slot);
+  return { lanes, finisher: pick(form === 'hype' ? 'hypeFinisher' : 'finisher') };
+}
+
+/**
+ * Which move ends a phrase. With a custom finisher equipped, every big phrase
+ * end is it and the small ones take turns with the table's own; without one,
+ * the character's signatures take turns with the table (when the sheet has them).
+ * `played` counts the finishers danced so far.
+ */
+export function finisherChoice(kind: FinisherKind, played: number, custom: boolean, signatures: boolean): 'custom' | 'signature' | 'table' {
+  if (kind === 'recovery') return 'table';
+  if (custom) return kind === 'finisherBig' || played % 2 === 1 ? 'custom' : 'table';
+  return signatures && played % 2 === 1 ? 'signature' : 'table';
+}
+
+/** Frame references at or above this come from a move's own art sheet: ART_BASE * (1 + sheet index) + frame. */
+export const ART_BASE = 1000;
+
+export function artFrame(sheetIndex: number, frame: number): number {
+  return ART_BASE * (1 + sheetIndex) + frame;
+}
+
+export function decodeArtFrame(ref: number): { sheet: number; frame: number } | null {
+  if (ref < ART_BASE) return null;
+  return { sheet: Math.floor(ref / ART_BASE) - 1, frame: ref % ART_BASE };
 }

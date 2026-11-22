@@ -14,7 +14,7 @@ import type { FruitId, Line } from './types';
  * from each stop's script.
  */
 
-export type PlaceKind = 'room' | 'station' | 'street' | 'depart';
+export type PlaceKind = 'room' | 'station' | 'street' | 'depart' | 'interior';
 
 /** What a generated stand-in background draws in a hotspot's box. Real art puts its own thing there. */
 export type PropKind =
@@ -42,7 +42,17 @@ export type HotspotKind =
   /** Leave: to the street, or on to the stage. Locked until the clue is heard. */
   | 'exit'
   /** The stop's fruit, waiting at the end of the street: starts the battle. */
-  | 'fruit';
+  | 'fruit'
+  /** A person to talk to (a room's resident): their lines, nothing else. */
+  | 'talk'
+  /** A door into one of the street's rooms (rooms.ts). */
+  | 'door'
+  /** The stop's trainer: battles A and B (stopLoop.ts). */
+  | 'trainer'
+  /** A person or thing of the stop's unlock task (tasks.ts). */
+  | 'task'
+  /** A crew member waiting at the station: talk to them to change who follows Berry. */
+  | 'crew';
 
 export interface Hotspot {
   id: string;
@@ -57,12 +67,28 @@ export interface Hotspot {
   /** Drawn by the stand-in background. Omitted where the art already has it (reused stages). */
   prop?: PropKind;
   lines: Line[];
+  /** An exit's destination, when it is not the station's usual way on (a room's way out, the street's way back). */
+  to?: { place: PlaceKind; at?: number };
+  /** A door's room id (rooms.ts). */
+  room?: string;
+  /** Someone standing here: the stand-in NPC (scarf colour), a loaded sheet, or a cast member. */
+  person?: { color?: number; texture?: string; who?: FruitId; flip?: boolean };
+  /** A task hotspot's spot id, or a crew hotspot's fruit. */
+  spot?: string;
 }
 
 /** Where the explore scene puts Berry: a stop and one of its places. */
 export interface ExploreData {
   stop: StopId;
   place: PlaceKind;
+  /** Inside a room ('interior'): which one (rooms.ts). */
+  room?: string;
+  /**
+   * Where Berry stands on arrival, in art pixels, when he comes back rather
+   * than arriving: out of a room at its door, back from a battle, or back to
+   * the station from the street. Skips the arrival walk and the train doors.
+   */
+  at?: number;
 }
 
 /** The first place of a stop: Berry's room for stop 1, the station for every other. */
@@ -82,6 +108,8 @@ export interface PlaceDef {
   /** Where Berry starts, in art pixels. */
   startX: number;
   hotspots: Hotspot[];
+  /** Interiors: the room this is (rooms.ts). */
+  room?: string;
 }
 
 /** Station and street widths, and the row everyone stands on. */
@@ -89,6 +117,8 @@ export const STATION_W = 256;
 export const STREET_W = 640;
 /** The old flat feet row; each background now has its own floor (src/explore/floors.ts). */
 export const FLOOR = 137;
+/** Height of the box over a standing person, in background art pixels (people are drawn at 4/5 scale). */
+export const PERSON_H = 42;
 
 /** Where things stand in every generated station (the real art keeps the same layout). */
 export const STATION_LAYOUT = {
@@ -201,9 +231,9 @@ function station(stop: StopDef): PlaceDef {
     kind: 'clue',
     label: stop.script.station[0]?.role ? titleCase(stop.script.station[0].role) : 'Local',
     x: npcX - 12,
-    y: floorAt(stop.stationBg, npcX) - 50,
+    y: floorAt(stop.stationBg, npcX) - PERSON_H,
     w: 24,
-    h: 50,
+    h: PERSON_H,
     lines: stop.script.station,
   };
   const out: Hotspot = { id: 'exit', kind: 'exit', label: seed.exit, x: exit.x, y: exit.y, w: exit.w, h: exit.h, lines: [] };
@@ -324,9 +354,9 @@ function street(stop: StopDef): PlaceDef | null {
     kind: 'fruit',
     label: stop.fruit,
     x: seed.fruitX - 14,
-    y: floorAt(stop.streetBg, seed.fruitX) - 52,
+    y: floorAt(stop.streetBg, seed.fruitX) - PERSON_H,
     w: 28,
-    h: 52,
+    h: PERSON_H,
     lines: [],
   };
   return {

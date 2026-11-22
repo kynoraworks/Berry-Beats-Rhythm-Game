@@ -11,6 +11,8 @@ import { CREW_ROUNDS, crewLineup, getSession, roundSpan, sliceChart } from './cr
 import { battleRules } from './gimmicks';
 import { CAST } from './cast';
 import type { RuledPlayData } from '../scenes/PlayScene';
+import { battleReturnPlace, isBossOpen } from './stopLoop';
+import type { ReturnTarget } from '../core/flow';
 
 /**
  * Load a story segment's chart and play it. Rejects (and stays put) if the
@@ -32,12 +34,22 @@ export async function playSegment(scene: Phaser.Scene, ref: StoryRef, options: {
   if (!scene.sys.isActive()) return;
   const data: PlayData = {
     chart,
-    returnTo: { scene: SceneKeys.LevelSelect, data: { levelId: stop.id } },
+    returnTo: segmentReturn(stop.id, segment.kind === 'battle' ? segment.battle.index : null),
     story: ref,
     autoplay: options.autoplay,
     difficulty,
   };
   goTo(scene, SceneKeys.Play, data);
+}
+
+/**
+ * Where a story battle goes back to: the trainer's battles (A and B) at a
+ * stop with the stop loop go back to the street, by the trainer; everything
+ * else goes back to the train.
+ */
+export function segmentReturn(stopId: string, battleIndex: number | null): ReturnTarget {
+  const back = battleReturnPlace(stopId, battleIndex);
+  return back ? { scene: SceneKeys.Explore, data: back } : { scene: SceneKeys.LevelSelect, data: { levelId: stopId } };
 }
 
 /** The segment after this one in the same stop, or null at the end of the stop. */
@@ -53,6 +65,8 @@ export function nextBattleRef(ref: StoryRef): StoryRef | null {
   const segments = stop ? segmentsFor(stop) : [];
   const current = segments[ref.segment];
   if (!stop || current?.kind !== 'battle' || current.battle.index >= 2) return null;
+  // The boss waits behind the stop loop's padlock: after B, back to the street until it is off.
+  if (current.battle.index === 1 && !isBossOpen(stop)) return null;
   return { stop: ref.stop, segment: ref.segment + 1 };
 }
 

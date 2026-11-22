@@ -1,4 +1,5 @@
 import { STOPS, type BattleDef, type StopDef } from './stops';
+import type { TaskState } from './tasks';
 import type { FruitId } from './types';
 
 /** What the story remembers between visits. */
@@ -19,6 +20,13 @@ export interface StoryProgress {
   inspected: string[];
   /** One-time story beats already shown (e.g. "boarded": Berry's first ride). */
   seen: string[];
+  /**
+   * Each stop's unlock task (story/tasks.ts), keyed by stop id. Older saves
+   * have none: a cleared stop counts its task as done (isTaskDone).
+   */
+  tasks?: Record<string, TaskState>;
+  /** The crew member who last walked the streets with Berry (story/follower.ts). */
+  follower?: FruitId;
 }
 
 const KEY = 'berrybeats.story.v1';
@@ -50,6 +58,23 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 }
 
+/** Read the saved task states, keeping only well-formed fields (a damaged save loses a task, never the story). */
+function taskStates(value: unknown): Record<string, TaskState> {
+  const out: Record<string, TaskState> = {};
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return out;
+  for (const [stopId, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof raw !== 'object' || raw === null) continue;
+    const record = raw as Record<string, unknown>;
+    const state: TaskState = {};
+    if (record.done === true) state.done = true;
+    if (typeof record.step === 'number' && Number.isFinite(record.step)) state.step = Math.max(0, Math.floor(record.step));
+    if (typeof record.tries === 'number' && Number.isFinite(record.tries)) state.tries = Math.max(0, Math.floor(record.tries));
+    if (Array.isArray(record.found)) state.found = strings(record.found);
+    out[stopId] = state;
+  }
+  return out;
+}
+
 export function getProgress(): StoryProgress {
   try {
     const raw = storage()?.getItem(KEY);
@@ -64,6 +89,8 @@ export function getProgress(): StoryProgress {
       talked: strings(record.talked),
       inspected: strings(record.inspected),
       seen: strings(record.seen),
+      ...(record.tasks !== undefined ? { tasks: taskStates(record.tasks) } : {}),
+      ...(typeof record.follower === 'string' ? { follower: record.follower as FruitId } : {}),
     };
   } catch {
     return empty();
@@ -201,6 +228,38 @@ export function markSeen(beat: string): void {
 
 export function hasSeen(beat: string): boolean {
   return getProgress().seen.includes(beat);
+}
+
+// ---------------------------------------------------------------------------
+// The stop loop: unlock tasks and the follower
+// ---------------------------------------------------------------------------
+
+/** A stop's unlock task as saved (empty before it is started). */
+export function getTaskState(stopId: string): TaskState {
+  return getProgress().tasks?.[stopId] ?? {};
+}
+
+export function setTaskState(stopId: string, state: TaskState): void {
+  const progress = getProgress();
+  progress.tasks = { ...progress.tasks, [stopId]: { ...state } };
+  save(progress);
+}
+
+/** The unlock task is done once it was finished, or once its stop was cleared (saves from before tasks). */
+export function isTaskDone(stopId: string): boolean {
+  const progress = getProgress();
+  return progress.cleared.includes(stopId) || progress.tasks?.[stopId]?.done === true;
+}
+
+export function rememberFollower(fruit: FruitId): void {
+  const progress = getProgress();
+  if (progress.follower === fruit) return;
+  progress.follower = fruit;
+  save(progress);
+}
+
+export function lastFollower(): FruitId | undefined {
+  return getProgress().follower;
 }
 
 /** True once the crew battle at the Grand Stage has been won. */

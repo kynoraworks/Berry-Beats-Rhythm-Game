@@ -7,6 +7,9 @@ import { characterSheet } from '../story/placeholders';
 import type { SheetLayout } from '../story/types';
 import { Depth } from './layout';
 import { FINISHER_DELAY, FINISHER_MIN_GAP, MOVES_BASE, MissStreak, detectSequence, extMoves, moveFeel, moveTimings, nextAfter, planFinisher, sequenceFrame, DOUBLE_GAP, type DuoFrames, type DuoPose, type ExtMoves, type FinisherPlan, type Hit, type MissReaction, type MoveFeel, type MoveFx, type MoveKind, type MoveSpec, type MoveTable } from './moves';
+import { artFrame, decodeArtFrame, finisherChoice, resolveLoadout, type ArtCheck, type FormMoves, type Loadout, type MoveClip } from './moves';
+import { moveById } from '../story/moveBook';
+import { getLoadout } from '../story/moveset';
 
 /** Hitting the same lane again within this time switches to the alternate move. */
 const REPEAT_WINDOW = 1.2;
@@ -407,6 +410,16 @@ export class Dancer {
   private recoil = 0;
   private shownIndex = -1;
   private checkedAt = -Infinity;
+  /** Berry's loadout, resolved per form (null: the built-in moves everywhere). */
+  private customMoves: { normal: FormMoves; hype: FormMoves } | null = null;
+  /** The custom moves of the form danced right now. */
+  private custom: FormMoves | null = null;
+  /** Art sheets of learned moves, indexed by their ART_BASE frame references. */
+  private artSheets: string[] = [];
+  /** A learned move's flavour tween (spin, tilt, stretch), stopped when the next pose starts. */
+  private fxTween: Phaser.Tweens.Tween | null = null;
+  /** A lane hit that shakes while it is held. */
+  private poseShake = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string, frames: FrameSet, scale: number, originX: number, originY: number, style: DanceStyle = STANDARD, options: DancerOptions = {}) {
     this.scene = scene;
@@ -452,6 +465,7 @@ export class Dancer {
     this.feel = on ? HYPE_FEEL : normal.feel;
     this.movesTexture = on ? null : normal.moves;
     this.ext = on ? null : normal.ext;
+    this.custom = (on ? this.customMoves?.hype : this.customMoves?.normal) ?? null;
     this.pending = null;
     this.plan = null;
     this.endDuo();
@@ -475,6 +489,54 @@ export class Dancer {
     this.secondsPerBeat = secondsPerBeat;
   }
 
+  /**
+   * Berry's loadout: the moves to dance in each slot, resolved for both forms
+   * (see resolveLoadout). Null slots keep the built-in moves.
+   */
+  setMoves(moves: { normal: FormMoves; hype: FormMoves } | null): void {
+    const encode = (form: FormMoves): FormMoves => ({
+      lanes: form.lanes.map((clip) => clip && this.encodeClip(clip)) as FormMoves['lanes'],
+      finisher: form.finisher && this.encodeClip(form.finisher),
+    });
+    this.customMoves = moves && { normal: encode(moves.normal), hype: encode(moves.hype) };
+    this.custom = (this.hypeForm ? this.customMoves?.hype : this.customMoves?.normal) ?? null;
+  }
+
+  /** A clip's frames as frame references: real art from its own sheet (ART_BASE up), the rest as they are. */
+  private encodeClip(clip: MoveClip): MoveClip {
+    if (!clip.sheet || clip.frames.some((f) => f >= MOVES_BASE)) return clip;
+    let index = this.artSheets.indexOf(clip.sheet);
+    if (index < 0) index = this.artSheets.push(clip.sheet) - 1;
+    return { ...clip, frames: clip.frames.map((f) => artFrame(index, f)), sheet: null };
+  }
+
+  /**
+   * Dance one move now, for the Moves screen's preview: a lane hit (`beats`
+   * ignored) or a finisher across `beats` beats.
+   */
+  previewMove(clip: MoveClip, kind: 'lane' | 'finisher', beats = 3): void {
+    if (this.mode === 'final') return;
+    const encoded = this.encodeClip(clip);
+    this.pending = null;
+    this.plan = null;
+    if (kind === 'finisher') {
+      this.startMove({ frames: encoded.frames, fx: encoded.fx }, beats, encoded.tempo);
+      return;
+    }
+    this.strikeClip(encoded);
+  }
+
+  /** A learned lane hit: its frames at its own tempo, mirrored if it points the other way, with its body flavour. */
+  private strikeClip(clip: MoveClip): void {
+    const frameTime = this.style.poseFrameTime * clip.tempo;
+    this.strike(clip.frames, frameTime);
+    if (clip.flip) this.sprite.setFlipX(true);
+    const time = Math.max(this.style.poseMax, frameTime * clip.frames.length);
+    if (clip.fx === 'shake') this.poseShake = !this.calm;
+    else if (clip.fx === 'bounce') this.squash(1.1, 0.88, 160);
+    else this.bodyFx(clip.fx === 'whirl' ? 'spin' : clip.fx, time);
+  }
+
   /** The move to play for `kind`: from the moves sheet when it is loaded, else from the base sheet. */
   private moveSpec(kind: MoveKind): MoveSpec | null {
     if (!this.feel) return null;
@@ -483,18 +545,34 @@ export class Dancer {
     return (this.movesTexture ? this.feel.table : this.feel.fallback)[kind];
   }
 
-  /** The move that ends a phrase: every other one is the character's signature move, when their sheet has it. */
+  /**
+   * The move that ends a phrase: every other one is the character's signature
+   * move, when their sheet has it. Berry's equipped finisher, when it is not his
+   * default, takes every big phrase end and every other small one (finisherChoice).
+   */
   private finisherSpec(kind: MoveKind): MoveSpec | null {
     const ext = this.ext;
-    if (ext && (kind === 'finisherSmall' || kind === 'finisherBig') && this.finishersPlayed++ % 2 === 1) {
-      return kind === 'finisherSmall' ? ext.signatureA : ext.signatureB;
-    }
+    if (kind !== 'finisherSmall' && kind !== 'finisherBig') return this.moveSpec(kind);
+    const clip = this.custom?.finisher ?? null;
+    const choice = finisherChoice(kind, this.finishersPlayed++, clip !== null, ext !== null);
+    if (choice === 'custom' && clip) return { frames: clip.frames, fx: clip.fx, tempo: clip.tempo };
+    if (choice === 'signature' && ext) return kind === 'finisherSmall' ? ext.signatureA : ext.signatureB;
     return this.moveSpec(kind);
   }
 
   /** Show a frame: base sheet frames as they are, moves sheet frames from MOVES_BASE up. */
   private show(frame: number): void {
     const sprite = this.sprite;
+    const art = decodeArtFrame(frame);
+    if (art) {
+      const key = this.artSheets[art.sheet];
+      if (key && this.scene.textures.exists(key)) {
+        if (sprite.texture.key !== key) sprite.setTexture(key, art.frame);
+        else sprite.setFrame(art.frame);
+        return;
+      }
+      frame = this.frames.idle[0];
+    }
     if (frame >= MOVES_BASE && this.movesTexture) {
       if (sprite.texture.key !== this.movesTexture) sprite.setTexture(this.movesTexture, frame - MOVES_BASE);
       else sprite.setFrame(frame - MOVES_BASE);
@@ -511,7 +589,9 @@ export class Dancer {
     if (this.mode === 'special' && this.elapsed < Math.min(this.style.specialLock, this.duration)) return;
     const f = this.frames;
     const style = this.style;
-    let frames = this.ext?.lanes?.[lane] ?? f.lanes[lane];
+    // Berry's loadout: a learned move in this lane's slot replaces the built-in hit (and its alternate).
+    const clip = this.custom?.lanes[lane] ?? null;
+    let frames = clip?.frames ?? this.ext?.lanes?.[lane] ?? f.lanes[lane];
     // A second lane landing on the same beat counts as held, so rivals get two-lane poses too.
     const previous = this.hits[this.hits.length - 1];
     if (previous && held.length === 0 && this.lastBeat - previous.beat <= DOUBLE_GAP && previous.lane !== lane) held = [previous.lane];
@@ -523,7 +603,7 @@ export class Dancer {
     if (combo) {
       frames = combo;
       this.useAlt = false;
-    } else if (f.altLanes) {
+    } else if (f.altLanes && !clip) {
       // Alternate between the two moves when a lane repeats, so streams do not look frozen.
       const repeat = lane === this.lastLane && this.sinceDance < REPEAT_WINDOW;
       this.useAlt = repeat ? !this.useAlt : style.altChance > 0 && this.moveRandom() < style.altChance;
@@ -555,6 +635,10 @@ export class Dancer {
     }
     if (style.poseDelay > 0) {
       this.pending = { frames, wait: style.poseDelay };
+      return;
+    }
+    if (clip && !sequence && !combo) {
+      this.strikeClip(clip);
       return;
     }
     this.strike(frames, sequence?.frameTime);
@@ -751,6 +835,7 @@ export class Dancer {
     this.flashTimer = null;
     this.moveOffset = 0;
     this.recoil = 0;
+    this.clearFx();
     this.sprite.clearTint().setFlipX(false).setPosition(this.baseX, this.baseY).setScale(this.baseScale);
     this.show(this.sequence[0]);
   }
@@ -801,6 +886,7 @@ export class Dancer {
       }
       this.sprite.setFlipX(false);
       this.moveFx = 'none';
+      this.clearFx();
       this.mode = 'idle';
       this.lastStep = -Infinity;
     }
@@ -883,7 +969,7 @@ export class Dancer {
 
     this.updateFinisher(beat, free);
 
-    const shaking = !this.calm && ((this.mode === 'special' && this.specialFx === 'shake') || (this.mode === 'move' && this.moveFx === 'shake'));
+    const shaking = !this.calm && ((this.mode === 'special' && this.specialFx === 'shake') || (this.mode === 'move' && this.moveFx === 'shake') || (this.mode === 'pose' && this.poseShake));
     const shake = shaking ? (Math.floor(this.elapsed / 0.045) % 2 === 0 ? -1 : 1) * this.baseScale : 0;
     sprite.setX(this.baseX + this.jolt + shake + this.moveOffset + Math.round(this.recoil));
   }
@@ -947,8 +1033,8 @@ export class Dancer {
   }
 
   /** Play a move from the table across `beats` beats, then fall back into the groove. */
-  private startMove(spec: MoveSpec, beats: number): void {
-    const { frameTime, duration } = moveTimings(spec.frames.length, beats, this.secondsPerBeat, this.feel?.tempo ?? 1);
+  private startMove(spec: MoveSpec, beats: number, tempo = spec.tempo ?? 1): void {
+    const { frameTime, duration } = moveTimings(spec.frames.length, beats, this.secondsPerBeat, (this.feel?.tempo ?? 1) * tempo);
     this.start('move', spec.frames, frameTime, duration);
     this.shownIndex = 0;
     this.bodyFx(spec.fx, duration);
@@ -964,6 +1050,50 @@ export class Dancer {
       this.scene.tweens.add({ targets: sprite, y: this.baseY - 4 * PX, duration: 140, yoyo: true, ease: 'Quad.easeOut' });
     } else if (fx === 'ground') {
       this.squash(1.1, 0.88, 240);
+    } else if (fx === 'spin' && !this.calm) {
+      // A paper turn: the pose narrows, mirrors and opens out again.
+      this.scene.tweens.killTweensOf(sprite);
+      sprite.setY(this.baseY).setScale(this.baseScale);
+      const turn = { v: 0 };
+      this.fxTween = this.scene.tweens.add({
+        targets: turn,
+        v: 1,
+        duration: Math.max(180, Math.min(duration * 1000 * 0.6, 700)),
+        ease: 'Sine.easeInOut',
+        onUpdate: () => sprite.setScale(this.baseScale * Math.cos(turn.v * Math.PI * 2), this.baseScale),
+        onComplete: () => sprite.setScale(this.baseScale),
+      });
+    } else if (fx === 'tilt' && !this.calm) {
+      // A lean from the feet, away from the lane and back.
+      const side = this.lastLane === 0 ? -1 : 1;
+      const lean = { v: 0 };
+      this.fxTween = this.scene.tweens.add({
+        targets: lean,
+        v: 1,
+        duration: Math.max(120, duration * 1000 * 0.4),
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onUpdate: () => sprite.setAngle(side * 9 * lean.v),
+        onComplete: () => sprite.setAngle(0),
+      });
+    } else if (fx === 'stretch' && !this.calm) {
+      // Up on the toes: tall and thin, then back.
+      this.scene.tweens.killTweensOf(sprite);
+      sprite.setY(this.baseY).setScale(this.baseScale * 0.9, this.baseScale * 1.16);
+      this.scene.tweens.add({ targets: sprite, scaleX: this.baseScale, scaleY: this.baseScale, duration: Math.max(160, duration * 1000 * 0.5), ease: 'Back.easeOut' });
+    } else if (fx === 'glide' && !this.calm) {
+      // A long backwards glide (the moonwalk): away from the lane's side, easing home.
+      const side = this.lastLane === 0 ? 1 : -1;
+      const glide = { v: 0 };
+      this.scene.tweens.add({
+        targets: glide,
+        v: side * 9 * this.baseScale,
+        duration: Math.max(160, duration * 600),
+        yoyo: true,
+        ease: 'Quad.easeOut',
+        onUpdate: () => (this.moveOffset = glide.v),
+        onComplete: () => (this.moveOffset = 0),
+      });
     } else if (fx === 'slide' && !this.calm) {
       // A step-slide: glide a few art pixels to one side and drift back by the end of the move.
       const side = this.lastLane === 3 ? 1 : -1;
@@ -1028,8 +1158,20 @@ export class Dancer {
     this.scene.tweens.add({ targets: s, scaleX: scale, scaleY: scale, duration: this.style.popTime, ease: 'Quad.easeOut' });
   }
 
+  /** Stop a learned move's flavour: its turn, lean or shake. */
+  private clearFx(): void {
+    if (this.fxTween) {
+      this.fxTween.stop();
+      this.fxTween = null;
+      this.sprite.setScale(this.baseScale);
+    }
+    this.poseShake = false;
+    if (this.sprite.angle !== 0) this.sprite.setAngle(0);
+  }
+
   private start(mode: Mode, sequence: number[], frameTime: number, duration: number): void {
     if (this.mode === 'duo' && mode !== 'duo') this.endDuo();
+    this.clearFx();
     this.mode = mode;
     this.sequence = sequence;
     this.frameTime = frameTime;
@@ -1052,7 +1194,12 @@ export const BerryFrame = { victory: [29, 30], defeat: 31, fingerGuns: 42, dab: 
  * for him, in their own sheet and style.
  */
 export function createPlayer(scene: Phaser.Scene, x: number, y: number, who: FruitId | 'berry' = 'berry', options: DancerOptions = {}): Dancer {
-  if (who === 'berry') return new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y, STANDARD, { calm: options.calm, partner: 1 });
+  if (who === 'berry') {
+    const berry = new Dancer(scene, x, y, Tex.blackberry, BERRY, PX, 0.5, BERRY_ORIGIN_Y, STANDARD, { calm: options.calm, partner: 1 });
+    // His loadout: the moves he has learned and put in his slots (src/story/moveset.ts).
+    berry.setMoves(berryMoves(scene, getLoadout()));
+    return berry;
+  }
   const { texture, layout } = characterSheet(scene, who);
   return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[who], { partner: 1, ...options, seed: `${options.seed ?? ''}:${who}` });
 }
@@ -1071,4 +1218,23 @@ export function createRival(scene: Phaser.Scene, kind: RivalKind, x: number, y: 
   }
   const { texture, layout } = kind === 'dancer' ? { texture: Tex.instructor, layout: 'berry' as const } : characterSheet(scene, kind);
   return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, STYLES[kind], { partner: -1, ...options, seed: `${options.seed ?? ''}:${kind}` });
+}
+
+/** True when a learned move's art sheet is loaded and holds its frames. */
+export function artCheck(scene: Phaser.Scene): ArtCheck {
+  return (art) => scene.textures.exists(art.sheet) && scene.textures.get(art.sheet).frameTotal - 1 > Math.max(...art.frames);
+}
+
+/** Berry's loadout resolved for both forms, ready for Dancer.setMoves. */
+export function berryMoves(scene: Phaser.Scene, loadout: Loadout): { normal: FormMoves; hype: FormMoves } {
+  const has = artCheck(scene);
+  return { normal: resolveLoadout(loadout, 'normal', moveById, has), hype: resolveLoadout(loadout, 'hype', moveById, has) };
+}
+
+/** Texture and frame of one of a clip's frames, for thumbnails and previews outside a Dancer. */
+export function clipFrame(clip: MoveClip, index: number, hype: boolean): { texture: string; frame: number } {
+  const frame = clip.frames[Math.max(0, Math.min(clip.frames.length - 1, index))] ?? 0;
+  if (clip.sheet) return { texture: clip.sheet, frame };
+  if (hype) return { texture: HYPE_TEXTURE, frame };
+  return frame >= MOVES_BASE ? { texture: `${Tex.blackberry}_moves`, frame: frame - MOVES_BASE } : { texture: Tex.blackberry, frame };
 }

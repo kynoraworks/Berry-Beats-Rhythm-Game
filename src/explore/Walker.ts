@@ -24,12 +24,22 @@ const IDLE: Record<Layout, number[]> = {
   npc: [0, 0, 1, 1],
 };
 
-/** Art pixels per second. */
-const SPEED = 64;
+/**
+ * Screen pixels per art pixel of a person on foot. The backgrounds are drawn
+ * at PX (5); people stand at 4, which puts them a little under door height
+ * (doors on the streets are 52 to 56 background pixels tall, people about 48
+ * sprite pixels, so 39 at this scale) and keeps their pixels square and crisp.
+ */
+export const CHAR_SCALE = 4;
+
+/** Background art pixels per second (slower than before so the smaller stride does not slide). */
+const SPEED = 57;
 const WALK_FPS = 10;
 /** Frames of a drawn walk cycle, and how fast it steps. */
 const CYCLE = [0, 1, 2, 3, 4, 5];
-const CYCLE_FPS = 9;
+const CYCLE_FPS = 10;
+/** Seconds a follower waits before setting off after the one they follow. */
+const FOLLOW_DELAY = 0.22;
 const IDLE_FPS = 3;
 
 export class Walker {
@@ -50,13 +60,18 @@ export class Walker {
   /** Art x this walker may not go past. */
   private min = 0;
   private max = Number.POSITIVE_INFINITY;
+  /** Screen pixels per sprite pixel. */
+  readonly scale: number;
+  /** Seconds the spot behind the leader has been out of reach (see follow). */
+  private lag = 0;
 
-  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floor: number | ((artX: number) => number), walkTexture?: string) {
+  constructor(scene: Phaser.Scene, texture: string, layout: Layout, artX: number, floor: number | ((artX: number) => number), walkTexture?: string, scale = CHAR_SCALE) {
+    this.scale = scale;
     this.layout = layout;
     this.texture = texture;
     this.walkTexture = walkTexture && scene.textures.exists(walkTexture) ? walkTexture : null;
     this.floorRow = typeof floor === 'number' ? () => floor : floor;
-    this.sprite = scene.add.sprite(artX * PX, this.groundY(artX), texture, IDLE[layout][0]).setOrigin(0.5, 63 / 64).setScale(PX);
+    this.sprite = scene.add.sprite(artX * PX, this.groundY(artX), texture, IDLE[layout][0]).setOrigin(0.5, 63 / 64).setScale(scale);
   }
 
   /** Position in art pixels. */
@@ -115,10 +130,27 @@ export class Walker {
     this.moving = false;
   }
 
-  /** Keep `gap` art pixels behind a leader, on the side they are walking away from. */
-  follow(leader: Walker, gap: number): void {
+  /**
+   * Keep `gap` art pixels behind a leader, on the side they are walking away
+   * from. With `dt`, set off a moment after them rather than in step.
+   */
+  follow(leader: Walker, gap: number, dt?: number): void {
     const spot = leader.x - leader.facing * gap;
-    if (Math.abs(spot - this.x) > 4) this.walkTo(spot);
+    if (Math.abs(spot - this.x) <= 4) {
+      this.lag = 0;
+      return;
+    }
+    if (dt !== undefined && this.target === null) {
+      this.lag += dt;
+      if (this.lag < FOLLOW_DELAY) return;
+    }
+    this.walkTo(spot);
+  }
+
+  /** Face a way without moving (1 right, -1 left). */
+  face(direction: number): this {
+    this.sprite.setFlipX(direction < 0);
+    return this;
   }
 
   update(dt: number): void {
@@ -161,6 +193,6 @@ export class Walker {
     const fps = this.moving ? WALK_FPS : IDLE_FPS;
     const index = Math.floor(this.clock * fps) % frames.length;
     this.sprite.setFrame(frames[index]);
-    this.sprite.setY(this.groundY(this.x) - (this.moving && index % 2 === 1 ? PX : 0));
+    this.sprite.setY(this.groundY(this.x) - (this.moving && index % 2 === 1 ? this.scale : 0));
   }
 }

@@ -3,10 +3,12 @@ import { COLORS, CSS, FONT, GAME_H, GAME_W, Tex } from '../core/config';
 import { hint } from '../core/mobile';
 import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
-import { voiceRate } from '../core/pitches';
+import { Voicer, punctuationPause, voiceFor, type VoiceDef } from '../core/voice';
 import { UI_SCALE, UiButton, addBody, addBox, addIcon, addText, addUiButton } from '../core/ui';
 import { CAST, portraitFrame, speakerName } from '../story/cast';
 import type { Line } from '../story/types';
+import { RichTextView } from './RichText';
+import { parseRich, type RichLine } from './textFx';
 
 const MARGIN = 36;
 const GAP = 12;
@@ -15,10 +17,8 @@ const BOX_H = 196;
 const BOX_Y = GAME_H - MARGIN - BOX_H;
 const BOX_W = GAME_W - MARGIN * 2 - PORTRAIT_BOX - GAP;
 const TEXT_SIZE = 32;
-/** Letters revealed per second while a line types out. */
+/** Letters revealed per second while a line types out (scaled by the speaker's voice and {slow}/{fast}). */
 const TYPE_SPEED = 48;
-/** A voice blip is played once per this many letters. */
-const BLIP_EVERY = 3;
 /**
  * The body font joins "fi", "fl" and "ff" into single glyphs that read badly at this
  * size ("first" looks like "Arst"). A zero-width non-joiner after the f keeps them apart.
@@ -83,8 +83,16 @@ export class Dialogue {
   private full = '';
   private shown = 0;
   private typed = 0;
-  /** The current speaker's blip pitch (see voiceRate). */
-  private voice = 1;
+  /** The current speaker's voice (core/voice.ts) and the blips it plays as letters appear. */
+  private voice: VoiceDef = voiceFor('npc');
+  private readonly voicer: Voicer;
+  /** Milliseconds left before the next letter (after punctuation or a {pause}). */
+  private hold = 0;
+  /** The letter whose {pause} has been waited out (so it is not waited for twice). */
+  private pausedAt = -1;
+  /** The line's tags, when it has any effects; null for a plain line, drawn as one text object. */
+  private rich: RichLine | null = null;
+  private readonly richView: RichTextView;
   private lineStart = 0;
   private open = true;
   private closing = false;
@@ -109,6 +117,8 @@ export class Dialogue {
     this.layer = scene.add
       .container(0, 0, [this.portraitBox, this.stand, this.standLetter, this.portrait, this.box, this.tag, this.nameText, this.body, this.next, this.help, this.skip.container])
       .setDepth(options.depth);
+    this.voicer = new Voicer(scene.game);
+    this.richView = new RichTextView(scene, { like: this.body, container: this.layer, calm: this.calm });
     if (!this.calm) scene.tweens.add({ targets: this.next, y: this.next.y + 8, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
     scene.input.keyboard?.on('keydown', this.onKey);
@@ -152,6 +162,7 @@ export class Dialogue {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.scene.tweens.killTweensOf(this.next);
+    this.richView.clear();
     this.layer.destroy();
   }
 
@@ -170,9 +181,12 @@ export class Dialogue {
     this.index = index;
     this.shown = 0;
     this.typed = 0;
+    this.hold = 0;
+    this.pausedAt = -1;
     this.lineStart = this.scene.time.now;
     this.next.setVisible(false);
     this.body.setText('');
+    this.richView.clear();
 
     const character = CAST[line.who];
     // Berry's portrait sits on the left, everyone else's on the right, like the stage.
@@ -186,15 +200,25 @@ export class Dialogue {
     this.next.setX(boxX + BOX_W - 44);
     this.setPortrait(line, portraitX + PORTRAIT_BOX / 2);
 
-    // Wrap the whole line up front, so words do not jump to the next row as they type out.
-    this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
-
-    this.voice = voiceRate(line.who, speakerName(line));
+    this.voice = voiceFor(line.who, line.role);
+    // Tags ({shake}, {wave}...) and the speaker's own light effect draw the line letter by letter;
+    // a plain line stays one text object, exactly as before.
+    const rich = parseRich(line.text, this.voice.effect);
+    this.rich = rich.tagged || rich.visual ? rich : null;
+    if (this.rich) {
+      this.full = this.rich.plain;
+      this.body.setText('');
+    } else {
+      // Wrap the whole line up front, so words do not jump to the next row as they type out.
+      this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
+    }
+    this.voicer.start(this.voice, rich.plain);
     this.nameText.setText(speakerName(line)).setColor(character.darkTag ? CSS.ink : CSS.cream);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;
     const tagX = onLeft ? boxX + 24 : boxX + BOX_W - 24 - tagWidth;
     this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(character.tag);
     this.nameText.setX(tagX + tagWidth / 2);
+    if (this.rich) this.richView.show(this.rich);
     this.options.onLine(line);
   }
 
@@ -246,7 +270,8 @@ export class Dialogue {
     if (!this.open || this.scene.time.now - this.lineStart < GUARD_MS) return;
     if (this.shown < this.full.length) {
       this.shown = this.full.length;
-      this.body.setText(this.full);
+      this.hold = 0;
+      this.render();
       this.next.setVisible(true);
       return;
     }
@@ -254,15 +279,60 @@ export class Dialogue {
     this.showLine(this.index + 1);
   }
 
+  /** Show the first `shown` letters. */
+  private render(): void {
+    if (this.rich) this.richView.reveal(this.shown);
+    else this.body.setText(this.full.slice(0, this.shown));
+  }
+
+  /**
+   * Types the line out: letters at the speaker's pace ({slow} and {fast} change
+   * it), a wait after punctuation and at each {pause}, and a voice blip for
+   * the letters as they appear (at most one a frame, see Voicer).
+   */
   private readonly onUpdate = (_time: number, deltaMs: number): void => {
-    if (!this.open || this.shown >= this.full.length) return;
-    this.typed += (deltaMs / 1000) * TYPE_SPEED;
-    const count = Math.min(this.full.length, Math.floor(this.typed));
-    if (count === this.shown) return;
-    if (Math.floor(count / BLIP_EVERY) !== Math.floor(this.shown / BLIP_EVERY) && /\S/.test(this.full.charAt(count - 1))) playSfx(this.scene.game, 'talkBlip', this.voice);
-    this.shown = count;
-    this.body.setText(this.full.slice(0, count));
-    if (count >= this.full.length) this.next.setVisible(true);
+    if (!this.open) return;
+    if (this.rich) this.richView.update(deltaMs);
+    if (this.shown >= this.full.length) return;
+    this.voicer.frame();
+    let left = deltaMs;
+    const before = this.shown;
+    while (left > 0 && this.shown < this.full.length) {
+      if (this.hold > 0) {
+        const wait = Math.min(this.hold, left);
+        this.hold -= wait;
+        left -= wait;
+        continue;
+      }
+      const speed = TYPE_SPEED * (this.voice.speed ?? 1) * (this.rich?.styles[this.shown]?.speed ?? 1);
+      const msPerLetter = 1000 / speed;
+      this.typed += left / msPerLetter;
+      left = 0;
+      while (this.typed >= 1 && this.shown < this.full.length) {
+        // A {pause} before this letter, taken once when the letter is due.
+        const pause = this.rich?.pauses[this.shown] ?? 0;
+        if (pause > 0 && this.pausedAt !== this.shown) {
+          this.pausedAt = this.shown;
+          this.hold = pause;
+          left = (this.typed - 1) * msPerLetter;
+          this.typed = 0;
+          break;
+        }
+        this.typed -= 1;
+        const char = this.full.charAt(this.shown);
+        this.shown++;
+        this.voicer.letter(char);
+        const wait = punctuationPause(char, this.full[this.shown], this.full[this.shown - 2]);
+        if (wait > 0 && this.shown < this.full.length) {
+          this.hold = wait;
+          left = this.typed * msPerLetter;
+          this.typed = 0;
+          break;
+        }
+      }
+    }
+    if (this.shown !== before) this.render();
+    if (this.shown >= this.full.length) this.next.setVisible(true);
   };
 
   private readonly onKey = (event: KeyboardEvent): void => {

@@ -60,13 +60,14 @@ const s = (theme: LifeTheme, piece: string, x: number, extra: Partial<LifeSpot> 
 const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
   stop01: {
     // Berry Town's platform: the neighbours seeing the train off.
-    station: { spots: [s('town', 'sweeper', 58), s('town', 'knitter', 124), s('town', 'wall_cat', 197)], effects: ['birds'] },
+    // (Birds cross behind the canopy in its ambience instead: src/explore/ambience.ts.)
+    station: { spots: [s('town', 'sweeper', 58), s('town', 'knitter', 124), s('town', 'wall_cat', 197)], effects: [] },
   },
   stop02: {
     station: { spots: [s('commuters', 'newspaper', 102), s('commuters', 'cat_on_bag', 207)], effects: [] },
     street: {
       spots: [s('town_streets', 'cafe', 172), s('town_streets', 'crate_kid', 216), s('town_streets', 'bench_lady', 340), s('town_streets', 'shop_sweeper', 478)],
-      effects: ['birds'],
+      effects: [],
     },
     battle: { spots: [s('town_streets', 'crate_kid', 26), s('town_streets', 'dog', 58), s('town_streets', 'shop_sweeper', 198), s('town_streets', 'cafe', 236)], effects: ['birds'] },
   },
@@ -87,7 +88,7 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
     station: { spots: [s('commuters', 'map_reader', 66), s('commuters', 'two_friends', 98)], effects: [] },
     street: {
       spots: [s('town_streets', 'picker', 172), s('commuters', 'headphones', 340), s('town_streets', 'juice_pair', 422, { covers: 'Juice stand' }), s('town_streets', 'dog', 486)],
-      effects: ['birds'],
+      effects: [],
     },
     battle: { spots: [s('town_streets', 'juice_pair', 38), s('town_streets', 'picker', 200), s('town_streets', 'dog', 236)], effects: [] },
   },
@@ -106,7 +107,8 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
         s('market', 'steamer_cook', 424, { covers: 'Dumpling stall' }),
         s('market', 'lantern_kid', 484),
       ],
-      effects: ['lanterns', 'steam'],
+      // Steam rises from the teapot and the steamer themselves in the ambience (src/explore/ambience.ts).
+      effects: ['lanterns'],
     },
     battle: { spots: [s('market', 'steamer_cook', 40), s('market', 'lantern_kid', 198), s('market', 'fanning_elder', 236)], effects: ['lanterns'] },
   },
@@ -126,7 +128,7 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
     },
   },
   stop08: {
-    station: { spots: [s('food', 'noodle_pair', 97), s('food', 'skewer_kid', 205)], effects: ['steam', 'lanterns'] },
+    station: { spots: [s('food', 'noodle_pair', 97), s('food', 'skewer_kid', 205)], effects: ['lanterns'] },
     street: {
       spots: [
         s('food', 'pot_cook', 118, { covers: 'Noodle stall' }),
@@ -136,7 +138,7 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
         s('food', 'pan_cook', 422, { covers: 'Dumpling stall' }),
         s('food', 'skewer_kid', 484),
       ],
-      effects: ['steam', 'lanterns'],
+      effects: ['lanterns'],
     },
     battle: { spots: [s('food', 'noodle_pair', 24), s('food', 'chin_rest', 58), s('food', 'slurper', 200), s('food', 'skewer_kid', 236)], effects: ['steam', 'lanterns'] },
   },

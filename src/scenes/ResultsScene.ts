@@ -9,7 +9,10 @@ import { getSettings, updateSettings } from '../core/settings';
 import { playHype } from '../core/announcer';
 import { playSfx } from '../core/sfx';
 import { FocusGroup, UiButton, addBody, addBox, addIcon, addText, addUiButton, fadeIn, goTo, menuKeys } from '../core/ui';
-import { BERRY_ORIGIN_Y, poseFrames } from '../play/characters';
+import { BERRY_ORIGIN_Y, artCheck, clipFrame, poseFrames } from '../play/characters';
+import { moveClip, type MoveDef } from '../play/moves';
+import { teacherName, teacherPortrait } from '../story/moveBook';
+import { learnFromBattle } from '../story/moveset';
 import { skipNextIntro } from '../play/Dialogue';
 import { rivalProfile } from '../play/rivals';
 import { DIFFICULTY_LABELS, scoreKey } from '../core/difficulty';
@@ -74,6 +77,8 @@ export class ResultsScene extends Phaser.Scene {
   private results!: FlairResults;
   private choices: UiButton[] = [];
   private focus!: FocusGroup;
+  /** The "Move learned" card while it is up: it takes the first press, then the buttons work again. */
+  private learnedCard: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super(SceneKeys.Results);
@@ -82,6 +87,7 @@ export class ResultsScene extends Phaser.Scene {
   init(data: FlairResults): void {
     this.results = data;
     this.choices = [];
+    this.learnedCard = null;
   }
 
   create(): void {
@@ -117,6 +123,9 @@ export class ResultsScene extends Phaser.Scene {
     const nextBattle = won && play.story ? nextBattleRef(play.story) : null;
     const nextBattleDef = nextBattle ? segmentAt(nextBattle)?.segment : undefined;
     const nextIndex = won && !nextBattle ? STOPS.indexOf(stop) + 1 : -1;
+    // The first win of a story battle teaches Berry the teacher's move.
+    const wonSegment = won && !play.practice ? segmentAt(play.story)?.segment : undefined;
+    const learnedMove = wonSegment?.kind === 'battle' ? learnFromBattle(wonSegment.battle.id) : null;
     const next = nextIndex > 0 && nextIndex < STOPS.length && isStopOpen(nextIndex) ? STOPS[nextIndex] : undefined;
     const plan = planResults({
       failed,
@@ -129,6 +138,7 @@ export class ResultsScene extends Phaser.Scene {
       meanErrorMs,
       flairUsed,
       abilityName,
+      learnedMove: learnedMove ? { name: learnedMove.name, teacher: teacherName(learnedMove) } : undefined,
     });
 
     const stage = play.chart.stage ?? levelForChart(play.chart.id)?.stage ?? Tex.room;
@@ -215,14 +225,86 @@ export class ResultsScene extends Phaser.Scene {
     );
     this.focus = new FocusGroup(this, timing ? [...this.choices, timing] : this.choices, { start: plan.primary });
 
+    // While the move learned card is up, the first press closes it.
+    const gate = (action: () => void) => () => (this.learnedCard ? this.closeLearnedCard() : action());
     menuKeys(this, {
-      left: () => this.focus.move(-1),
-      right: () => this.focus.move(1),
-      up: () => this.focus.move(-1),
-      down: () => this.focus.move(1),
-      confirm: () => this.focus.activate(),
-      back: guarded(actions.back),
+      left: gate(() => this.focus.move(-1)),
+      right: gate(() => this.focus.move(1)),
+      up: gate(() => this.focus.move(-1)),
+      down: gate(() => this.focus.move(1)),
+      confirm: gate(() => this.focus.activate()),
+      back: gate(guarded(actions.back)),
     });
+    if (learnedMove && plan.learned) {
+      const learned = plan.learned;
+      this.time.delayedCall(calm ? 500 : 2300, () => this.showLearnedCard(learnedMove, learned.title, learned.line, calm));
+    }
+  }
+
+  /**
+   * The card for a newly learned move: Berry dancing it on a little spotlight,
+   * its name and teacher, and where to equip it.
+   */
+  private showLearnedCard(move: MoveDef, title: string, line: string, calm: boolean): void {
+    const w = 700;
+    const h = 380;
+    const dim = this.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.7).setOrigin(0).setInteractive();
+    dim.on(Phaser.Input.Events.POINTER_UP, () => this.closeLearnedCard());
+    const box = addBox(this, GAME_W / 2 - w / 2, GAME_H / 2 - h / 2, w, h, 'panel_focus');
+    const top = GAME_H / 2 - h / 2;
+    const heading = addText(this, GAME_W / 2, top + 50, title, 48, { color: CSS.yellow });
+    const stageX = GAME_W / 2 - 200;
+    const feet = top + h - 50;
+    const pool = this.add.ellipse(stageX, feet, 200, 34, 0xfff3c4, 0.22);
+    const clip = moveClip(move, 'normal', artCheck(this));
+    const first = clip ? clipFrame(clip, 0, false) : { texture: Tex.blackberry, frame: 0 };
+    const dancer = this.add.sprite(stageX, feet, first.texture, first.frame).setOrigin(0.5, BERRY_ORIGIN_Y).setScale(4);
+    const textX = GAME_W / 2 - 60;
+    const name = addText(this, textX, top + 150, move.name, 44, { origin: [0, 0.5] });
+    for (let size = 44; name.width > w / 2 + 40 && size > 24; size -= 4) name.setFontSize(size);
+    const from = addBody(this, textX + 56, top + 210, line.slice(move.name.length + 1), 26, { origin: [0, 0.5], color: CSS.lilac, bold: true });
+    const faceFrame = teacherPortrait(move.teacher, 'bold');
+    const face = this.add.image(textX + 22, top + 210, Tex.portraits, faceFrame !== null && this.textures.get(Tex.portraits).has(String(faceFrame)) ? faceFrame : 0).setDisplaySize(44, 44);
+    if (faceFrame === null) face.setVisible(false);
+    const where = addBody(this, textX, top + 262, 'Equip it on the train: Moves (M)', 22, { origin: [0, 0.5], color: CSS.grey, wrapWidth: w / 2 + 40 });
+    const ok = addUiButton(this, textX + 130, top + h - 56, 'Nice!', () => this.closeLearnedCard(), { width: 220, height: 56, size: 26, sfx: null }).setFocused(true);
+    const card = this.add.container(0, 0, [dim, box, heading, pool, dancer, name, from, face, where, ok.container]).setDepth(50);
+    this.learnedCard = card;
+    playSfx(this.game, 'bonus');
+    // Berry dances the move on a loop, a beat apart.
+    if (clip && clip.frames.length > 0) {
+      let step = 0;
+      const frameMs = Math.round(150 * clip.tempo);
+      const loop = clip.frames.length + 3;
+      this.time.addEvent({
+        delay: frameMs,
+        loop: true,
+        callback: () => {
+          if (!dancer.active) return;
+          const i = step++ % loop;
+          const f = i < clip.frames.length ? clipFrame(clip, i, false) : clipFrame(clip, clip.frames.length - 1, false);
+          dancer.setTexture(f.texture, f.frame).setFlipX(false);
+          if (i === 0 && !calm) {
+            dancer.setScale(4.3, 3.7);
+            this.tweens.add({ targets: dancer, scaleX: 4, scaleY: 4, duration: 160, ease: 'Back.easeOut' });
+          }
+        },
+      });
+    }
+    if (calm) return;
+    card.setAlpha(0);
+    this.tweens.add({ targets: card, alpha: 1, duration: 200 });
+    heading.setScale(1.6);
+    this.tweens.add({ targets: heading, scale: 1, duration: 260, ease: 'Back.easeOut' });
+  }
+
+  private closeLearnedCard(): void {
+    const card = this.learnedCard;
+    if (!card) return;
+    this.learnedCard = null;
+    playSfx(this.game, 'select');
+    if (getSettings().reduceMotion) card.destroy();
+    else this.tweens.add({ targets: card, alpha: 0, duration: 160, onComplete: () => card.destroy() });
   }
 
   /** A dancer, large and celebrating, or smaller and slumped in the shade. */

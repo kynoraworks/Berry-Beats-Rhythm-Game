@@ -39,7 +39,12 @@ export interface Settings {
   keys: string[][];
   /** Story battles: Easy, Normal or Hard beat maps (core/difficulty.ts). */
   difficulty: Difficulty;
+  /** Explore ambience (src/explore/ambience.ts): Full, or Low for slow devices (half the particles, no sky or sway). */
+  effects: EffectsLevel;
 }
+
+export type EffectsLevel = 'full' | 'low';
+export const EFFECTS_LEVELS: readonly EffectsLevel[] = ['full', 'low'];
 
 export const DEFAULT_SETTINGS: Settings = {
   musicVolume: 0.8,
@@ -61,6 +66,7 @@ export const DEFAULT_SETTINGS: Settings = {
     ['ArrowRight', 'KeyK'],
   ],
   difficulty: 'normal',
+  effects: 'full',
 };
 
 const STORAGE_KEY = 'berrybeats.settings.v1';
@@ -94,6 +100,7 @@ function sanitize(raw: Partial<Settings>): Settings {
     touchGuides: typeof raw.touchGuides === 'boolean' ? raw.touchGuides : d.touchGuides,
     keys: keysOk ? raw.keys!.map((lane) => lane.slice(0, 4)) : d.keys.map((lane) => lane.slice()),
     difficulty: isDifficulty(raw.difficulty) ? raw.difficulty : d.difficulty,
+    effects: EFFECTS_LEVELS.includes(raw.effects as EffectsLevel) ? (raw.effects as EffectsLevel) : d.effects,
   };
 }
 

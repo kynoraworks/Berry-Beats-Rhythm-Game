@@ -88,6 +88,12 @@ async function main() {
     );
     await page.goto(`${base}?scene=LevelSelect`);
     await waitForScene('LevelSelect');
+    // Berry's moves, from the train's M key: the stop's won battles have taught him theirs.
+    await page.waitForTimeout(1200);
+    await page.keyboard.press('m');
+    await waitForScene('Moves');
+    const learned = await page.evaluate(() => JSON.parse(localStorage.getItem('berrybeats.moves.v1') || '{}').learned || []);
+    if (!learned.includes('learn_stop01')) problems.push(`the moves of stop 1 were not granted from the story save (got ${learned.join(', ')})`);
     await page.goto(`${base}?scene=Explore&stop=stop02&place=station`);
     await waitForScene('Explore');
     await page.goto(`${base}?scene=Explore&stop=stop02&place=street`);
@@ -112,7 +118,7 @@ async function main() {
     server.close();
   }
   if (problems.length > 0) throw new Error(`Smoke test failed:\n  ${[...new Set(problems)].join('\n  ')}`);
-  console.log('Smoke test passed: title, menu, Berry\'s room, the train, a station, a street, the crew battle lineup, the tutorial and results all loaded without errors.');
+  console.log('Smoke test passed: title, menu, Berry\'s room, the train, the moves screen, a station, a street, the crew battle lineup, the tutorial and results all loaded without errors.');
 }
 
 main().catch((error) => {

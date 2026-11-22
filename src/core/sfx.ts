@@ -676,6 +676,7 @@ export function sfxDuration(name: SfxName): number {
  *   hype: stingers, scratches, record moves ─┐                ├─ master ceiling ─ out
  *   crowd: reactions and the bed (high-passed)├─ glue ─ limit ┘
  *   voice: the MC (softened bite) ────────────┘
+ *   talk: dialogue voice blips (core/voice.ts) ───────────────┘
  *
  * The song is never turned down for a hype moment (only for a spinback, which
  * replaces it, and a miss's brief dip); instead the hype buses are set well
@@ -683,13 +684,15 @@ export function sfxDuration(name: SfxName): number {
  * compressor here has its automatic makeup gain taken back off (see
  * compressor), so a ceiling never makes anything louder.
  */
-export type Bus = 'main' | 'hype' | 'crowd' | 'voice';
+export type Bus = 'main' | 'hype' | 'crowd' | 'voice' | 'talk';
 
 /** Each hype bus's level, before the Sound volume: well under the song. */
 export const BUS_LEVELS: Record<Exclude<Bus, 'main'>, number> = {
   hype: 0.5,
   crowd: 0.42,
   voice: 0.8,
+  // Dialogue blips: well under the music, straight to the ceiling like the menu sounds (no glue, so they never pump).
+  talk: 0.55,
 };
 
 /**
@@ -797,6 +800,10 @@ function makeBus(ctx: BaseAudioContext, bus: Exclude<Bus, 'main'>): { input: Aud
   } else if (bus === 'voice') {
     // The MC's PA bite (a +5 dB lift at 2.8 kHz, see tools/build_sfx.py) taken partly back, and no boom.
     tail = tail.connect(filter(ctx, 'highpass', 160)).connect(filter(ctx, 'peaking', 2800, 0.9, -4));
+  } else if (bus === 'talk') {
+    // Dialogue blips: no rumble, and not through the hype glue.
+    tail.connect(filter(ctx, 'highpass', 140)).connect(masterInput(ctx));
+    return { input: level, duck };
   }
   tail.connect(hypeGroup(ctx));
   return { input: level, duck };
