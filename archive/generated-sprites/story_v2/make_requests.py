@@ -163,3 +163,60 @@ R2["res_5"] = res([
     ("Foreman Chestnut, a tunnel worker who is a CHESTNUT: brown hair, a yellow hard hat, a hi-vis vest", "standing, holding a thermos", "sipping from the thermos")])
 (HERE / "requests2.json").write_text(json.dumps(R2, indent=1))
 print(len(R2), "requests in wave 2")
+
+# ---- wave 3: the rest of each trainer (requests3.json), from their first sheet ----
+SIGS = {
+    "lime": ("7 jumping onto an invisible rail; 8 grinding sideways along it, arms out; 9 landing with a flat thumbs up",
+             "his rail slide: 1 running up; 2 jumping onto an invisible rail; 3 grinding sideways along it, arms out for balance; 4 still grinding, crouched lower; 5 hopping off; 6 landing with a flat thumbs up",
+             "his kickflip on an invisible skateboard: 1 crouching as if riding a skateboard; 2 an ollie jump; 3 kicking the invisible board into a flip, legs tucked; 4 catching it with both feet in the air; 5 landing crouched; 6 standing, a bored shrug"),
+    "peach": ("7 shaking a spray can; 8 spraying a wide arc; 9 stepping back to admire, chin in hand",
+              "her spray arc: 1 shaking a spray can; 2 spraying in a wide arc to the LEFT; 3 spraying overhead on tiptoe; 4 spraying an arc to the RIGHT; 5 blowing on the nozzle; 6 holding the can up proudly",
+              "stepping back to admire her work: 1 stepping back; 2 framing it with her fingers; 3 head tilted, chin in her hand; 4 a hand on her heart, moved; 5 a little twirl; 6 a chef's-kiss gesture"),
+    "cherries": ("7 both swinging low to the LEFT, the stem arcing; 8 both swinging low to the RIGHT; 9 a mirror pose, each raising the outer arm",
+                 "their stem swing: 1 both crouching; 2 both swinging low to the LEFT, the stem arcing; 3 both swinging up; 4 both swinging low to the RIGHT; 5 spinning round each other; 6 a ta-da, all arms out",
+                 "their mirror pose: 1 back to back; 2 each raising the outer arm; 3 each pointing outwards; 4 holding one open umbrella together over both; 5 twirling the umbrella; 6 a bow together"),
+    "grapefruit": ("7 turning away, arms folded; 8 looking back over her shoulder, unimpressed; 9 one tired finger raised: eureka",
+                   "her bitter twist: 1 turning away; 2 arms folded, back turned; 3 looking back over her shoulder, unimpressed; 4 turning back with a sigh; 5 a deadpan shrug; 6 tapping her clipboard",
+                   "her tired eureka: 1 slumped, yawning; 2 lifting one finger lazily; 3 a weak little hop; 4 finger up, eureka, with a flat face; 5 sighing; 6 writing on the clipboard"),
+    "lychee": ("7 raising the lantern high; 8 twirling under the lantern; 9 a tiny bow",
+               "her lantern float: 1 lifting the lantern; 2 holding it high on tiptoe; 3 twirling under it; 4 swaying it to the LEFT; 5 swaying it to the RIGHT; 6 hugging the lantern stick, a shy smile",
+               "her tiny bow: 1 peeking out from behind the lantern; 2 stepping out; 3 a tiny bow; 4 a deeper bow; 5 rising, blushing; 6 a tiny wave"),
+    "passionfruit": ("7 a sharp popped freeze, arms angled; 8 a different popped freeze; 9 wiping a single tear dramatically",
+                     "his strobe pop freezes: six sharp, different popping freezes as if under a strobe light: 1 arms angled; 2 head turned, one arm up; 3 one knee up; 4 a point; 5 a fist to the sky; 6 the lighting remote held high",
+                     "his dramatic tear wipe: 1 clutching his chest; 2 head thrown back; 3 wiping a single tear with one finger; 4 a hand on his notebook, reciting; 5 an arm sweeping out, dramatic; 6 a deep bow"),
+    "mango": ("7 flipping a pan, a pancake flying up; 8 catching it in the other pan; 9 spinning an order ticket on one finger",
+              "her pan flip: 1 a pancake tossed up from one pan; 2 the pancake high above; 3 catching it in the other pan; 4 flipping both pans at once; 5 juggling the pans; 6 pans crossed, triumphant",
+              "her spinning order ticket: 1 grabbing an order ticket; 2 reading it fast, mouth open; 3 spinning on one foot, the ticket held up; 4 slapping the ticket down; 5 pointing, shouting; 6 wiping sweat from her brow"),
+    "fig": ("7 a busker shuffle, playing; 8 squeezing the accordion wide open; 9 a bow, tipping his cap",
+            "his busker shuffle: 1 shuffling LEFT, playing; 2 shuffling RIGHT, playing; 3 a little heel kick; 4 sitting on an upturned crate, playing; 5 tapping his foot on the crate; 6 tipping his cap",
+            "his accordion squeeze: 1 squeezing the accordion closed; 2 pulling it wide open; 3 leaning back, eyes closed, playing; 4 a big squeeze, knees bent; 5 a bow with the accordion; 6 rising with a wink"),
+    "quince": ("7 a slow butler's bow; 8 a slow sweep with the tray; 9 standing perfectly straight, presenting the tray",
+               "his butler's bow: 1 perfectly upright; 2 beginning a slow bow; 3 a deep bow, the tray held level; 4 rising slowly; 5 adjusting his tiny glasses; 6 a polite cough, a gloved fist at his mouth",
+               "his slow tray sweep: 1 the tray held high; 2 sweeping the tray slowly to the LEFT; 3 sweeping it to the RIGHT; 4 a slow turn on the spot; 5 presenting the tray with a bow; 6 tucking the tray under his arm"),
+}
+LITE_B = "1 crouching low, pointing DOWN at the floor; 2 a deep squat, one hand slapping the floor; 3 stumbling: one foot slips, arms flailing; 4 catching balance on one leg; 5 victory: a jump with one fist up; 6 defeat: kneeling, head down; "
+OWN = "The reference image shows the character's design; draw the character EXACTLY like it (the same face, hair, clothes, palette, proportions and size)."
+DUO_T = DUO_L.replace("her LEFT", "them on the LEFT")
+R3 = {}
+for name, desc in TRAINERS.items():
+    lite, a, b = SIGS[name]
+    R3[f"{name}_b"] = sheet9(desc, [f"{name}_a"], LITE_B + lite, OWN)
+    R3[f"{name}_md"] = sheet6(desc, [f"{name}_a"], a, OWN)
+    R3[f"{name}_me"] = sheet6(desc, [f"{name}_a"], b, OWN)
+    R3[f"{name}_mf"] = sheet6(desc, [f"{name}_a"], DUO_L.replace("her LEFT", "the LEFT side"), OWN)
+def portraits(intro, refs, faces):
+    return params(f"Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), {PSTYLE} {intro} In reading order: {faces}.", ["portrait_style"] + refs)
+R3["portraits_t1"] = portraits("The characters are drawn EXACTLY like the sprites in the other references: Lime (second reference), Peach (third), Bing, the twin on the LEFT of the cherry pair (fourth).",
+    ["lime_a", "peach_a", "cherries_a"],
+    "1 Lime, neutral: a flat, bored, expressionless face; 2 Lime, bold: the same flat face with a thumbs up; 3 Peach, neutral: a dreamy half smile; 4 Peach, bold: an excited grin, a paint smudge on her nose; "
+    "5 Bing, neutral: beaming, little bow tie, the green cherry stem rising from his head; 6 Bing, bold: a huge grin and a wink")
+R3["portraits_t2"] = portraits("The characters are drawn EXACTLY like the sprites in the other references: Morello, the twin on the RIGHT of the cherry pair (second reference), Grapefruit (third), Lychee (fourth).",
+    ["cherries_a", "grapefruit_a", "lychee_a"],
+    "1 Morello, neutral: half-lidded eyes, grey scarf, the green cherry stem rising from his head; 2 Morello, bold: a sly smirk; 3 Grapefruit, neutral: tired, dark rings under her eyes, goggles on her forehead; "
+    "4 Grapefruit, bold: one finger raised, a deadpan eureka; 5 Lychee, neutral: peeking shyly out of her bumpy pink hood; 6 Lychee, bold: the tiniest determined face")
+R3["portraits_t3"] = portraits("The characters are drawn EXACTLY like the sprites in the other references: Passion Fruit (second reference), Mango (third), Fig (fourth).",
+    ["passionfruit_a", "mango_a", "fig_a"],
+    "1 Passion Fruit, neutral: a soft sad face, an earpiece; 2 Passion Fruit, bold: moved, a single tear on his cheek; 3 Mango, neutral: mid-sentence, red bandana; 4 Mango, bold: shouting an order, sweat drops; "
+    "5 Fig, neutral: a kind old face, flat cap; 6 Fig, bold: a wink and a grin")
+(HERE / "requests3.json").write_text(json.dumps(R3, indent=1))
+print(len(R3), "requests in wave 3")

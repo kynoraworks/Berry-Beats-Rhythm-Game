@@ -200,33 +200,29 @@ def onset_env(x: np.ndarray, hop: int = 128) -> tuple[np.ndarray, float]:
 
 
 def fit_grid(x: np.ndarray, bpm_guess: float) -> dict:
-    """Beat period and phase from the onset envelope: a comb search near the asked tempo,
-    then a least-squares fit of strong onsets to beat indices."""
-    import librosa
-
+    """Tempo and beat phase from the onset envelope. For each candidate tempo near the asked
+    one, the envelope is folded on the sixteenth-note period in 10 s windows; the tempo whose
+    windows add up most coherently wins (a wrong tempo makes the phase walk from window to
+    window). Generated songs come out at the whole-number tempo they were asked for, so a
+    fit within 0.05 BPM of a whole number is snapped to it."""
     env, fps = onset_env(x)
     t = np.arange(len(env)) / fps
-    best = (0.0, bpm_guess)
-    for bpm in np.arange(bpm_guess * 0.96, bpm_guess * 1.04, 0.01):
-        z = np.abs(np.sum(env * np.exp(2j * np.pi * t * bpm / 60)))
-        if z > best[0]:
-            best = (z, bpm)
-    bpm = best[1]
-    mono = x.mean(axis=1).astype(np.float32)
-    on = librosa.onset.onset_detect(y=mono, sr=SR, hop_length=128, units="time", backtrack=False)
+    w = int(10 * fps)
+    starts = range(0, max(1, len(env) - w), w)
+
+    def coherence(bpm: float) -> float:
+        p = 60 / bpm / 4
+        return float(sum(abs(np.sum(env[i : i + w] * np.exp(2j * np.pi * t[i : i + w] / p))) for i in starts))
+
+    grid = np.arange(bpm_guess * 0.97, bpm_guess * 1.03, 0.01)
+    scores = [coherence(b) for b in grid]
+    bpm = float(grid[int(np.argmax(scores))])
+    fine = np.arange(bpm - 0.012, bpm + 0.012, 0.002)
+    bpm_fit = float(fine[int(np.argmax([coherence(b) for b in fine]))])
+    bpm = float(round(bpm_fit)) if abs(bpm_fit - round(bpm_fit)) < 0.05 else bpm_fit
     period = 60 / bpm
-    for _ in range(3):
-        phase = np.angle(np.sum(np.exp(2j * np.pi * on / period))) / (2 * np.pi) * period
-        k = np.round((on - phase) / period)
-        err = on - (phase + k * period)
-        keep = np.abs(err) < 0.03
-        if keep.sum() < 8:
-            break
-        period, phase = np.polyfit(k[keep], on[keep], 1)
-    bpm_fit = 60 / period
-    # Generated songs are made at a whole-number tempo: snap to it when close.
-    beat = round(bpm_fit) if abs(bpm_fit - round(bpm_fit)) < 0.05 else bpm_fit
-    return {"bpm_fit": float(bpm_fit), "bpm": float(beat), "phase": float(phase % period), "period": float(period), "onsets": on}
+    phase = float(np.angle(np.sum(env * np.exp(2j * np.pi * t / period))) / (2 * np.pi) * period) % period
+    return {"bpm_fit": bpm_fit, "bpm": bpm, "phase": phase, "period": period}
 
 
 def local_phase(env: np.ndarray, fps: float, period: float, centre: float, width: float = 6.0) -> float:
@@ -275,9 +271,20 @@ def bar_db(x: np.ndarray, start: float, length: float) -> float:
 # Loops
 # ---------------------------------------------------------------------------
 
+def band_flux(x: np.ndarray, hop: int = 128) -> tuple[np.ndarray, float]:
+    """Positive log-mel flux in 24 bands (rows), 2.9 ms steps."""
+    import librosa
+
+    mono = x.mean(axis=1).astype(np.float32)
+    mel = librosa.power_to_db(librosa.feature.melspectrogram(y=mono, sr=SR, n_fft=2048, hop_length=hop, n_mels=24))
+    d = np.diff(mel, axis=1, prepend=mel[:, :1])
+    d[d < 0] = 0
+    return d, SR / hop
+
+
 def choose_loop(x: np.ndarray, bpm_guess: float) -> dict:
     g = fit_grid(x, bpm_guess)
-    period, bar = g["period"], 4 * g["period"]
+    period, bar = g["period"], 4 * g["period"]  # of the snapped tempo
     duration = len(x) / SR
     # Downbeat: of the four beat phases, the one whose bars change most at their start
     # (chords and bass move on the downbeat) with the strongest low end on it.
@@ -323,18 +330,46 @@ def choose_loop(x: np.ndarray, bpm_guess: float) -> dict:
     _, s, e, sim = best
     ls = starts[s]
     le_grid = ls + (e - s) * bar
-    # Correct the end for any tempo drift: line it up with the onsets around it.
-    env, fps = onset_env(x)
-    p0 = local_phase(env, fps, period / 4, ls + 6.0)
-    p1 = local_phase(env, fps, period / 4, le_grid - 6.0)
-    corr = 0.0 if np.isnan(p0) or np.isnan(p1) else wrap(p1 - p0, period / 4)
-    if abs(corr) > 0.020:
-        corr = 0.0  # not a drift a fitted grid could have: trust the grid
-    le = le_grid + corr
+    # Check the length against the song itself: the lag near (e - s) bars at which the
+    # multi-band onset pattern best matches itself (everything from loopStart on). Only a
+    # clear match within 40 ms moves the end; a weak one (a song whose last bars differ)
+    # leaves the grid's length.
+    flux, fps = band_flux(x)
+    a = int(ls * fps)
+    lag0 = (le_grid - ls) * fps
+    cs = {}
+    for L in range(int(lag0 - 0.04 * fps), int(lag0 + 0.04 * fps) + 1):
+        b = flux.shape[1] - L
+        if b - a < fps:
+            continue
+        u, v = flux[:, a:b], flux[:, a + L : b + L]
+        u = u - u.mean(axis=1, keepdims=True)
+        v = v - v.mean(axis=1, keepdims=True)
+        cs[L] = float(np.sum(u * v) / (np.sqrt(np.sum(u * u) * np.sum(v * v)) + 1e-12))
+    best_lag = max(cs, key=cs.get) if cs else int(round(lag0))
+    best_c = cs.get(best_lag, 0.0)
+    edge = best_lag in (min(cs), max(cs)) if cs else True
+    le = le_grid
+    if best_c > 0.3 and not edge:
+        le = ls + best_lag / fps
+    env, efps = onset_env(x)
     return {
         "bpm_fit": round(g["bpm_fit"], 3), "bpm": g["bpm"], "bars": e - s, "start_bar": s, "loopStart": ls, "loopEnd": le,
-        "drift_correction_ms": round(corr * 1000, 1), "end_similarity": round(sim, 3), "steady_bars": last_ok + 1,
+        "drift_correction_ms": round((le - le_grid) * 1000, 1), "self_match": round(best_c, 3), "end_similarity": round(sim, 3),
+        "steady_bars": last_ok + 1, "continuation_offset_ms": continuation_offset(env, efps, ls, le),
     }
+
+
+def continuation_offset(env: np.ndarray, fps: float, ls: float, le: float, span: float = 0.05) -> float:
+    """How far (ms) what follows loopEnd in the raw song is shifted against what follows
+    loopStart: the tempo hitch a jump from loopEnd to loopStart would make. 0 is seamless."""
+    a, b = int(ls * fps), int(le * fps)
+    n = min(len(env) - b - int(span * fps) - 1, int(4 * fps))
+    if n < int(0.5 * fps):
+        return float("nan")
+    ref = env[a : a + n]
+    best = max(range(-int(span * fps), int(span * fps) + 1), key=lambda k: float(np.dot(ref, env[b + k : b + k + n])))
+    return round(best / fps * 1000, 1)
 
 
 def make_loop(x: np.ndarray, info: dict) -> np.ndarray:
@@ -373,8 +408,8 @@ def seam_test(dec: np.ndarray, ls: int, le: int, period: float) -> dict:
     hitch = []
     for s in seams:
         t = s / SR
-        before = local_phase(env, fps, period / 4, t - 4.0, 4.0)
-        after = local_phase(env, fps, period / 4, t + 4.0, 4.0)
+        before = local_phase(env, fps, period / 4, t - 6.0, 6.0)
+        after = local_phase(env, fps, period / 4, t + 6.0, 6.0)
         hitch.append(round(wrap(after - before, period / 4) * 1000, 1))
     return {"click_ratio": clicks, "hf_burst_ratio": bursts, "phase_shift_ms": hitch}
 
@@ -495,10 +530,11 @@ def ship_music(key: str, loops: dict) -> dict:
         dec = decode(dest)
         shift = lag(y, dec)
         ls, le = int(round(lp["loopStart"] * SR)), len(y)
-        test = seam_test(dec, ls, le, 60 / lp["bpm_fit"])
+        test = seam_test(dec, ls, le, 60 / lp["bpm"])
         loops[key] = {
             "file": f"assets/audio/story/{key}.mp3",
-            "bpm": round(lp["bpm_fit"], 2),
+            "bpm": lp["bpm"],
+            "bpm_fit": lp["bpm_fit"],
             "bars": lp["bars"],
             "loopStart": round(ls / SR, 4),
             "loopEnd": round(le / SR, 4),
@@ -508,6 +544,8 @@ def ship_music(key: str, loops: dict) -> dict:
             "decodeLag": shift,
             "seam": test,
             "drift_correction_ms": lp["drift_correction_ms"],
+            "self_match": lp["self_match"],
+            "continuation_offset_ms": lp["continuation_offset_ms"],
             "end_similarity": lp["end_similarity"],
         }
         info.update(loops[key])
@@ -573,8 +611,8 @@ def write_cues() -> int:
     beat = 60 / bpm
     t = lambda b, q=1.0: round(offset + ((b - 1) * 4 + (q - 1)) * beat, 3)  # noqa: E731
     sections = [
-        ("intro", 1, 8, "Stomp-and-clap intro, sub hits, no lead (bars 1 to 4 quieter, 5 to 8 add the riff)."),
-        ("build", 7, 8, "Pre-drop: the bass drops out in bar 8, fills lead into drop 1."),
+        ("intro", 1, 6, "Stomp-and-clap intro: drums and sub bass only, no melody (the 'other' stem is silent)."),
+        ("build", 7, 8, "Pre-drop: the lead riff enters in bar 7, the bass drops out in bar 8, a fill into drop 1."),
         ("drop1", 9, 16, "Drop 1: the full groove and hook come in (+4 dB in the mids). Bar 16 is a fill."),
         ("groove", 17, 32, "Main groove, steady; accents (fills) on bars 24 and 32."),
         ("stop", 33, 33, "A one-bar stop: the drums drop out, a sub boom rings. Bar 34 slams back in."),
@@ -582,7 +620,8 @@ def write_cues() -> int:
         ("break", 43, 48, "Breakdown: beat 1 of bar 43 is the last hit, a held pad decays to near silence by bar 48."),
         ("build2", 49, 50, "Riser from silence (bar 49), the beat builds back in (bar 50)."),
         ("drop2", 51, 58, "Drop 2: everything back at full stack."),
-        ("final", 59, 80, "The biggest section (59 to 66 is the loudest, the lead on top), then everything to bar 80."),
+        ("final", 59, 80, "The biggest section: in 59 to 65 the lead (the hook) is loudest against the mix (other stem 3 to 4 dB "
+         "above anywhere else), then everything at once to bar 80."),
         ("finisher", 81, 83, "Three single hits, one per bar (step, spin, drop), each the song's final hit and its ring."),
         ("cut", 84, 84, "The hook's opening (from bar 59) starts on beat 1 and stops dead on beat 3 and a half; a frozen "
          "sustained note rings to the bar 85 downbeat; then digital silence (static)."),

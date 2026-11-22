@@ -4,3 +4,8 @@ batch 2 (5 accepted, 6 rejected by the 8-concurrent limit, not charged): coach_a
 batch 3: conductor_a strawberry_me strawberry_mg bluex_a berryx_a portraits_kids = 7.5 (total 20.0)
 batch 4 (4 accepted, 4 rejected by the concurrency limit): coach b d g h = 5.0 (total 25.0)
 batch 5 (via requests.json refs): coach c e f, ycoach b = 5.0 (total 30.0)
+batch 6: coach_i ycoach c-i = 10.0 (total 40.0)
+batch 7: ycoach md me mf, lime_a peach_a cherries_a grapefruit_a lychee_a = 10.0 (total 50.0)
+batch 8: passionfruit_a mango_a fig_a quince_a portraits_legends portraits_conductor coach_ma coach_mb = 10.0 (total 60.0)
+batch 9: coach mc md me mf sitwalk walk, conductor_walk, res_1 = 10.0 (total 70.0)
+batch 10: res_2-5, lime b md me mf = 10.0 (total 80.0)
