@@ -28,6 +28,12 @@ export interface PatternPadOptions {
   onDone: () => void;
   /** Esc: leave without finishing (the task waits). */
   onCancel: () => void;
+  /** Heard, not seen (stop 9's echo): the arrows do not light while it plays, unless hinted. */
+  audioOnly?: boolean;
+  /** A joke after a miss (the bible's wrong-answer lines), shown in the caption. */
+  failText?: (tries: number) => string | undefined;
+  /** Round n of m, for the title ("Round 2 of 3"). */
+  round?: string;
 }
 
 /** Play an arrow's lane sound. */
@@ -53,6 +59,7 @@ export class PatternPad {
   private hinted: boolean;
   private input: PadLane[] = [];
   private listening = false;
+  private tries = 0;
   private closed = false;
   private timers: Phaser.Time.TimerEvent[] = [];
   private readonly laneOf = new Map<string, PadLane>();
@@ -67,7 +74,7 @@ export class PatternPad {
     const top = Math.round((GAME_H - boxH) / 2) - 40;
     const dim = scene.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.55).setOrigin(0).setInteractive();
     const box = addBox(scene, (GAME_W - boxW) / 2, top, boxW, boxH, 'panel');
-    const title = addText(scene, GAME_W / 2, top + 46, `${options.teacher}'s pattern`, 36, { color: CSS.yellow });
+    const title = addText(scene, GAME_W / 2, top + 46, `${options.teacher}${options.round ? `: ${options.round}` : "'s pattern"}`, 36, { color: CSS.yellow });
     this.caption = addBody(scene, GAME_W / 2, top + 96, '', 24, { color: CSS.cream, bold: true, wrapWidth: boxW - 80 });
     this.objects.push(dim, box, title, this.caption);
     const rowY = top + 220;
@@ -120,8 +127,13 @@ export class PatternPad {
   }
 
   /** Light a receptor with its lane's note. */
-  private flash(lane: PadLane, strong: boolean): void {
+  private flash(lane: PadLane, strong: boolean, heard = false): void {
     const receptor = this.receptors[lane];
+    if (heard) {
+      // An echo in the dark: only the sound.
+      playLane(this.scene.game, lane);
+      return;
+    }
     receptor.setFrame(lane).setAlpha(1).setTint(strong ? 0xffffff : LANE_COLORS[lane]);
     this.scene.tweens.killTweensOf(receptor);
     receptor.setScale(NOTE_SCALE * 1.18);
@@ -138,7 +150,8 @@ export class PatternPad {
     this.hintRow.forEach((arrow) => arrow.setVisible(this.hinted));
     this.caption.setText(this.hinted && this.options.hint ? this.options.hint : 'Watch and listen...').setColor(CSS.cream);
     const step = this.options.stepMs;
-    this.options.pattern.forEach((lane, i) => this.later(delay + i * step, () => this.flash(lane, false)));
+    const dark = !!this.options.audioOnly && !this.hinted;
+    this.options.pattern.forEach((lane, i) => this.later(delay + i * step, () => this.flash(lane, false, dark)));
     this.later(delay + this.options.pattern.length * step + 250, () => {
       this.listening = true;
       this.caption.setText(this.hinted && this.options.hint ? `${this.options.hint}  Your turn!` : 'Your turn!').setColor(CSS.yellow);
@@ -153,10 +166,13 @@ export class PatternPad {
     if (verdict === 'wrong') {
       this.listening = false;
       playSfx(this.scene.game, 'miss');
-      this.caption.setText('Not quite. Again!').setColor(CSS.miss);
       this.dots.forEach((dot, i) => dot.setFillStyle(i < this.input.length - 1 ? COLORS.perfect : i === this.input.length - 1 ? COLORS.miss : COLORS.ink));
+      this.tries++;
+      const joke = this.options.failText?.(this.tries);
+      this.caption.setText(joke ?? 'Not quite. Again!').setColor(CSS.miss);
+      if (this.options.audioOnly) for (let k = 1; k <= 3; k++) this.later(k * 220, () => playLane(this.scene.game, lane));
       this.hinted = this.options.onTry(false);
-      this.later(900, () => this.demonstrate(300));
+      this.later(joke ? 2400 : 900, () => this.demonstrate(300));
       return;
     }
     this.dots[this.input.length - 1]?.setFillStyle(LANE_COLORS[lane]);

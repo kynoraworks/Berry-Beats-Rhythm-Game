@@ -153,10 +153,17 @@ const WAVES: readonly VoiceWave[] = ['square', 'triangle', 'sawtooth', 'sine', '
 const PATTERNS: readonly VoicePattern[] = ['flat', 'rise', 'fall', 'bounce', 'random'];
 const EFFECTS: readonly VoiceEffect['kind'][] = ['shake', 'wave', 'sparkle'];
 
+/** Columns of VOICES.md that become other fields once the whole row is read. */
+type DocField = keyof VoiceDef | 'id' | 'pitchMin' | 'pitchMax' | 'cps';
+
 /** A column or key name from the doc, to a field. */
-function fieldOf(name: string): keyof VoiceDef | 'id' | null {
+function fieldOf(name: string): DocField | null {
   const key = name.toLowerCase().replace(/[^a-z]/g, '');
-  if (['id', 'speaker', 'who', 'key', 'character', 'voice'].includes(key)) return 'id';
+  if (['id', 'presetid', 'speaker', 'who', 'key', 'character', 'voice'].includes(key)) return 'id';
+  if (key === 'pitchmin' || key === 'pitchlow') return 'pitchMin';
+  if (key === 'pitchmax' || key === 'pitchhigh') return 'pitchMax';
+  if (key === 'cps') return 'cps';
+  if (key === 'blipevery') return 'every';
   if (key.startsWith('wave')) return 'wave';
   if (key.startsWith('pitch') || key === 'hz' || key === 'base' || key === 'basepitch') return 'pitch';
   if (key.startsWith('jitter') || key === 'spread') return 'jitter';
@@ -173,6 +180,7 @@ function fieldOf(name: string): keyof VoiceDef | 'id' | null {
 
 /** One value from the doc into a voice, if it makes sense; anything else is ignored. */
 function applyField(voice: Partial<VoiceDef>, field: keyof VoiceDef, raw: string): void {
+  if (field === 'blipMs' && /per[- ]word/i.test(raw)) return;
   const text = raw.trim().replace(/`/g, '').toLowerCase();
   if (text === '' || text === '-') return;
   const number = parseFloat(text);
@@ -219,7 +227,7 @@ function applyField(voice: Partial<VoiceDef>, field: keyof VoiceDef, raw: string
  */
 export function parseVoiceDoc(markdown: string): Record<string, Partial<VoiceDef>> {
   const out: Record<string, Partial<VoiceDef>> = {};
-  let header: (keyof VoiceDef | 'id' | null)[] | null = null;
+  let header: (DocField | null)[] | null = null;
   for (const rawLine of markdown.split(/\r?\n/)) {
     const line = rawLine.trim();
     if (line.startsWith('|')) {
@@ -235,9 +243,19 @@ export function parseVoiceDoc(markdown: string): Record<string, Partial<VoiceDef
       const id = cells[idAt]?.replace(/[`*]/g, '').trim();
       if (!id) continue;
       const voice: Partial<VoiceDef> = {};
+      const extra: Partial<Record<'pitchMin' | 'pitchMax' | 'cps', number>> = {};
       header.forEach((field, i) => {
-        if (field && field !== 'id' && cells[i] !== undefined) applyField(voice, field, cells[i]);
+        if (!field || field === 'id' || cells[i] === undefined) return;
+        if (field === 'pitchMin' || field === 'pitchMax' || field === 'cps') {
+          const n = parseFloat(cells[i]);
+          if (Number.isFinite(n)) extra[field] = n;
+        } else applyField(voice, field, cells[i]);
       });
+      applyRange(voice, extra);
+      const patternCell = header.indexOf('pattern');
+      const volume = patternCell >= 0 ? /volume\s+(0?\.\d+)/i.exec(cells[patternCell] ?? '') : null;
+      // The doc's volumes are of full scale (0.18 is its default); ours are before the talk bus (about 0.45).
+      if (volume) voice.volume = Math.min(1, Math.round((parseFloat(volume[1]) / 0.18) * 0.45 * 100) / 100);
       out[id] = { ...out[id], ...voice };
       continue;
     }
@@ -248,16 +266,107 @@ export function parseVoiceDoc(markdown: string): Record<string, Partial<VoiceDef
     for (const pair of bullet[2].split(',')) {
       const [name, value] = pair.split('=');
       const field = name && value !== undefined ? fieldOf(name) : null;
-      if (field && field !== 'id') applyField(voice, field, value);
+      if (field && field !== 'id' && field !== 'pitchMin' && field !== 'pitchMax' && field !== 'cps') applyField(voice, field, value);
     }
     if (Object.keys(voice).length > 0) out[bullet[1]] = { ...out[bullet[1]], ...voice };
   }
   return out;
 }
 
+/**
+ * A row's pitch range and speed (VOICES.md writes pitch_min, pitch_max and cps):
+ * the middle of the range, a spread of half of it in semitones, and a speed
+ * that keeps the doc's ordering (slow Quince, fast Mango) around our 48 letters
+ * a second (18 cps is speed 1).
+ */
+function applyRange(voice: Partial<VoiceDef>, extra: Partial<Record<'pitchMin' | 'pitchMax' | 'cps', number>>): void {
+  const { pitchMin: lo, pitchMax: hi, cps } = extra;
+  if (lo && hi && hi >= lo) {
+    voice.pitch = Math.round((lo + hi) / 2);
+    voice.jitter = Math.round(((12 * Math.log2(hi / lo)) / 2) * 100) / 100;
+  } else if (lo || hi) voice.pitch = lo ?? hi;
+  if (cps && cps > 0) voice.speed = Math.round(Math.pow(cps / 18, 0.7) * 100) / 100;
+  // Shorter blips than 15 ms click rather than sound (the phone's 12 ms).
+  if (voice.blipMs !== undefined && voice.blipMs < 15) voice.blipMs = 15;
+}
+
+/**
+ * VOICES.md ids (snake case, as the writers keep them) to the speaker ids the
+ * game uses (story/speakers.ts, cast ids). Both are kept, so either works.
+ */
+export const VOICE_ALIASES: Record<string, string> = {
+  berry_silent: 'berrySilent',
+  berry_hood_down: 'berryHoodDown',
+  berry_kid: 'kidBerry',
+  raspberry_kid: 'kidRaspberry',
+  blueberry_kid: 'kidBlueberry',
+  orange_young: 'orangeYoung',
+  juice_fm: 'juiceFm',
+  passion_fruit: 'passionFruit',
+  mrs_damson: 'mrsDamson',
+  postmaster_gooseberry: 'gooseberry',
+  little_currant: 'currant',
+  clerk_date: 'clerkDate',
+  officer_elderberry: 'elderberry',
+  mr_olive: 'olive',
+  robot_b33: 'b33',
+  mrs_satsuma: 'satsuma',
+  auntie_longan: 'longan',
+  foreman_chestnut: 'chestnut',
+  ms_clementine: 'clementine',
+  lord_medlar: 'medlar',
+  res_high: 'resHigh',
+  res_mid: 'resMid',
+  res_low: 'resLow',
+  res_kid: 'resKid',
+  res_elder: 'resElder',
+  res_sleep: 'resSleep',
+};
+
+/**
+ * The doc's presets for generic residents (VOICES.md 2.1): its "Speakers"
+ * column, as role keys (`tourist`, `mopperSloe`) to preset ids.
+ */
+export function parsePresetSpeakers(markdown: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  let speakersAt = -1;
+  for (const raw of markdown.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line.startsWith('|')) {
+      speakersAt = -1;
+      continue;
+    }
+    const cells = line.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
+    if (cells[0].toLowerCase().startsWith('preset')) {
+      speakersAt = cells.findIndex((cell) => cell.toLowerCase() === 'speakers');
+      continue;
+    }
+    if (speakersAt < 0 || /^:?-+/.test(cells[0])) continue;
+    const preset = cells[0].replace(/`/g, '');
+    for (const name of (cells[speakersAt] ?? '').replace(/\([^)]*\)/g, '').split(',')) {
+      const role = name.trim();
+      if (role) out[voiceKey(role)] = preset;
+    }
+  }
+  return out;
+}
+
+/** Read a VOICES.md into the table: its voices, their aliases, and the presets for residents by role. */
+export function applyVoiceDoc(markdown: string): void {
+  overrideVoices(parseVoiceDoc(markdown));
+  for (const [doc, id] of Object.entries(VOICE_ALIASES)) if (VOICES[doc]) VOICES[id] = { ...VOICES[doc] };
+  for (const [role, preset] of Object.entries(parsePresetSpeakers(markdown))) {
+    // A named voice of its own wins over the preset (Mrs. Damson, Little Currant, Nib).
+    if (VOICES[role] || !VOICES[preset]) continue;
+    VOICES[role] = { ...VOICES[preset] };
+  }
+  // The resident in Mopper Sloe's hat is cast as `sloe`.
+  if (!VOICES.sloe && VOICES.mopperSloe) VOICES.sloe = { ...VOICES.mopperSloe };
+}
+
 // The story agent's doc, if it is there when the game is built (an empty glob when it is not).
 const VOICE_DOCS = import.meta.glob<string>('../../docs/story_v2/VOICES.md', { query: '?raw', import: 'default', eager: true });
-for (const doc of Object.values(VOICE_DOCS)) overrideVoices(parseVoiceDoc(doc));
+for (const doc of Object.values(VOICE_DOCS)) applyVoiceDoc(doc);
 
 // ---------------------------------------------------------------------------
 // Timing and pitch (pure)

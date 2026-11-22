@@ -22,7 +22,16 @@ import { ObjectiveBanner } from '../explore/ObjectiveBanner';
 import { PatternPad } from '../explore/PatternPad';
 import { CHAR_SCALE, Walker } from '../explore/Walker';
 import { Dialogue } from '../play/Dialogue';
+import { hasImage, storySong } from '../cutscene/storyFiles';
 import { CAST } from '../story/cast';
+import { chapterOf, type Chapter, type LookSpot, type ResidentSpot } from '../story/chapters';
+import { storyState } from '../story/conditions';
+import { holds } from '../story/conditions';
+import { nodesOf } from '../story/lines';
+import { POSTCARDS, RUMOURS, isRumourHeard, postcardFor, rumourForLine, secretsAt, syncRumours, truthRevealed } from '../story/mystery';
+import { MixtapeCard, Phone, PostcardCard, TapeViewer } from '../explore/StoryCards';
+import { playNodes } from '../explore/StoryPlayer';
+import type { BNode } from '../story/bible';
 import { battleSegment, firstSegment } from '../story/flow';
 import {
   banterLines,
@@ -30,10 +39,12 @@ import {
   currentFollower,
   followerOptions,
   hasPickedThisVisit,
+  leavingLines,
   needsFollowerPick,
   setFollower,
   startVisit,
   waitingCrew,
+  waitingLines,
   type BanterTrigger,
 } from '../story/follower';
 import { STATION_LAYOUT, placeOf, talkKey, type ExploreData, type Hotspot, type PlaceDef, type PlaceKind } from '../story/places';
@@ -52,13 +63,20 @@ import {
   markSeen,
   markTalked,
   setTaskState,
+  applySets,
+  hasFlag,
+  setFlag,
+  markVisited,
+  writePostcard,
+  unlockRumour,
 } from '../story/progress';
 import { doorHotspot, isRoomLocked, roomById, roomPlace, roomsFor, type RoomDef } from '../story/rooms';
 import { playSegment } from '../story/run';
-import { bossLockedMessage, hasLoop, loopHotspots, loopStatus, objectiveLines, TASKS, TRAINERS, trainerBattle, trainerFruit } from '../story/stopLoop';
+import { bossLockedMessage, hasLoop, loopHotspots, loopStatus, objectiveLines, TASKS, TRAINERS, trainerBattle, trainerWho } from '../story/stopLoop';
 import { STOPS, stopById, type StopDef } from '../story/stops';
-import { chooseAnswer, findItem, patternHinted, patternStepMs, patternTry, talkChain, taskSpots, type SpotWhere, type TaskDef } from '../story/tasks';
+import { chooseAnswer, currentQuestion, findItem, findNeed, patternHinted, patternStepMs, patternTry, talkChain, taskSpots, type SpotWhere, type TaskDef, type TaskSpot } from '../story/tasks';
 import type { CharacterId, FruitId, Line } from '../story/types';
+import { stripTags } from '../play/textFx';
 
 /** How close (art pixels) Berry must be to a hotspot to use it. */
 const REACH = 15;
@@ -74,6 +92,18 @@ const BERRY_WALK = 'berry_walk';
 const WAIT_X = [210, 194, 178];
 /** Where Berry stands on coming back to a station from the street. */
 const STATION_RETURN_X = STATION_LAYOUT.exit.x - 6;
+/** Stops whose follower has said their line leaving the station this visit. */
+const LEFT_STATION = new Set<string>();
+/** Gap between two follower bubbles, ms (SYSTEMS 9). */
+const BANTER_GAP = 20000;
+/** No progress on the task this long: one hint (SYSTEMS 10). */
+const IDLE_HINT_MS = 60000;
+
+/** Stop 1's opening in Berry's room, from the bible. */
+function stopOneArrival(): BNode[] {
+  return nodesOf('s01', 'arrival', 'main');
+}
+
 /** Fruits who join the crew at some stop. */
 const ALLIES = new Set<string>(STOPS.flatMap((stop) => (stop.joins ? [stop.joins] : [])));
 
@@ -144,6 +174,14 @@ export class ExploreScene extends Phaser.Scene {
   private lamp: LampPool | null = null;
   private extras: Residents | null = null;
   private effects: AmbientEffects | null = null;
+  /** The bible's chapter for this stop. */
+  private chapter: Chapter | undefined;
+  /** When the follower last chipped in (game ms): at most one bubble every 20 s. */
+  private lastBanter = -1e9;
+  private bubble: Phaser.GameObjects.Container | null = null;
+  /** The task last moved on at (game ms), for the 60 s idle hint. */
+  private idleSince = 0;
+  private hintsGiven = 0;
 
   constructor() {
     super(SceneKeys.Explore);
@@ -159,6 +197,11 @@ export class ExploreScene extends Phaser.Scene {
     else this.place = placeOf(this.stop.id, kind === 'interior' ? 'street' : kind) ?? placeOf(this.stop.id, arrival)!;
     this.at = typeof data?.at === 'number' && Number.isFinite(data.at) ? data.at : undefined;
     this.task = hasLoop(this.stop) ? TASKS[this.stop.id] : undefined;
+    this.chapter = chapterOf(this.stop.id);
+    this.lastBanter = -1e9;
+    this.bubble = null;
+    this.idleSince = 0;
+    this.hintsGiven = 0;
     this.crew = [];
     this.crewIds = [];
     this.waiting = [];
@@ -182,6 +225,27 @@ export class ExploreScene extends Phaser.Scene {
     this.effects = null;
   }
 
+  /**
+   * Art that lands bit by bit (public/assets/img): the room's own background
+   * (and the Echo Room's dark one), this stop's battle stages and the sprites of
+   * the people standing here, each loaded once it is there and never before.
+   */
+  preload(): void {
+    const want = new Set<string>();
+    if (this.room) {
+      want.add(this.room.bg);
+      if (this.room.dark) want.add(`${this.room.bg}_dark`);
+    }
+    if (this.place.kind === 'street' || this.place.kind === 'station') want.add(this.place.bg);
+    for (const battle of this.stop.battles) if (battle.stage) want.add(battle.stage);
+    for (const key of want) if (!this.textures.exists(key) && hasImage(key)) this.load.image(key, `assets/img/${key}.png`);
+    const sprites = new Set<string>();
+    const trainer = TRAINERS[this.stop.id];
+    if (trainer?.sprite) sprites.add(trainer.sprite);
+    for (const spot of this.place.hotspots) if (spot.resident && spot.resident.who !== 'npc') sprites.add(CAST[spot.resident.who]?.sprite ?? '');
+    for (const key of sprites) if (key && !this.textures.exists(key) && hasImage(key)) this.load.spritesheet(key, `assets/img/${key}.png`, { frameWidth: 64, frameHeight: 64 });
+  }
+
   create(): void {
     const width = this.place.width * PX;
     const main = this.cameras.main;
@@ -197,8 +261,11 @@ export class ExploreScene extends Phaser.Scene {
     main.startFollow(this.berry.sprite, true, 0.12, 1);
     main.fadeIn(250, 18, 10, 36);
     this.uiCamera.fadeIn(250, 18, 10, 36);
-    const song = (this.place.kind === 'room' ? 'tutorial' : (this.room?.music ?? this.stop.song)) as MusicKey;
-    music.play(song);
+    // The town's own soundtrack (MUSIC_LIST.md) once it has landed; the stop's song until then.
+    const town = this.chapter ? storySong(this.townMusic(), this.stop.song) : this.stop.song;
+    music.play((this.room?.music ?? town) as MusicKey);
+    syncRumours();
+    this.idleSince = this.time.now;
     this.arrive();
   }
 
@@ -213,6 +280,7 @@ export class ExploreScene extends Phaser.Scene {
 
   /** Where this place is, for task spots (station, street or a room). */
   private where(): SpotWhere | null {
+    if (this.place.kind === 'room') return 'room:berry';
     if (this.place.kind === 'station') return 'station';
     if (this.place.kind === 'street') return 'street';
     if (this.place.kind === 'interior' && this.room) return `room:${this.room.id}`;
@@ -223,23 +291,40 @@ export class ExploreScene extends Phaser.Scene {
   private allHotspots(): Hotspot[] {
     const place = this.place;
     const floor = (x: number) => this.floorRow(x);
-    const list = [...place.hotspots];
-    if (place.kind === 'street') {
+    const cleared = isCleared(this.stop.id);
+    const follower = currentFollower(this.stop);
+    const list = place.hotspots.filter((h) => {
+      // Before-the-boss and after-the-boss things (the half mural, the finished one).
+      if (h.look?.only === 'beforeBoss' && cleared) return false;
+      if (h.look?.only === 'afterBoss' && !cleared) return false;
+      // Stop 1: Raspberry is at the counter until she has beaten Berry in the garden.
+      if (h.resident?.id === 'raspberryCounter' && cleared) return false;
+      // Stop 12: the one who walks with Berry is not also waiting in the dressing room.
+      if (this.stop.id === 'stop12' && h.resident && h.resident.who === follower) return false;
+      return true;
+    });
+    if (place.kind === 'street' && this.stop.number !== 1) {
       list.push({ id: 'station', kind: 'exit', label: 'Station', x: 0, y: floor(7) - 56, w: 14, h: 56, lines: [], to: { place: 'station', at: STATION_RETURN_X } });
-      for (const room of roomsFor(this.stop.id)) list.push(doorHotspot(room, floor(room.doorX)));
     }
+    if (place.kind === 'street') for (const room of roomsFor(this.stop.id)) list.push(doorHotspot(room, floor(room.doorX)));
     const where = this.where();
     if (where) list.push(...loopHotspots(this.stop, where, floor));
     // The crew who stayed behind, by the station's exit.
     this.waiting.forEach((entry, i) => {
       list.push({ id: `crew_${i}`, kind: 'crew', label: CAST[entry.fruit].name, x: entry.x - 10, y: floor(entry.x) - 42, w: 20, h: 42, lines: [], spot: String(i) });
     });
+    // Stop 8: nobody waits; the bench by the exit is empty.
+    if (place.kind === 'station' && this.stop.number === 8 && !cleared && this.chapter) {
+      list.push({ id: 'bench', kind: 'look', label: 'Empty bench', x: WAIT_X[0] - 12, y: floor(WAIT_X[0]) - 30, w: 24, h: 30, lines: this.chapter.follower.noPicker });
+    }
     return list;
   }
 
   private buildWorld(): void {
     const place = this.place;
-    const background = place.kind === 'interior' && this.room ? interiorBackground(this, this.room, this.stop.time) : placeBackground(this, place);
+    // The Echo Room is dark (outlines only) until its echo task lights the lamps.
+    const dark = this.room?.dark && !isTaskDone(this.stop.id) && this.textures.exists(`${this.room.bg}_dark`) ? `${this.room.bg}_dark` : null;
+    const background = dark ?? (place.kind === 'interior' && this.room ? interiorBackground(this, this.room, this.stop.time) : placeBackground(this, place));
     this.world.add(this.add.image(0, 0, background).setOrigin(0).setScale(PX));
     for (const prop of placeProps(this, place)) this.world.add(this.add.image(prop.x * PX, prop.y * PX, prop.key).setOrigin(0).setScale(PX));
 
@@ -255,14 +340,16 @@ export class ExploreScene extends Phaser.Scene {
     // Who walks with him: the whole crew off the train, else the one picked to follow.
     const options = followerOptions(this.stop);
     let walking: FruitId[] = [];
-    if (place.kind === 'depart') walking = ['raspberry'];
+    if (place.kind === 'depart') walking = isCleared(this.stop.id) ? ['raspberry'] : [];
     else if (place.kind === 'station' && this.at === undefined) {
       startVisit(this.stop);
-      walking = options;
+      LEFT_STATION.delete(this.stop.id);
+      // At the Grand Stage the others wait in the dressing room, not on the platform.
+      walking = this.stop.number === 12 ? options.slice(0, 1) : options;
     } else if (place.kind !== 'room') {
       const follower = currentFollower(this.stop);
       walking = follower ? [follower] : [];
-      if (place.kind === 'station') {
+      if (place.kind === 'station' && this.stop.number !== 12) {
         waitingCrew(options, follower)
           .slice(0, WAIT_X.length)
           .forEach((fruit, i) => this.waiting.push({ fruit, walker: this.addWalker(fruit, WAIT_X[i], max), x: WAIT_X[i] }));
@@ -323,20 +410,26 @@ export class ExploreScene extends Phaser.Scene {
       if (frames.length > 1) this.time.addEvent({ delay: ms, loop: true, callback: () => sprite.active && sprite.setFrame(frames[++step % frames.length]) });
       return sprite;
     };
+    /** Someone of the chapters: their own street sprite once drawn, else the stand-in in their colour. */
+    const someone = (who: CharacterId, flip = false): Phaser.GameObjects.Sprite => {
+      const own = CAST[who]?.sprite;
+      if (own && this.textures.exists(own)) return person(own, [0, 1], 820, flip);
+      if (who === 'npc') return person(npcSheet(this, CAST[this.stop.fruit].color), [0, 1], 900, flip);
+      const sprite = person(characterSheet(this, who).texture, [0, 1, 0, 2], 340, flip);
+      this.standing.set(who, sprite);
+      return sprite;
+    };
     switch (hotspot.kind) {
       case 'clue':
-        return this.place.kind === 'station' ? person(npcSheet(this, CAST[this.stop.fruit].color), [0, 1], 900, true) : undefined;
+        if (this.place.kind !== 'station') return undefined;
+        return hotspot.resident && hotspot.resident.who !== 'npc' ? someone(hotspot.resident.who, true) : person(npcSheet(this, CAST[this.stop.fruit].color), [0, 1], 900, true);
       case 'fruit': {
         const sprite = person(characterSheet(this, this.stop.fruit).texture, [0, 1, 0, 2], 320);
         this.standing.set(this.stop.fruit, sprite);
         return sprite;
       }
-      case 'trainer': {
-        const fruit = trainerFruit(this.stop, isBattleWon(this.stop.battles[0]));
-        const sprite = person(characterSheet(this, fruit).texture, [0, 1, 0, 2], 360, true);
-        this.standing.set(fruit, sprite);
-        return sprite;
-      }
+      case 'trainer':
+        return someone(trainerWho(this.stop, isBattleWon(this.stop.battles[0])), true);
       case 'talk':
       case 'task': {
         const look = hotspot.person;
@@ -349,11 +442,7 @@ export class ExploreScene extends Phaser.Scene {
           if (!getSettings().reduceMotion) this.tweens.add({ targets: item, y: item.y - PX, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
           return item;
         }
-        if (look.who) {
-          const sprite = person(characterSheet(this, look.who).texture, [0, 1, 0, 2], 340, look.flip);
-          this.standing.set(look.who, sprite);
-          return sprite;
-        }
+        if (look.who) return someone(look.who, look.flip);
         const texture = look.texture && this.textures.exists(look.texture) ? look.texture : npcSheet(this, look.color ?? COLORS.yellow);
         return person(texture, [0, 1], 800 + Math.round(Math.random() * 300), look.flip ?? true);
       }
@@ -401,7 +490,7 @@ export class ExploreScene extends Phaser.Scene {
    */
   private addExtras(): void {
     const place = this.place;
-    const life = placeLife(this.stop.id, place.kind);
+    const life = placeLife(this.stop.id, place.kind, place);
     if (life.spots.length === 0) return;
     const where = place.kind === 'street' ? 'street' : 'station';
     this.extras = new Residents(this, life.spots.map((spot) => placePiece(spot, place.bg, where)), {
@@ -416,7 +505,7 @@ export class ExploreScene extends Phaser.Scene {
   /** Light beams, neon, steam, bubbles, confetti, birds and lantern glow, as the place calls for. */
   private addEffects(): void {
     const place = this.place;
-    const life = placeLife(this.stop.id, place.kind);
+    const life = placeLife(this.stop.id, place.kind, place);
     if (life.effects.length === 0) return;
     const sources = place.hotspots.filter((h) => h.kind === 'look').map((h) => ({ x: (h.x + h.w / 2) * PX, y: h.y * PX }));
     this.effects = new AmbientEffects(this, {
@@ -437,7 +526,7 @@ export class ExploreScene extends Phaser.Scene {
       case 'fruit':
         return CAST[this.stop.fruit].color;
       case 'trainer':
-        return CAST[trainerFruit(this.stop, isBattleWon(this.stop.battles[0]))].color;
+        return CAST[trainerWho(this.stop, isBattleWon(this.stop.battles[0]))].color;
       case 'crew':
         return CAST[this.waiting[Number(hotspot.spot)]?.fruit ?? 'raspberry'].color;
       case 'exit':
@@ -484,7 +573,7 @@ export class ExploreScene extends Phaser.Scene {
       case 'fruit':
         return CAST[this.stop.fruit].name;
       case 'trainer':
-        return `${CAST[trainerFruit(this.stop, isBattleWon(this.stop.battles[0]))].name} (trainer)`;
+        return this.stop.id === 'stop10' ? 'The qualifier stage' : `${TRAINERS[this.stop.id]?.name ?? 'Trainer'} (trainer)`;
       case 'crew':
         return CAST[this.waiting[Number(hotspot.spot)]?.fruit ?? 'raspberry'].name;
       default:
@@ -512,6 +601,8 @@ export class ExploreScene extends Phaser.Scene {
       const name = marker.list[2] as Phaser.GameObjects.Text;
       if (hotspot.kind === 'look') marker.setAlpha(hasInspected(this.lookKey(hotspot)) ? 0.45 : 1);
       if (hotspot.kind === 'clue') marker.setAlpha(hasTalked(talkKey(this.stop.id)) ? 0.45 : 1);
+      // A resident with a line not heard yet shows a bright mark; once all are heard, a dim one.
+      if (hotspot.kind === 'talk' && hotspot.resident) marker.setAlpha(this.residentHasNews(hotspot.resident) ? 1 : 0.45);
       if (hotspot.kind === 'trainer') marker.setAlpha(trainerBattle(isBattleWon(this.stop.battles[0]), isBattleWon(this.stop.battles[1])) === null ? 0.45 : 1);
       if (hotspot.kind === 'task') {
         const found = this.itemFound(hotspot);
@@ -638,20 +729,17 @@ export class ExploreScene extends Phaser.Scene {
       this.time.delayedCall(350, () =>
         this.doors.open(() => {
           // Far enough onto the platform for the whole crew to step off behind him.
-          this.berry.walkTo(Math.min(100, place.startX + FOLLOW_GAP * (this.crew.length + 1)), () => {
-            this.locked = false;
-            this.banter('arrive');
-          });
+          this.berry.walkTo(Math.min(100, place.startX + FOLLOW_GAP * (this.crew.length + 1)), () => this.arrivalBeats());
         }),
       );
-      this.showHint();
-    } else if (this.at !== undefined && place.kind !== 'room' && place.kind !== 'depart') {
+    } else if (this.at !== undefined && place.kind !== 'depart') {
       // Back from a room, a battle or the street: standing where he left off.
       this.berry.place(this.at);
       this.berry.face(place.kind === 'station' ? -1 : 1);
       this.lineUpBehind();
       this.cameras.main.centerOn(this.berry.sprite.x, GAME_H / 2);
-      if (place.kind === 'interior') this.banter(`room:${this.room?.id ?? ''}`);
+      if (place.kind === 'interior') this.enterRoom();
+      if (place.kind === 'street' && isCleared(this.stop.id)) this.banter('afterBoss');
     } else if (place.kind === 'street') {
       this.berry.place(-4);
       this.crew.forEach((walker, i) => walker.place(-4 - (i + 1) * FOLLOW_GAP));
@@ -660,25 +748,117 @@ export class ExploreScene extends Phaser.Scene {
         this.locked = false;
         this.banter('arrive');
       });
-      this.showHint();
     } else if (place.kind === 'interior') {
       this.berry.face(1);
       this.lineUpBehind();
-      if (this.room) this.banter(`room:${this.room.id}`);
+      this.enterRoom();
     } else if (place.kind === 'room') {
-      this.showHint();
+      this.roomArrival();
     } else {
-      this.departBeat();
+      this.departArrival();
     }
   }
 
+  /**
+   * On the platform: Coach's track label (the mixtape card), her text, the
+   * stop's own arrival scene (the Grand Stage's morning), then a hint.
+   */
+  private arrivalBeats(): void {
+    const chapter = this.chapter;
+    const steps: ((next: () => void) => void)[] = [];
+    if (chapter && this.stop.number >= 2) steps.push((next) => this.openModal(new MixtapeCard(this, chapter.card, DEPTH.modal, () => (this.closeModal(), next()))));
+    if (chapter && chapter.texts.length > 0) steps.push((next) => this.phone(chapter.texts, next));
+    if (chapter && chapter.arrivalScene.length > 0 && !hasSeen(`${this.stop.id}:morning`)) {
+      steps.push((next) => this.talk(chapter.arrivalScene, () => (markSeen(`${this.stop.id}:morning`), next())));
+    }
+    const run = (i: number): void => {
+      if (i >= steps.length) {
+        this.locked = false;
+        this.showHint();
+        return;
+      }
+      steps[i](() => run(i + 1));
+    };
+    run(0);
+  }
+
+  /** Stop 1, Berry's room: the first time, Coach climbs in, then the lesson. After it, the room is his to leave. */
+  private roomArrival(): void {
+    if (this.at !== undefined) {
+      this.berry.place(this.at);
+      this.cameras.main.centerOn(this.berry.sprite.x, GAME_H / 2);
+    }
+    if (hasSeen('stop01:arrival') || !this.chapter) {
+      this.showHint();
+      return;
+    }
+    this.locked = true;
+    this.say('Tap, tap. At the window...', 1400);
+    this.time.delayedCall(1300, () =>
+      this.playStory(this.arrivalNodes(), () => {
+        markSeen('stop01:arrival');
+        this.startBattle();
+      }),
+    );
+  }
+
+  /** The bible's opening in Berry's room (stop 1, before the lesson). */
+  private arrivalNodes(): BNode[] {
+    return this.chapter?.stop === 'stop01' ? stopOneArrival() : [];
+  }
+
+  /** Stop 1's platform: the first time, the departure scene; then the stand and the 6:15. */
+  private departArrival(): void {
+    this.backButton.setVisible(true);
+    const scene = this.chapter?.departScene ?? [];
+    if (hasSeen('stop01:departScene') || scene.length === 0) {
+      this.say('Write a postcard, or board the 6:15.', 2400);
+      return;
+    }
+    this.locked = true;
+    this.time.delayedCall(500, () =>
+      this.playStory(scene, () => {
+        markSeen('stop01:departScene');
+        this.say('Write a postcard, or board the 6:15.', 2400);
+      }),
+    );
+  }
+
+  /** Walking into a room: its scene the first time (when it applies), then the follower's reaction. */
+  private enterRoom(): void {
+    const room = this.room;
+    if (!room) return;
+    markVisited(room.id);
+    const scene = room.onEnter;
+    const key = `enter:${room.id}`;
+    const then = () => {
+      this.banter(`room:${room.id}`);
+      this.backstageTalk();
+    };
+    if (scene && !(scene.once && hasSeen(key)) && holds(scene.cond, this.state())) {
+      this.locked = true;
+      this.time.delayedCall(350, () =>
+        this.playStory(scene.nodes, () => {
+          markSeen(key);
+          // Meeting Raspberry at the counter starts stop 1's task; the July message is the hut's.
+          if (room.id === 'bakery_shop') markSeen('stop01:counter');
+          if (room.id === 'water_tower_hut') setFlag('julyPlayed');
+          this.refreshMarkers();
+          then();
+        }),
+      );
+      return;
+    }
+    then();
+  }
+
   private showHint(): void {
-    const first = this.place.kind === 'room' ? "Someone's at the door." : this.place.kind === 'station' ? `Talk to the ${this.clueLabel().toLowerCase()} to find the way out.` : '';
+    const first = this.place.kind === 'room' ? 'The door is on the right.' : this.place.kind === 'station' ? `Talk to the ${this.clueLabel().toLowerCase()} to find the way out.` : '';
     if (this.place.kind === 'station' && hasTalked(talkKey(this.stop.id))) return;
     if (first) this.say(first, 2600);
   }
 
-  /** After the win in stop 1: Berry and Raspberry walk onto the platform and board the train. */
+  /** Stop 1: Berry and Raspberry walk to the 6:15 and board it. */
   private departBeat(): void {
     this.locked = true;
     this.backButton.setVisible(false);
@@ -692,7 +872,7 @@ export class ExploreScene extends Phaser.Scene {
         const board = () => {
           if (++aboard < this.crew.length) return;
           markSeen('boarded');
-          this.doors.close('Berry Town', 'Doors closing', () => this.time.delayedCall(500, () => this.leave(SceneKeys.LevelSelect, { levelId: STOPS[1].id })));
+          this.doors.close('Berry Town', 'Doors closing', () => this.time.delayedCall(500, () => this.leave(SceneKeys.LevelSelect, { levelId: STOPS[0].id })));
         };
         if (this.crew.length === 0) board();
         this.crew.forEach((walker) =>
@@ -710,18 +890,21 @@ export class ExploreScene extends Phaser.Scene {
     this.dialogue?.destroy();
     this.dialogue = null;
     if (this.place.kind === 'interior' && this.room) {
-      // Out of a room is back to the street, at its door.
+      // Out of a room is back to the street (or the room it opens from), at its door.
       this.goOutside();
       return;
     }
     if (this.place.kind === 'room' && !isCleared(this.stop.id)) this.leave(SceneKeys.Menu);
+    else if (this.place.kind === 'depart' && !hasSeen('boarded')) this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street', at: (this.chapter?.street.exitX ?? 600) - 20 } satisfies ExploreData);
     else this.leave(SceneKeys.LevelSelect, { levelId: this.stop.id });
   }
 
   private goOutside(): void {
     if (!this.room) return;
     playSfx(this.game, 'doorThunk');
-    this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street', at: this.room.doorX } satisfies ExploreData);
+    const parent = this.room.in;
+    if (parent) this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'interior', room: parent, at: this.room.doorX } satisfies ExploreData);
+    else this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street', at: this.room.doorX } satisfies ExploreData);
   }
 
   /** Fade both cameras out and start another scene. */
@@ -792,21 +975,15 @@ export class ExploreScene extends Phaser.Scene {
     const after = () => this.banter(`hotspot:${hotspot.id}`);
     switch (hotspot.kind) {
       case 'look':
-        playSfx(this.game, 'lookAt');
-        this.talk(hotspot.lines, () => {
-          markInspected(this.lookKey(hotspot));
-          this.refreshMarkers();
-          after();
-        });
+        this.useLook(hotspot, after);
         break;
       case 'clue':
         playSfx(this.game, 'npcHey');
-        this.talk(hotspot.lines, () => {
+        this.talk(this.residentLines(hotspot.resident, hotspot.lines), () => {
           const first = !hasTalked(talkKey(this.stop.id));
           markTalked(talkKey(this.stop.id));
           this.refreshMarkers();
-          if (this.place.kind === 'room') this.coachArrives();
-          else if (first) {
+          if (first) {
             playSfx(this.game, 'unlock');
             this.say(`The way to ${this.exitLabel()} is open.`, 2200, CSS.perfect);
           }
@@ -828,13 +1005,211 @@ export class ExploreScene extends Phaser.Scene {
         this.useTask(hotspot);
         break;
       case 'talk':
-        playSfx(this.game, 'npcHey');
-        this.talk(hotspot.lines, after);
+        this.useResident(hotspot, after);
         break;
       case 'crew':
         this.useWaiting(Number(hotspot.spot));
         break;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // Things and people of the chapters
+  // -------------------------------------------------------------------------
+
+  /** Conditions are checked against the save and whoever follows Berry. */
+  private state() {
+    return storyState(this.crewIds[0] ?? null, this.stop.number);
+  }
+
+  /** Play a stretch of the bible (lines and choices) in the speech box and the choice box. */
+  private playStory(nodes: readonly BNode[], done: () => void): void {
+    this.locked = true;
+    playNodes(
+      {
+        say: (lines, next) => {
+          let cut = false;
+          this.talk(lines, () => next(cut), () => (cut = true));
+        },
+        choose: (labels, pick) =>
+          this.openModal(
+            new ChoiceBox(this, {
+              prompt: '',
+              choices: labels.map((label) => (label.startsWith('[') ? label : label)),
+              depth: DEPTH.modal,
+              onPick: (index) => {
+                this.closeModal();
+                pick(index);
+              },
+            }),
+          ),
+        state: () => this.state(),
+        direction: (text) => {
+          const screen = /`([^`]+)`/.exec(text);
+          if (/^Screen text/i.test(text) && screen) this.say(screen[1], 2600, CSS.lilac);
+        },
+      },
+      nodes,
+      () => {
+        this.locked = false;
+        this.refreshMarkers();
+        done();
+      },
+    );
+  }
+
+  /** Texts on Berry's phone (Coach's, Raspberry's hints). */
+  private phone(lines: readonly Line[], done: () => void): void {
+    const visible = lines.filter((line) => holds(line.cond, this.state()));
+    if (visible.length === 0) {
+      done();
+      return;
+    }
+    const phone = this.openModal(new Phone(this, { lines: visible, depth: DEPTH.modal, onDone: () => (this.closeModal(), done()) }));
+    phone.onAdd = (object) => this.cameras.main.ignore(object);
+  }
+
+  /** The town's soundtrack key: the Rooftop's full band plays once the crew is back. */
+  private townMusic(): string {
+    const music = this.chapter?.music ?? '';
+    return this.stop.number === 8 && isCleared(this.stop.id) ? 'town_rooftop_full' : music;
+  }
+
+  private residentKey(resident: ResidentSpot, part: string): string {
+    return `${this.stop.id}:res:${resident.id}:${part}`;
+  }
+
+  /** The moments a resident's lines are for, now: their own, the task's, after the boss. */
+  private residentMoment(when: string | undefined): boolean {
+    if (!when) return true;
+    const w = when.toLowerCase();
+    if (w.includes('after a fail')) return false;
+    if (w.startsWith('during task') || w === 'task') return this.taskActive();
+    if (w.startsWith('after boss') || w.startsWith('after the boss')) return isCleared(this.stop.id);
+    return true;
+  }
+
+  /**
+   * What a resident says this time (SYSTEMS 7): the first talk is everything
+   * that applies now; after that, the lines not heard yet (the task's, the
+   * after-boss ones); once all are heard, their last line again.
+   */
+  private residentLines(resident: ResidentSpot | undefined, fallback: readonly Line[]): Line[] {
+    if (!resident) return [...fallback];
+    const state = this.state();
+    const now = resident.lines.filter((line) => this.residentMoment(line.when) && holds(line.cond, state));
+    const fresh = now.filter((line) => !hasTalked(this.residentKey(resident, line.id ?? line.text)));
+    for (const line of now) markTalked(this.residentKey(resident, line.id ?? line.text));
+    if (fresh.length > 0) return fresh;
+    return now.slice(-1);
+  }
+
+  /** True while a resident has something not heard yet. */
+  private residentHasNews(resident: ResidentSpot): boolean {
+    const state = this.state();
+    return resident.lines.some((line) => this.residentMoment(line.when) && holds(line.cond, state) && !hasTalked(this.residentKey(resident, line.id ?? line.text)));
+  }
+
+  private useLook(hotspot: Hotspot, after: () => void): void {
+    const look = hotspot.look;
+    playSfx(this.game, 'lookAt');
+    const finish = () => {
+      markInspected(this.lookKey(hotspot));
+      if (look) this.lookSets(look);
+      this.refreshMarkers();
+      this.giveAttached(`look:${hotspot.id}`, after);
+    };
+    if (look?.kind === 'postcard') {
+      this.writeCard(finish);
+      return;
+    }
+    if (look?.kind === 'radio') {
+      playSfx(this.game, 'djChirp');
+      this.talk(hotspot.lines, finish);
+      return;
+    }
+    if (look?.kind === 'tape' && isRumourHeard(RUMOURS.find((page) => page.stop === this.stop.number)!)) {
+      this.openNotebook(this.stop.number - 1, true, finish);
+      return;
+    }
+    if (look?.nodes) {
+      this.playStory(look.nodes, finish);
+      return;
+    }
+    const lines = hotspot.lines.filter((line) => holds(line.cond, this.state()));
+    this.talk(lines.length > 0 ? lines : hotspot.lines.slice(0, 1).filter((line) => !line.cond), finish);
+  }
+
+  /** A thing's flags (sawPoster) and, the first time, word that a secret was found. */
+  private lookSets(look: LookSpot): void {
+    const fresh = (look.sets ?? []).some((flag) => !hasFlag(flag.split('=')[0]));
+    applySets(look.sets);
+    if (look.secret && fresh) {
+      const { found, total } = secretsAt(this.stop.number);
+      playSfx(this.game, 'bonus');
+      this.say(`Secret found: ${look.label} (${found} of ${total} here)`, 2600, CSS.yellow);
+    }
+  }
+
+  /** The station's postcard stand: Berry writes this stop's card (once), or reads it again. */
+  private writeCard(done: () => void): void {
+    const card = postcardFor(this.stop.number);
+    if (!card) {
+      done();
+      return;
+    }
+    const first = writePostcard(this.stop.number);
+    playSfx(this.game, first ? 'marker' : 'paperFlip');
+    this.openModal(
+      new PostcardCard(this, {
+        cards: [card],
+        title: `Postcard ${card.stop}${first ? ', written' : ''}`,
+        depth: DEPTH.modal,
+        onDone: () => {
+          this.closeModal();
+          if (first) this.say(`Postcards written: ${POSTCARDS.filter((c) => c.stop <= this.stop.number).length > 0 ? card.stop : 0}. Kept, not sent.`, 2200, CSS.lilac);
+          done();
+        },
+      }),
+    );
+  }
+
+  /** The WHO WON? notebook, open on a page (and its tape playing). */
+  private openNotebook(page: number, playing: boolean, done: () => void): void {
+    const pages = RUMOURS.map((p) => ({ page: p, heard: isRumourHeard(p) }));
+    this.openModal(new TapeViewer(this, { pages, start: page, playing, truth: truthRevealed(), depth: DEPTH.modal, onDone: () => (this.closeModal(), done()) }));
+  }
+
+  private useResident(hotspot: Hotspot, after: () => void): void {
+    const resident = hotspot.resident;
+    playSfx(this.game, 'npcHey');
+    // A talk chain step with this person comes first (stop 2's clerk, Kumquat).
+    if (resident && this.chainStep(`resident:${resident.id}`, after)) return;
+    // Someone who sets the task (stop 10's registrar).
+    if (resident && this.task?.kind === 'find' && this.task.giver?.spot.attach === `resident:${resident.id}` && !isTaskDone(this.stop.id)) {
+      this.useGiver(after);
+      return;
+    }
+    if (resident?.nodes && !hasTalked(this.residentKey(resident, 'scene'))) {
+      markTalked(this.residentKey(resident, 'scene'));
+      for (const line of resident.lines) markTalked(this.residentKey(resident, line.id ?? line.text));
+      this.playStory(resident.nodes.filter((node) => node.kind !== 'line' || this.residentMoment(node.when)), () => this.giveAttached(`resident:${resident.id}`, after));
+      return;
+    }
+    this.talk(this.residentLines(resident, hotspot.lines), () => {
+      this.refreshMarkers();
+      if (resident) this.giveAttached(`resident:${resident.id}`, after);
+      else after();
+    });
+  }
+
+  /** Stop 12: the follower's own word before the stage, said on walking into the dressing room with them. */
+  private backstageTalk(): void {
+    const follower = this.crewIds[0];
+    if (this.stop.id !== 'stop12' || this.room?.id !== 'dressing_room' || !follower) return;
+    const own = this.room.people?.find((person) => person.who === follower);
+    if (!own || this.itemIsFound(`resident:${own.id}`)) return;
+    this.talk(this.residentLines(own, own.lines), () => this.giveAttached(`resident:${own.id}`, () => undefined));
   }
 
   private useExit(hotspot: Hotspot): void {
@@ -843,14 +1218,26 @@ export class ExploreScene extends Phaser.Scene {
       this.say(`Talk to the ${this.clueLabel().toLowerCase()} first.`, 2000, CSS.miss);
       return;
     }
-    if (hotspot.to) {
-      // A room's way out, or the street's way back to the station.
-      if (this.place.kind === 'interior') {
+    const to = hotspot.to;
+    if (to) {
+      if (this.place.kind === 'interior' && to.place !== 'depart') {
         this.goOutside();
         return;
       }
-      playSfx(this.game, 'select');
-      this.leave(SceneKeys.Explore, { stop: this.stop.id, place: hotspot.to.place, at: hotspot.to.at } satisfies ExploreData);
+      // Stop 1: the station steps open once Raspberry has been beaten; the 6:15 boards.
+      if (to.place === 'depart') {
+        if (this.place.kind === 'depart') {
+          this.departBeat();
+          return;
+        }
+        if (!isCleared(this.stop.id)) {
+          playSfx(this.game, 'locked');
+          this.say('Not yet. The garden first.', 2000, CSS.miss);
+          return;
+        }
+      }
+      playSfx(this.game, to.place === 'room' || to.place === 'street' ? 'doorThunk' : 'select');
+      this.leave(SceneKeys.Explore, { stop: this.stop.id, place: to.place, at: to.at, room: to.room } satisfies ExploreData);
       return;
     }
     playSfx(this.game, 'select');
@@ -858,13 +1245,23 @@ export class ExploreScene extends Phaser.Scene {
       this.startBattle();
       return;
     }
-    const toStreet = () => this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street' } satisfies ExploreData);
+    const toStreet = () => {
+      const follower = currentFollower(this.stop);
+      const lines = leavingLines(this.stop, follower).filter((line) => holds(line.cond, this.state()));
+      if (lines.length > 0 && !LEFT_STATION.has(this.stop.id)) {
+        LEFT_STATION.add(this.stop.id);
+        this.talk(lines, () => this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street' } satisfies ExploreData));
+        return;
+      }
+      this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street' } satisfies ExploreData);
+    };
     // Two or more of the crew: who comes along?
     const options = followerOptions(this.stop);
     if (needsFollowerPick(options) && !hasPickedThisVisit(this.stop)) {
       this.openPicker(options, currentFollower(this.stop), (fruit) => {
         setFollower(this.stop, fruit);
-        toStreet();
+        const lines = leavingLines(this.stop, fruit).filter((line) => holds(line.cond, this.state()));
+        this.talk(lines, () => this.leave(SceneKeys.Explore, { stop: this.stop.id, place: 'street' } satisfies ExploreData));
       });
       return;
     }
@@ -886,13 +1283,22 @@ export class ExploreScene extends Phaser.Scene {
     );
   }
 
-  /** Talking to a crew member who waits at the station: swap who follows. */
+  /** Talking to a crew member who waits at the station: their line, a signature (stop 10), or a swap. */
   private useWaiting(slot: number): void {
     const entry = this.waiting[slot];
     if (!entry) return;
     playSfx(this.game, 'npcHey');
+    const attach = `crew:${entry.fruit}`;
+    if (this.taskActive() && this.findsAttached(attach)) {
+      this.giveAttached(attach, () => undefined);
+      return;
+    }
+    this.talk(waitingLines(this.stop, entry.fruit), () => this.swapPicker(entry.fruit));
+  }
+
+  private swapPicker(waitingFruit: FruitId): void {
     const options = followerOptions(this.stop);
-    this.openPicker(options, entry.fruit, (fruit) => {
+    this.openPicker(options, waitingFruit, (fruit) => {
       const current = this.crewIds[0];
       if (fruit === current || !current) return;
       const index = this.waiting.findIndex((w) => w.fruit === fruit);
@@ -930,7 +1336,21 @@ export class ExploreScene extends Phaser.Scene {
 
   private useBoss(): void {
     const status = loopStatus(this.stop);
+    const task = this.task;
     if (hasLoop(this.stop) && !status.bossOpen) {
+      // The boss may be the one who sets or asks the task (Banana's ticket, the bunch's riddles, Plum's flames).
+      if (this.chainStep('boss', () => undefined)) return;
+      if (task?.kind === 'chooseAnswer' && task.asker.attach === 'boss' && !isTaskDone(this.stop.id)) {
+        playSfx(this.game, 'npcHey');
+        this.talk(task.intro, () => this.ask(task));
+        return;
+      }
+      if (task?.bossIntro && !isTaskDone(this.stop.id) && !hasTalked(`${this.stop.id}:bossIntro`)) {
+        markTalked(`${this.stop.id}:bossIntro`);
+        playSfx(this.game, 'npcHey');
+        this.talk(task.bossIntro, () => this.refreshMarkers());
+        return;
+      }
       playSfx(this.game, 'locked');
       this.say(bossLockedMessage(status, this.task), 2600, CSS.miss);
       return;
@@ -941,27 +1361,34 @@ export class ExploreScene extends Phaser.Scene {
   private useTrainer(): void {
     const trainer = TRAINERS[this.stop.id];
     if (!trainer) return;
+    if (this.chainStep('trainer', () => undefined)) return;
     const next = trainerBattle(isBattleWon(this.stop.battles[0]), isBattleWon(this.stop.battles[1]));
+    const task = this.task;
+    const asks = task?.kind === 'chooseAnswer' && task.asker.attach === 'trainer' && !isTaskDone(this.stop.id) ? task : null;
     playSfx(this.game, 'npcHey');
-    if (next === 0) {
-      this.talk(trainer.beforeA, () => this.startBattle(0));
-      return;
-    }
-    if (next === 1) {
-      this.talk(trainer.beforeB, () => this.startBattle(1));
-      return;
-    }
-    // Both won: a rematch if he wants one.
     const [a, b] = this.stop.battles;
+    const battle = (index: 0 | 1) => (index === 0 ? this.startBattle(0) : this.talk(trainer.beforeB, () => this.startBattle(1)));
+    if (!asks && next !== null) {
+      battle(next);
+      return;
+    }
+    // The trainer also asks the task's questions (the doorman, the butler), or offers a rematch.
+    const choices: { label: string; go: () => void }[] = [];
+    if (next !== null) choices.push({ label: `Dance: ${this.stop.battles[next].name}`, go: () => battle(next) });
+    else {
+      choices.push({ label: `Again: ${a.name}`, go: () => this.startBattle(0) });
+      choices.push({ label: `Again: ${b.name}`, go: () => this.startBattle(1) });
+    }
+    if (asks) choices.push({ label: 'The questions', go: () => this.talk(asks.intro, () => this.ask(asks)) });
+    choices.push({ label: 'Not now', go: () => this.talk(next === null ? trainer.after : [], () => undefined) });
     this.openModal(
       new ChoiceBox(this, {
-        prompt: `${CAST[trainerFruit(this.stop, true)].name}: dance again?`,
-        choices: [`A: ${a.name}`, `B: ${b.name}`, 'Not now'],
+        prompt: `${CAST[trainerWho(this.stop, isBattleWon(a))].name}`,
+        choices: choices.map((c) => c.label),
         depth: DEPTH.modal,
         onPick: (index) => {
           this.closeModal();
-          if (index === 0 || index === 1) this.startBattle(index);
-          else this.talk(trainer.after, () => undefined);
+          choices[index]?.go();
         },
         onCancel: () => this.closeModal(),
       }),
@@ -972,7 +1399,14 @@ export class ExploreScene extends Phaser.Scene {
   // The unlock task
   // -------------------------------------------------------------------------
 
-  private taskSpot(hotspot: Hotspot) {
+  /** The task has begun (stop 1's waits for Raspberry at the counter) and is not done. */
+  private taskActive(): boolean {
+    const task = this.task;
+    if (!task || isTaskDone(this.stop.id)) return false;
+    return !task.startsAfter || hasSeen(task.startsAfter);
+  }
+
+  private taskSpot(hotspot: Hotspot): TaskSpot | undefined {
     return this.task ? taskSpots(this.task).find((spot) => spot.id === hotspot.spot) : undefined;
   }
 
@@ -980,6 +1414,92 @@ export class ExploreScene extends Phaser.Scene {
   private itemFound(hotspot: Hotspot): boolean {
     if (hotspot.kind !== 'task' || hotspot.person || this.task?.kind !== 'find') return false;
     return (getTaskState(this.stop.id).found ?? []).includes(hotspot.spot ?? '');
+  }
+
+  /** The find task's item standing on someone or something (`attach`), found already. */
+  private itemIsFound(attach: string): boolean {
+    if (this.task?.kind !== 'find') return false;
+    const item = this.task.items.find((entry) => entry.spot.attach === attach);
+    return !!item && (getTaskState(this.stop.id).found ?? []).includes(item.spot.id);
+  }
+
+  /** True when someone or something carries one of the find task's items, still to be found. */
+  private findsAttached(attach: string): boolean {
+    const task = this.task;
+    if (task?.kind !== 'find') return false;
+    const item = task.items.find((entry) => entry.spot.attach === attach);
+    if (!item || (getTaskState(this.stop.id).found ?? []).includes(item.spot.id)) return false;
+    if (item.spot.needs && !hasFlag(item.spot.needs)) return false;
+    // Stop 10: the signatures are collected once the registrar has asked for them.
+    if (task.giver && !hasTalked(`${this.stop.id}:giver`)) return false;
+    return true;
+  }
+
+  /** After using someone or something: the item they carry, if the task wants it. Then `after`. */
+  private giveAttached(attach: string, after: () => void): void {
+    const task = this.task;
+    if (task?.kind !== 'find' || !this.taskActive() || !this.findsAttached(attach)) {
+      after();
+      return;
+    }
+    const item = task.items.find((entry) => entry.spot.attach === attach)!;
+    const result = findItem(task, getTaskState(this.stop.id), item.spot.id);
+    if (result.outcome === 'again') {
+      after();
+      return;
+    }
+    setTaskState(this.stop.id, result.state);
+    this.idleSince = this.time.now;
+    playSfx(this.game, 'badgePop');
+    if (task.carry) this.berry.speedScale = result.outcome === 'done' ? 1 : 0.5;
+    this.refreshMarkers();
+    this.say(`${item.spot.label}: found ${result.count} of ${result.need}`, 2000, CSS.perfect);
+    const said = item.lines.filter((line) => holds(line.cond, this.state()));
+    this.talk(said, () => {
+      if (result.outcome !== 'done') return after();
+      const thanks = task.giver?.thanksNodes;
+      if (thanks && thanks.length > 0) this.playStory(thanks, () => this.taskDone());
+      else this.talk(task.giver?.thanks ?? [], () => this.taskDone());
+    });
+  }
+
+  /** The find task's giver (stop 10's registrar): the ask, and the follower signs at once. */
+  private useGiver(after: () => void): void {
+    const task = this.task;
+    if (task?.kind !== 'find' || !task.giver) return after();
+    const first = !hasTalked(`${this.stop.id}:giver`);
+    markTalked(`${this.stop.id}:giver`);
+    const found = (getTaskState(this.stop.id).found ?? []).length;
+    this.talk(first || found < findNeed(task) ? task.giver.intro : [], () => {
+      const follower = this.crewIds[0];
+      if (follower && this.findsAttached(`crew:${follower}`)) this.giveAttached(`crew:${follower}`, after);
+      else after();
+    });
+  }
+
+  /** A talk chain step for this person, if the chain wants them now (or they are a wrong turn). True if it played. */
+  private chainStep(attach: string, after: () => void): boolean {
+    const task = this.task;
+    if (task?.kind !== 'talkChain' || !this.taskActive()) return false;
+    const result = talkChain(task, getTaskState(this.stop.id), attach);
+    if (result.outcome === 'again' && !task.steps.some((step) => step.spot.attach === attach && task.steps.indexOf(step) === (getTaskState(this.stop.id).step ?? 0))) {
+      if (result.lines.length === 0 || attach.startsWith('resident:')) return false;
+    }
+    if (result.outcome === 'early' && result.lines.length === 0) return false;
+    playSfx(this.game, 'npcHey');
+    this.talk(result.lines, () => {
+      if (result.outcome === 'advance' || result.outcome === 'done') {
+        setTaskState(this.stop.id, result.state);
+        this.idleSince = this.time.now;
+      }
+      if (result.outcome === 'done') this.taskDone();
+      else if (result.outcome === 'advance') {
+        playSfx(this.game, 'badgePop');
+        this.refreshMarkers();
+      }
+      after();
+    });
+    return true;
   }
 
   /** A talk chain's person already talked to, in order. */
@@ -1012,9 +1532,8 @@ export class ExploreScene extends Phaser.Scene {
         return;
       }
       case 'find': {
-        if (task.giver && spotId === task.giver.spot.id) {
-          playSfx(this.game, 'npcHey');
-          this.talk(done ? task.giver.thanks : task.giver.intro, after);
+        if (!this.taskActive()) {
+          this.say('Not yet.', 1400, CSS.grey);
           return;
         }
         const result = findItem(task, state, spotId);
@@ -1023,11 +1542,7 @@ export class ExploreScene extends Phaser.Scene {
         playSfx(this.game, 'badgePop');
         this.refreshMarkers();
         this.say(`Found ${result.count} of ${result.need}`, 1800, CSS.perfect);
-        this.talk(result.lines, () => {
-          if (result.outcome !== 'done') return after();
-          if (task.giver) this.talk(task.giver.thanks, () => this.taskDone());
-          else this.taskDone();
-        });
+        this.talk(result.lines, () => (result.outcome === 'done' ? this.taskDone() : after()));
         return;
       }
       case 'copyPattern':
@@ -1050,22 +1565,39 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   private openPad(task: Extract<TaskDef, { kind: 'copyPattern' }>, teacher: string): void {
+    const rounds = [task.pattern, ...(task.rounds ?? [])];
+    const round = Math.min(getTaskState(this.stop.id).step ?? 0, rounds.length - 1);
     const hinted = patternHinted(getTaskState(this.stop.id));
+    const jokes = (task.fails ?? []).filter((line) => holds(line.cond, this.state()));
     this.openModal(
       new PatternPad(this, {
         teacher,
-        pattern: task.pattern,
+        pattern: rounds[round],
         stepMs: patternStepMs(task, hinted),
         hinted,
-        hint: task.hint[0]?.text,
+        hint: task.hint[0] ? stripTags(task.hint[0].text) : undefined,
+        audioOnly: task.audioOnly,
+        round: rounds.length > 1 ? `Round ${round + 1} of ${rounds.length}` : undefined,
+        failText: (tries) => {
+          const joke = jokes[(tries - 1) % Math.max(1, jokes.length)];
+          return joke ? `${joke.role ?? CAST[joke.who].name}: ${stripTags(joke.text)}` : undefined;
+        },
         depth: DEPTH.modal,
         onTry: (copied) => {
-          const result = patternTry(getTaskState(this.stop.id), copied);
+          const result = patternTry(getTaskState(this.stop.id), copied && round + 1 >= rounds.length);
           setTaskState(this.stop.id, result.state);
           return result.hint;
         },
         onDone: () => {
           this.closeModal();
+          if (round + 1 < rounds.length) {
+            // The next round (stop 9: a lamp lights for each).
+            setTaskState(this.stop.id, { ...getTaskState(this.stop.id), step: round + 1, tries: 0 });
+            playSfx(this.game, 'unlock');
+            this.say(`Round ${round + 1} done. A lamp lights.`, 1800, CSS.perfect);
+            this.time.delayedCall(900, () => this.openPad(task, teacher));
+            return;
+          }
           this.talk(task.success, () => this.taskDone());
         },
         onCancel: () => this.closeModal(),
@@ -1074,40 +1606,42 @@ export class ExploreScene extends Phaser.Scene {
   }
 
   private ask(task: Extract<TaskDef, { kind: 'chooseAnswer' }>): void {
-    this.openModal(
-      new ChoiceBox(this, {
-        prompt: task.question,
-        choices: task.choices.map((choice) => choice.text),
-        depth: DEPTH.modal,
-        onPick: (index) => {
-          this.closeModal();
-          const result = chooseAnswer(task, getTaskState(this.stop.id), index);
-          if (result.correct) setTaskState(this.stop.id, result.state);
-          else playSfx(this.game, 'miss');
-          // A wrong answer gets its line, then the question again.
-          this.talk(result.lines, () => (result.correct ? this.taskDone() : this.ask(task)));
-        },
-        onCancel: () => this.closeModal(),
-      }),
+    const question = currentQuestion(task, getTaskState(this.stop.id));
+    const before = question.before.filter((line) => holds(line.cond, this.state()));
+    // The question is said in the box first, then the answers come up.
+    this.talk(before, () =>
+      this.openModal(
+        new ChoiceBox(this, {
+          prompt: question.question,
+          choices: question.choices.map((choice) => choice.text),
+          depth: DEPTH.modal,
+          onPick: (index) => {
+            this.closeModal();
+            const result = chooseAnswer(task, getTaskState(this.stop.id), index);
+            if (result.correct) setTaskState(this.stop.id, result.state);
+            else playSfx(this.game, 'miss');
+            const lines = result.lines.filter((line) => holds(line.cond, this.state()));
+            // A wrong answer gets its joke, then the question again; a right one the next question.
+            this.talk(lines, () => (result.finished ? this.taskDone() : this.ask(task)));
+          },
+          onCancel: () => this.closeModal(),
+        }),
+      ),
     );
   }
 
   private taskDone(): void {
     playSfx(this.game, 'unlock');
+    this.berry.speedScale = 1;
     this.refreshMarkers();
     const open = loopStatus(this.stop).bossOpen;
     this.say(open ? 'Done! The boss awaits.' : `Done: ${this.task?.title.toLowerCase() ?? 'task'}.`, 2400, CSS.perfect);
+    const done = this.task?.done ?? [];
+    if (done.length > 0) this.time.delayedCall(300, () => this.talk(done, () => undefined));
   }
 
   private exitLabel(): string {
     return this.place.hotspots.find((h) => h.kind === 'exit')?.label ?? 'the street';
-  }
-
-  /** Stop 1: once the neighbour has gone, the Coach climbs in through the window and the lesson begins. */
-  private coachArrives(): void {
-    this.locked = true;
-    this.say('Tap, tap. At the window...', 1400);
-    this.time.delayedCall(1300, () => this.startBattle());
   }
 
   /** Start one of the stop's battles (0 A, 1 B, 2 C), or with none given the one picked on the train. */
@@ -1131,14 +1665,47 @@ export class ExploreScene extends Phaser.Scene {
   // Talking and messages
   // -------------------------------------------------------------------------
 
-  /** The follower chips in, if the story gave them something to say here. */
+  /**
+   * The follower chips in, if the story gave them something to say here: a
+   * small bubble over their head (SYSTEMS 9), never during a conversation, at
+   * most one every 20 s, each line once per save. `then` runs straight on.
+   */
   private banter(trigger: BanterTrigger, then?: () => void): void {
-    const lines = banterLines(this.crewIds[0], banterPlaceId(this.stop.id, this.place.kind, this.room?.id), trigger);
-    if (lines.length === 0 || !this.crewIds[0]) {
-      then?.();
-      return;
-    }
-    this.talk(lines, () => then?.());
+    const follower = this.crewIds[0];
+    const all = banterLines(follower, banterPlaceId(this.stop.id, this.place.kind, this.room?.id), trigger);
+    const lines = all.filter((line) => holds(line.cond, this.state()) && !hasTalked(`banter:${line.id ?? line.text}`));
+    then?.();
+    if (!follower || lines.length === 0 || this.time.now - this.lastBanter < BANTER_GAP) return;
+    const walker = this.crew[0];
+    if (!walker) return;
+    this.lastBanter = this.time.now;
+    for (const line of lines) markTalked(`banter:${line.id ?? line.text}`);
+    this.showBubbles(walker.sprite, lines);
+  }
+
+  /** Speech bubbles over someone's head, one line after another. */
+  private showBubbles(target: Phaser.GameObjects.Sprite, lines: readonly Line[]): void {
+    this.bubble?.destroy();
+    const show = (i: number): void => {
+      const line = lines[i];
+      if (!line || !target.active) {
+        this.bubble?.destroy();
+        this.bubble = null;
+        return;
+      }
+      this.bubble?.destroy();
+      const text = addBody(this, 0, 0, stripTags(line.text), 20, { color: CSS.ink, wrapWidth: 300 });
+      const w = Math.min(330, text.width + 28);
+      const h = text.height + 20;
+      const box = this.add.rectangle(0, 0, w, h, COLORS.cream).setStrokeStyle(4, COLORS.ink);
+      const tail = this.add.triangle(0, h / 2 + 6, -8, 0, 8, 0, 0, 10, COLORS.cream);
+      this.bubble = this.add.container(target.x, target.y - target.displayHeight * 0.9 - h / 2, [box, tail, text]).setDepth(DEPTH.marker + 1);
+      this.world.add(this.bubble);
+      this.uiCamera.ignore(this.bubble);
+      playSfx(this.game, 'talkBlip');
+      this.time.delayedCall(2200 + stripTags(line.text).length * 45, () => show(i + 1));
+    };
+    show(0);
   }
 
   /** Crew who are here: walking with Berry, or waiting at the station. */
@@ -1153,20 +1720,48 @@ export class ExploreScene extends Phaser.Scene {
   private castLines(lines: readonly Line[]): Line[] {
     const here = this.present();
     const stand = this.crewIds[0];
-    return lines.map((line) => (ALLIES.has(line.who) && !here.has(line.who) && stand && line.who !== this.stop.fruit ? { ...line, who: stand } : line));
+    return lines.map((line) => (ALLIES.has(line.who) && !here.has(line.who) && !this.standing.has(line.who) && stand && line.who !== this.stop.fruit ? { ...line, who: stand } : line));
   }
 
-  private talk(lines: readonly Line[], onDone: () => void): void {
+  private talk(lines: readonly Line[], onDone: () => void, onCut?: () => void): void {
     if (lines.length === 0) {
       onDone();
       return;
     }
+    // Texts on the phone and lines in the box, in turn, when a scene has both (the interludes).
+    const split = lines.findIndex((line, i) => i > 0 && (line.who === 'phone') !== (lines[0].who === 'phone'));
+    if (split > 0) {
+      this.talk(lines.slice(0, split), () => this.talk(lines.slice(split), onDone, onCut));
+      return;
+    }
     this.prompt.setText('');
+    this.bubble?.destroy();
+    this.bubble = null;
     const before = new Set(this.children.list);
+    // Texts on the phone go to the phone, not the speech box.
+    if (lines.every((line) => line.who === 'phone')) {
+      this.phone(lines, onDone);
+      return;
+    }
     this.dialogue = new Dialogue(this, {
-      lines: this.castLines(lines),
+      lines: this.castLines(lines.filter((line) => line.who !== 'phone')),
       depth: DEPTH.dialogue,
+      onObjects: (objects) => this.cameras.main.ignore(objects),
+      onCut: onCut
+        ? () => {
+            this.dialogue = null;
+            this.quietUntil = this.time.now + 200;
+            onCut();
+            onDone();
+          }
+        : undefined,
       onLine: (line) => {
+        // A rumour: the notebook gets its page.
+        const page = rumourForLine(line.id);
+        if (page && unlockRumour(page.stop)) {
+          playSfx(this.game, 'tapeInsert');
+          this.say('WHO WON? A new page in the notebook.', 2400, CSS.yellow);
+        }
         // A little hop from whoever on screen is speaking.
         const speaker = this.speakerSprite(line.who);
         if (speaker) this.tweens.add({ targets: speaker, scaleY: CHAR_SCALE * 1.06, duration: 90, yoyo: true });
@@ -1228,7 +1823,19 @@ export class ExploreScene extends Phaser.Scene {
     this.lamp?.update();
     this.leaves?.update(dt);
     this.breath?.update(dt);
+    this.idleHint();
     this.updateNear();
+  }
+
+  /** After 60 s on a task with no progress: one hint, from the follower if one is here, else as a text. */
+  private idleHint(): void {
+    const hints = this.task?.hints ?? [];
+    if (!this.ready() || !this.taskActive() || this.hintsGiven >= hints.length || this.time.now - this.idleSince < IDLE_HINT_MS) return;
+    const hint = hints[this.hintsGiven++];
+    this.idleSince = this.time.now;
+    const follower = this.crew[0];
+    if (hint.who !== 'phone' && follower && this.crewIds[0]) this.showBubbles(follower.sprite, [{ ...hint, who: this.crewIds[0] }]);
+    else this.phone([{ ...hint, who: 'phone', role: hint.role ?? `${CAST[hint.who]?.name ?? 'Coach'} (text)`, voice: 'phone' }], () => undefined);
   }
 
   private reachOf(hotspot: Hotspot): number {
@@ -1294,7 +1901,7 @@ export class ExploreScene extends Phaser.Scene {
       case 'door':
         return `go into ${hotspot.label}`;
       case 'trainer': {
-        const name = CAST[trainerFruit(this.stop, isBattleWon(this.stop.battles[0]))].name;
+        const name = this.stop.id === 'stop10' ? CAST[trainerWho(this.stop, isBattleWon(this.stop.battles[0]))].name : (TRAINERS[this.stop.id]?.name ?? 'the trainer');
         return trainerBattle(isBattleWon(this.stop.battles[0]), isBattleWon(this.stop.battles[1])) === null ? `talk to ${name}` : `train with ${name}`;
       }
       case 'task':

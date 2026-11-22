@@ -16,6 +16,14 @@ import { BeatMapsScene } from './scenes/BeatMapsScene';
 import { ComposerScene } from './scenes/ComposerScene';
 import { UiKitScene } from './scenes/UiKitScene';
 import { MovesScene } from './scenes/MovesScene';
+import { PrologueScene } from './scenes/story/PrologueScene';
+import { KidsGardenScene } from './scenes/story/KidsGardenScene';
+import { SkyIntroScene } from './scenes/story/SkyIntroScene';
+import { FinaleScene } from './scenes/story/FinaleScene';
+import { CreditsScene } from './scenes/story/CreditsScene';
+import { EpilogueScene } from './scenes/story/EpilogueScene';
+import { PostCreditsScene } from './scenes/story/PostCreditsScene';
+import { ExtrasScene } from './scenes/story/ExtrasScene';
 
 /** Set by vite.config.ts: changes with every production build. */
 declare const __BUILD_ID__: string;
@@ -33,7 +41,7 @@ const game = new Phaser.Game({
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   input: { activePointers: 4 },
-  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, ExploreScene, LineupScene, CrewEndScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene, UiKitScene, MovesScene],
+  scene: [BootScene, PreloadScene, TitleScene, MenuScene, LevelSelectScene, ExploreScene, LineupScene, CrewEndScene, OptionsScene, PlayScene, ResultsScene, BeatMapsScene, ComposerScene, UiKitScene, MovesScene, PrologueScene, KidsGardenScene, SkyIntroScene, FinaleScene, CreditsScene, EpilogueScene, PostCreditsScene, ExtrasScene],
 });
 
 music.init(game);

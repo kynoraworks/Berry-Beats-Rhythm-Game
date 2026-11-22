@@ -245,6 +245,11 @@ const beat = (extra: Partial<Hit> = {}): Hit => ({ every: 1, ...extra });
 export const STAGE_LOOPS: Readonly<Record<string, readonly StageLoopDef[]>> = {
   // Berry's room: the cat figurine nods along, the helmet on the shelf bobs on the backbeat, the posters take turns
   // to bounce, the lamps breathe.
+  // Stop 1's garden (its boss stage): the swing and the weeds sway on the beat.
+  room_garden_overgrown: [
+    { kind: 'cut', rect: r(84, 44, 52, 50), mask: 'rect', motion: { type: 'hop', px: 1, hit: { every: 4, offset: 0 } } },
+    { kind: 'cut', rect: r(210, 56, 30, 20), mask: { bright: 140 }, motion: { type: 'glow', alpha: 0.4, hit: { every: 4, offset: 2, decay: 2 } } },
+  ],
   room: [
     { kind: 'cut', rect: r(22, 67, 18, 18), mask: 'key', motion: { type: 'hop', px: 1, hit: beat() } },
     { kind: 'cut', rect: r(101, 41, 23, 30), mask: 'key', motion: { type: 'hop', px: 1, hit: { every: 4, offset: 0 } } },

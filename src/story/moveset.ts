@@ -1,6 +1,6 @@
 import { LANE_SLOTS, SLOT_IDS, fitsSlot, type LaneSlot, type Loadout, type MoveDef, type SlotId } from '../play/moves';
-import { DEFAULT_LOADOUT, LEARNED_MOVES, moveById, moveForBattle } from './moveBook';
-import { isBattleWon } from './progress';
+import { DEFAULT_LOADOUT, LEARNED_MOVES, POSTGAME_MOVES, moveById, moveForBattle } from './moveBook';
+import { hasSeen, isBattleWon, markSeen } from './progress';
 import { BATTLES } from './stops';
 
 /**
@@ -93,7 +93,7 @@ export function choicesFor(slot: SlotId, learned: readonly string[], book: reado
 
 /** Moves of the battles `won` says are won. */
 export function movesFromWins(won: (battleId: string) => boolean): string[] {
-  return LEARNED_MOVES.filter((move) => move.battle !== null && won(move.battle)).map((move) => move.id);
+  return [...LEARNED_MOVES, ...POSTGAME_MOVES].filter((move) => move.battle !== null && won(move.battle)).map((move) => move.id);
 }
 
 /**
@@ -143,6 +143,8 @@ function write(moveset: Moveset): void {
 }
 
 const storyWins = (battleId: string): boolean => {
+  // The epilogue's moves are "won" by the beat that teaches them (learnPostGameMove).
+  if (battleId.startsWith('epilogue_')) return hasSeen(battleId);
   const battle = BATTLES.find((b) => b.id === battleId);
   return battle !== undefined && isBattleWon(battle);
 };
@@ -180,6 +182,18 @@ export function learnFromBattle(battleId: string): MoveDef | null {
   moveset.fresh.push(move.id);
   write(migrate(moveset, storyWins));
   return move;
+}
+
+/**
+ * Learn one of the epilogue's two moves ('mv_bog_queen_stomp', 'mv_summer_catch'),
+ * for the epilogue scene. Returns the move the first time, null after.
+ */
+export function learnPostGameMove(id: string): MoveDef | null {
+  const move = POSTGAME_MOVES.find((m) => m.id === id);
+  if (!move || !move.battle) return null;
+  if (hasSeen(move.battle)) return null;
+  markSeen(move.battle);
+  return learnFromBattle(move.battle);
 }
 
 /** Put a move in a slot (see applyEquip). Returns the new loadout, or null when it does not fit. */

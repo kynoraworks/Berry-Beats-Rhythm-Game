@@ -28,6 +28,60 @@
       "drift_correction_ms": 1.7,
       "end_similarity": 0.956
     },
+    "town_citrus_labs": {
+      "file": "assets/audio/story/town_citrus_labs.mp3",
+      "bpm": 110.02,
+      "bars": 16,
+      "loopStart": 0.3737,
+      "loopEnd": 35.2801,
+      "loopStartSample": 16479,
+      "loopEndSample": 1555851,
+      "fileSamples": 1555851,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.07,
+          0.07
+        ],
+        "hf_burst_ratio": [
+          0.04,
+          0.04
+        ],
+        "phase_shift_ms": [
+          -0.8,
+          -0.7
+        ]
+      },
+      "drift_correction_ms": 3.4,
+      "end_similarity": 0.944
+    },
+    "town_graffiti_corner": {
+      "file": "assets/audio/story/town_graffiti_corner.mp3",
+      "bpm": 89.99,
+      "bars": 20,
+      "loopStart": 0.5762,
+      "loopEnd": 53.9108,
+      "loopStartSample": 25410,
+      "loopEndSample": 2377467,
+      "fileSamples": 2377467,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.15,
+          0.15
+        ],
+        "hf_burst_ratio": [
+          0.03,
+          0.03
+        ],
+        "phase_shift_ms": [
+          -0.3,
+          -0.4
+        ]
+      },
+      "drift_correction_ms": -3.9,
+      "end_similarity": 0.993
+    },
     "town_grand_stage": {
       "file": "assets/audio/story/town_grand_stage.mp3",
       "bpm": 100.02,
@@ -55,6 +109,249 @@
       "drift_correction_ms": 8.8,
       "end_similarity": 0.88
     },
+    "town_lantern_market": {
+      "file": "assets/audio/story/town_lantern_market.mp3",
+      "bpm": 80.05,
+      "bars": 16,
+      "loopStart": 2.9636,
+      "loopEnd": 50.9336,
+      "loopStartSample": 130693,
+      "loopEndSample": 2246170,
+      "fileSamples": 2246170,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.1,
+          0.1
+        ],
+        "hf_burst_ratio": [
+          0.25,
+          0.25
+        ],
+        "phase_shift_ms": [
+          -27.4,
+          -27.7
+        ]
+      },
+      "drift_correction_ms": 0.0,
+      "end_similarity": 0.917
+    },
+    "town_orange_plaza": {
+      "file": "assets/audio/story/town_orange_plaza.mp3",
+      "bpm": 123.99,
+      "bars": 28,
+      "loopStart": 0.8819,
+      "loopEnd": 55.0802,
+      "loopStartSample": 38892,
+      "loopEndSample": 2429035,
+      "fileSamples": 2429035,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.44,
+          0.44
+        ],
+        "hf_burst_ratio": [
+          0.74,
+          0.74
+        ],
+        "phase_shift_ms": [
+          0.1,
+          0.1
+        ]
+      },
+      "drift_correction_ms": 1.6,
+      "end_similarity": 0.876
+    },
+    "town_peel_street": {
+      "file": "assets/audio/story/town_peel_street.mp3",
+      "bpm": 100.0,
+      "bars": 22,
+      "loopStart": 2.0106,
+      "loopEnd": 54.811,
+      "loopStartSample": 88666,
+      "loopEndSample": 2417164,
+      "fileSamples": 2417164,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.16,
+          0.16
+        ],
+        "hf_burst_ratio": [
+          0.06,
+          0.06
+        ],
+        "phase_shift_ms": [
+          0.2,
+          0.1
+        ]
+      },
+      "drift_correction_ms": 1.6,
+      "end_similarity": 0.952
+    },
+    "town_pineapple_hall": {
+      "file": "assets/audio/story/town_pineapple_hall.mp3",
+      "bpm": 92.01,
+      "bars": 16,
+      "loopStart": 8.2196,
+      "loopEnd": 49.9569,
+      "loopStartSample": 362486,
+      "loopEndSample": 2203101,
+      "fileSamples": 2203101,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.15,
+          0.15
+        ],
+        "hf_burst_ratio": [
+          0.19,
+          0.19
+        ],
+        "phase_shift_ms": [
+          -0.6,
+          -0.6
+        ]
+      },
+      "drift_correction_ms": 3.3,
+      "end_similarity": 0.934
+    },
+    "town_rooftop_alone": {
+      "file": "assets/audio/story/town_rooftop_alone.mp3",
+      "bpm": 76.0,
+      "bars": 20,
+      "loopStart": 0.0388,
+      "loopEnd": 63.189,
+      "loopStartSample": 1711,
+      "loopEndSample": 2786636,
+      "fileSamples": 2786636,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.08,
+          0.08
+        ],
+        "hf_burst_ratio": [
+          0.73,
+          0.73
+        ],
+        "phase_shift_ms": [
+          11.7,
+          11.7
+        ]
+      },
+      "drift_correction_ms": -9.8,
+      "end_similarity": 0.965
+    },
+    "town_rooftop_full": {
+      "file": "assets/audio/story/town_rooftop_full.mp3",
+      "bpm": 75.98,
+      "bars": 17,
+      "loopStart": 3.0066,
+      "loopEnd": 56.6949,
+      "loopStartSample": 132591,
+      "loopEndSample": 2500244,
+      "fileSamples": 2500244,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.23,
+          0.23
+        ],
+        "hf_burst_ratio": [
+          0.15,
+          0.15
+        ],
+        "phase_shift_ms": [
+          1.7,
+          2.0
+        ]
+      },
+      "drift_correction_ms": -11.4,
+      "end_similarity": 0.93
+    },
+    "town_the_club": {
+      "file": "assets/audio/story/town_the_club.mp3",
+      "bpm": 120.0,
+      "bars": 28,
+      "loopStart": 0.1127,
+      "loopEnd": 56.1131,
+      "loopStartSample": 4970,
+      "loopEndSample": 2474586,
+      "fileSamples": 2474586,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.19,
+          0.19
+        ],
+        "hf_burst_ratio": [
+          0.03,
+          0.03
+        ],
+        "phase_shift_ms": [
+          -0.1,
+          -0.1
+        ]
+      },
+      "drift_correction_ms": -0.5,
+      "end_similarity": 0.96
+    },
+    "town_the_tunnel": {
+      "file": "assets/audio/story/town_the_tunnel.mp3",
+      "bpm": 70.31,
+      "bars": 15,
+      "loopStart": 1.7371,
+      "loopEnd": 52.9412,
+      "loopStartSample": 76605,
+      "loopEndSample": 2334705,
+      "fileSamples": 2334705,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.07,
+          0.07
+        ],
+        "hf_burst_ratio": [
+          0.02,
+          0.02
+        ],
+        "phase_shift_ms": [
+          21.6,
+          21.6
+        ]
+      },
+      "drift_correction_ms": 0.0,
+      "end_similarity": 0.77
+    },
+    "town_vine_crossing": {
+      "file": "assets/audio/story/town_vine_crossing.mp3",
+      "bpm": 96.0,
+      "bars": 19,
+      "loopStart": 0.5064,
+      "loopEnd": 48.0148,
+      "loopStartSample": 22334,
+      "loopEndSample": 2117452,
+      "fileSamples": 2117452,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          1.01,
+          1.01
+        ],
+        "hf_burst_ratio": [
+          0.56,
+          0.56
+        ],
+        "phase_shift_ms": [
+          -0.0,
+          -0.0
+        ]
+      },
+      "drift_correction_ms": 6.2,
+      "end_similarity": 0.851
+    },
     "train_between": {
       "file": "assets/audio/story/train_between.mp3",
       "bpm": 88.01,
@@ -81,6 +378,33 @@
       },
       "drift_correction_ms": 0.6,
       "end_similarity": 0.979
+    },
+    "train_between_alone": {
+      "file": "assets/audio/story/train_between_alone.mp3",
+      "bpm": 87.87,
+      "bars": 15,
+      "loopStart": 0.4099,
+      "loopEnd": 41.3795,
+      "loopStartSample": 18077,
+      "loopEndSample": 1824837,
+      "fileSamples": 1824837,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.39,
+          0.39
+        ],
+        "hf_burst_ratio": [
+          1.08,
+          1.08
+        ],
+        "phase_shift_ms": [
+          47.1,
+          48.0
+        ]
+      },
+      "drift_correction_ms": 0.0,
+      "end_similarity": 0.945
     }
   }
 }

@@ -11,7 +11,7 @@ import { SONGS, getSong, type SongDef } from '../core/songs';
 const PRESENT = new Set(files);
 
 /** Prefixes of the images the story cutscenes may use, loaded in their scenes' preload. */
-export const STORY_IMAGE_PREFIXES = ['prologue_', 'sky_', 'kids_', 'kid_', 'shed_', 'garden_', 'finale_', 'credits_', 'epilogue_', 'postcredits_', 'cranberry', 'strawberry', 'conductor', 'orange_young', 'static_', 'vhs_', 'telly', 'train_side', 'line_panorama', 'berry_town_', 'trio_photo', 'golden_', 'envelope', 'lychee'];
+export const STORY_IMAGE_PREFIXES = ['prologue_', 'sky_', 'kids_', 'kid_', 'shed_', 'garden_', 'finale_', 'credits_', 'epilogue_', 'postcredits_', 'cranberry', 'strawberry', 'conductor', 'orange_young', 'static_', 'vhs_', 'telly', 'train_side', 'line_panorama', 'berry_town_', 'trio_photo', 'golden_', 'envelope', 'lychee', 'room_shed', 'room_garden', 'room_berry', 'cut_', 'ui_'];
 
 /** True if public/assets/img/<key>.png exists. */
 export function hasImage(key: string): boolean {
@@ -26,11 +26,13 @@ export function storyImages(): string[] {
     .filter((key) => STORY_IMAGE_PREFIXES.some((prefix) => key.startsWith(prefix)));
 }
 
-/** URL of a story audio file (public/assets/audio/story/<key>.mp3, .ogg or .wav), or null if it has not landed. */
+/** URL of a story audio file (public/assets/audio/story/<key>, or a stinger in public/assets/audio/sfx/<key>; mp3, ogg or wav), or null if it has not landed. */
 export function storyAudioUrl(key: string): string | null {
-  for (const ext of ['mp3', 'ogg', 'wav']) {
-    const path = `assets/audio/story/${key}.${ext}`;
-    if (PRESENT.has(path)) return path;
+  for (const dir of ['assets/audio/story', 'assets/audio/sfx']) {
+    for (const ext of ['mp3', 'ogg', 'wav']) {
+      const path = `${dir}/${key}.${ext}`;
+      if (PRESENT.has(path)) return path;
+    }
   }
   return null;
 }

@@ -318,11 +318,11 @@ export function hasFlag(name: string): boolean {
   return getFlag(name) !== undefined;
 }
 
-/** Set a flag (true, or a value), or clear it with `undefined`. */
-export function setFlag(name: string, value: true | string | undefined = true): void {
+/** Set a flag (true, or a value), or clear it with `null`. */
+export function setFlag(name: string, value: true | string | null = true): void {
   const progress = getProgress();
   const flags = { ...progress.flags };
-  if (value === undefined) delete flags[name];
+  if (value === null) delete flags[name];
   else flags[name] = value;
   progress.flags = flags;
   save(progress);

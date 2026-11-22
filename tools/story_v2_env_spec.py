@@ -216,6 +216,7 @@ PROP_SETS = {
     "the_tunnel": [("sandbags", 16), ("cone", 14), ("lamp", 56), ("pipe", 36), ("barrier", 22), ("toolbox", 14)],
     "orange_plaza": [("crowd", 30), ("barrier", 22), ("confetti_cannon", 26), ("spotlight", 30), ("bunting", 12), ("cider_barrel", 20)],
     "pineapple_hall": [("velvet_rope", 22), ("pillar", 70), ("vase", 30), ("candelabra", 26), ("chandelier", 28), ("fern", 30)],
+    "station": [("postcard_stand", 34), ("bench", 18), ("speaker", 12), ("tea_cart", 34), ("snack_trolley", 26), ("post_box", 22)],
     "grand_stage": [("cables", 10), ("flight_cases", 30), ("curtain_edge", 90), ("stage_light", 44), ("road_case", 20), ("mic_stand", 40)],
 }
 
@@ -346,3 +347,276 @@ BUILD["prologue_confetti"] = confetti_drift
 BUILD["prologue_petals"] = petals
 BUILD["prologue_mud_splash"] = mud_splash
 BUILD["prologue_trio_fade"] = trio_fade
+
+
+# --- UI -----------------------------------------------------------------------
+
+
+def grid_frames(raw, cols, rows, height, town="none", outline=True):
+    def build():
+        im = Image.open(RAW / f"{raw}.png")
+        w, h = im.size
+        cells = []
+        for r in range(rows):
+            for c in range(cols):
+                box = (c * w // cols, r * h // rows, (c + 1) * w // cols, (r + 1) * h // rows)
+                cells.append(prop(raw, height, town, colors=16, tol=0, box=box, outline=outline))
+        cw = max(c.size[0] for c in cells)
+        sheet = Image.new("RGBA", (cw * len(cells), height))
+        for i, c in enumerate(cells):
+            sheet.paste(c, (i * cw + (cw - c.size[0]) // 2, 0))
+        return sheet
+
+    return build
+
+
+BUILD["ui_ticket"] = props("ui_ticket", 64, "none", colors=20, tol=0)
+BUILD["ui_stamps"] = grid_frames("ui_stamps", 6, 2, 20, outline=False)
+BUILD["ui_notebook_cover"] = lambda: prop("ui_notebook", 60, "none", colors=20, tol=0, box=(0, 0, 340, 640))
+BUILD["ui_notebook_open"] = lambda: prop("ui_notebook", 60, "none", colors=20, tol=0, box=(340, 0, 1024, 640))
+BUILD["ui_phone"] = lambda: prop("ui_phone", 72, "none", colors=20, tol=0, box=(0, 0, 420, 640))
+BUILD["ui_phone_down"] = lambda: prop("ui_phone", 36, "none", colors=20, tol=0, box=(420, 0, 1024, 640))
+
+
+# --- Cutscene stills -------------------------------------------------------------
+
+
+def panels(raw, n, town="none", anchor_y=0.5, inset=10, colors=40, tol=0):
+    """A raw holding n side-by-side panels -> n frames of 256x160 laid side by side."""
+
+    def build():
+        im = Image.open(RAW / f"{raw}.png").convert("RGB")
+        w, h = im.size
+        out = []
+        for i in range(n):
+            box = (i * w // n + inset, inset, (i + 1) * w // n - inset, h - inset)
+            out.append(background(im.crop(box), 256, 160, town, colors=colors, tol=tol, anchor_y=anchor_y))
+        return frames(out)
+
+    return build
+
+
+for _name in ["cut_golden_ticket", "cut_mixtape", "prologue_freeze", "cut_walkout", "cut_low_point", "cut_mic", "cut_static_finale_base", "cut_cap_off", "cut_envelope_read", "cut_saved_seat"]:
+    BUILD[_name] = bg(_name, "none", colors=40, tol=0)
+BUILD["cut_lemon_footage"] = panels("cut_lemon_footage", 3, anchor_y=0.45)
+BUILD["cut_july_tape"] = panels("cut_july_tape", 3)
+BUILD["cut_envelope"] = panels("cut_envelope", 2)
+
+
+def crowd_layer(height, shade, repeat):
+    """A crowd layer from the generated two-beat crowd strip: 2 frames (512 wide each) side by side."""
+
+    def build():
+        im = Image.open(RAW / "prologue_crowd.png")
+        w, h = im.size
+        out = []
+        for r in range(2):
+            strip = prop("prologue_crowd", height, "none", colors=16, tol=0, box=(0, r * h // 2, w, (r + 1) * h // 2), outline=False, width=512 // repeat)
+            a = np.array(strip).astype(np.int32)
+            lum = a[..., :3].sum(axis=2)
+            dim = lum < 420  # keep the glowsticks bright
+            a[dim, :3] = (a[dim, :3] * shade).astype(np.int32)
+            tile = np.concatenate([a] * repeat, axis=1).astype(np.uint8)
+            out.append(Image.fromarray(tile, "RGBA"))
+        return frames(out)
+
+    return build
+
+
+BUILD["prologue_crowd_front"] = crowd_layer(48, 1.0, 1)
+BUILD["prologue_crowd_mid"] = crowd_layer(32, 0.75, 2)
+BUILD["prologue_crowd_back"] = crowd_layer(20, 0.5, 4)
+
+
+GREYS = np.array([[24, 24, 30], [86, 86, 96], [160, 160, 170], [232, 232, 236]], dtype=np.uint8)
+
+
+def static_creep():
+    """The finale freeze with static creeping in from the edges: 3 frames of growing static, then the clean frame."""
+    base = np.array(background("cut_static_finale_base", 256, 160, "none", colors=40, tol=0))
+    rng = np.random.default_rng(212)
+    yy, xx = np.mgrid[0:160, 0:256]
+    edge = np.minimum(np.minimum(xx, 255 - xx) / 256, np.minimum(yy, 159 - yy) / 160)  # 0 at the border
+    out = []
+    for depth in (0.08, 0.17, 0.3):
+        img = base.copy()
+        noise = rng.random((160, 256))
+        mask = noise * 0.12 + edge < depth
+        idx = rng.choice(4, size=(160, 256), p=[0.3, 0.32, 0.25, 0.13])
+        img[mask] = GREYS[idx][mask]
+        out.append(Image.fromarray(img, "RGB"))
+    out.append(Image.fromarray(base, "RGB"))
+    return frames(out)
+
+
+def vhs_filter(name, n):
+    """VHS look for tape stills: a little desaturated and warm, every third row darker, a few rows torn sideways."""
+
+    def build():
+        src = np.array(panels(name, n)()).astype(np.float64)
+        grey = src.mean(axis=2, keepdims=True)
+        img = grey + (src - grey) * 0.7 + np.array([8, 2, -6])
+        img[::3] *= 0.86
+        rng = np.random.default_rng(7)
+        w = 256
+        for f in range(n):
+            for _ in range(3):
+                y = rng.integers(0, 160)
+                seg = img[y, f * w:(f + 1) * w].copy()
+                img[y, f * w:(f + 1) * w] = np.roll(seg, rng.choice([-2, 2]), axis=0)
+        img = (np.round(np.clip(img, 0, 255) / 6) * 6).clip(0, 255)
+        return Image.fromarray(img.astype(np.uint8), "RGB")
+
+    return build
+
+
+BUILD["cut_static_finale"] = static_creep
+BUILD["cut_july_tape"] = vhs_filter("cut_july_tape", 3)
+
+
+def catch_frames():
+    return frames([panels("cut_catch_a", 3)(), panels("cut_catch_b", 3)()])
+
+
+BUILD["cut_catch"] = catch_frames
+
+BUILD["ui_postcard_box"] = lambda: prop("ui_box_tape_card", 48, "none", colors=24, tol=0, box=(0, 0, 365, 640))
+BUILD["ui_vhs_tape"] = lambda: prop("ui_box_tape_card", 30, "none", colors=16, tol=0, box=(365, 0, 750, 640))
+BUILD["ui_mixtape_card"] = lambda: prop("ui_box_tape_card", 44, "none", colors=12, tol=0, box=(750, 0, 1024, 640))
+BUILD["ui_topshelf_poster"] = props("ui_topshelf_poster", 64, "none", colors=20, tol=0)
+
+
+def lanterns_rise():
+    """4 frames from the 2-panel generation: the first lantern alone, then the sky filling as the rest rise past."""
+    a, b = [np.array(f) for f in (lambda s: [s.crop((0, 0, 256, 160)), s.crop((256, 0, 512, 160))])(panels("cut_lanterns_rise", 2)())]
+    sky = 56  # rows of sky above the market wall
+
+    def risen(offset):
+        img = b.copy()
+        img[offset:sky] = b[: sky - offset]
+        img[:offset] = a[:offset]
+        return img
+
+    return frames([Image.fromarray(x, "RGB") for x in (a, risen(20), risen(10), b)])
+
+
+BUILD["cut_lanterns_rise"] = lanterns_rise
+BUILD["cut_mural_finished"] = bg("cut_mural_finished", "graffiti_corner")
+
+for _teller in ["damson", "kumquat", "peach", "grape", "lemon", "plum", "dragonfruit", "watermelon", "fig", "orange", "quince"]:
+    BUILD[f"cut_tape_{_teller}"] = vhs_filter(f"cut_tape_{_teller}", 3)
+BUILD["cut_coach_window"] = panels("cut_coach_window", 2)
+
+for _name in ["cut_phone_call", "cut_fruit_city_central", "cut_champions", "cut_group_photo", "cut_lychee_envelope", "cut_banana_slips_base"]:
+    BUILD[_name] = bg(_name, "none", colors=40, tol=0)
+BUILD["cut_crew_climbs"] = panels("cut_crew_climbs", 3)
+BUILD["cut_complete_tape"] = vhs_filter("cut_complete_tape", 3)
+
+
+def postcards():
+    """15 credits postcards, 128x96 each with their white border, in one row (14 drawn, the 15th, Lychee's, blank)."""
+    cards = []
+    for sheet in ("cut_postcards_a", "cut_postcards_b"):
+        im = Image.open(RAW / f"{sheet}.png").convert("RGBA")
+        w, h = im.size
+        for r in range(2):
+            for c in range(4):
+                cell = im.crop((c * w // 4, r * h // 2, (c + 1) * w // 4, (r + 1) * h // 2))
+                a = np.array(cell)[..., 3]
+                ys, xs = np.nonzero(a > 140)
+                card = cell.crop((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)).convert("RGB")
+                inner = np.array(background(card, 120, 88, "none", colors=32, tol=0))
+                framed = np.full((96, 128, 3), 250, dtype=np.uint8)
+                framed[:, :1] = framed[:, -1:] = framed[:1] = framed[-1:] = (200, 196, 188)
+                framed[4:92, 4:124] = inner
+                cards.append(Image.fromarray(framed, "RGB"))
+    order = list(range(14))  # sheet A: raspberry .. grapefruit; sheet B: grape .. plum, then gnome, telly
+    out = [cards[i] for i in order]
+    blank = np.full((96, 128, 3), 250, dtype=np.uint8)
+    blank[:, :1] = blank[:, -1:] = blank[:1] = blank[-1:] = (200, 196, 188)
+    out.append(Image.fromarray(blank, "RGB"))
+    out += [cards[14], cards[15]]
+    return frames(out)
+
+
+BUILD["cut_postcards"] = postcards
+
+
+def banana_slips():
+    """Banana in the cap mid-slip, then black (2 frames)."""
+    a = background("cut_banana_slips_base", 256, 160, "none", colors=40, tol=0)
+    return frames([a, Image.new("RGB", (256, 160), (8, 8, 14))])
+
+
+def end_card():
+    """End card: BERRY BEATS in big chunky capitals, and small, SIDE C? in Coach's capitals (5x7 pixel letters)."""
+    big = {
+        "B": ["1110", "1001", "1110", "1001", "1001", "1110"], "E": ["1111", "1000", "1110", "1000", "1000", "1111"],
+        "R": ["1110", "1001", "1110", "1010", "1001", "1001"], "Y": ["1001", "1001", "0110", "0010", "0010", "0010"],
+        "A": ["0110", "1001", "1111", "1001", "1001", "1001"], "T": ["1111", "0110", "0110", "0110", "0110", "0110"],
+        "S": ["0111", "1000", "0110", "0001", "0001", "1110"], " ": ["0000"] * 6, "I": ["1110", "0100", "0100", "0100", "0100", "1110"],
+        "D": ["1110", "1001", "1001", "1001", "1001", "1110"], "C": ["0111", "1000", "1000", "1000", "1000", "0111"], "?": ["0110", "1001", "0010", "0100", "0000", "0100"],
+    }
+    img = np.zeros((160, 256, 3), dtype=np.uint8)
+    img[...] = (14, 10, 30)
+
+    def write(text, x0, y0, scale, colour, shadow):
+        x = x0
+        for ch in text:
+            for gy, row in enumerate(big[ch]):
+                for gx, bit in enumerate(row):
+                    if bit == "1":
+                        img[y0 + gy * scale + 1:y0 + (gy + 1) * scale + 1, x + gx * scale + 1:x + (gx + 1) * scale + 1] = shadow
+                        img[y0 + gy * scale:y0 + (gy + 1) * scale, x + gx * scale:x + (gx + 1) * scale] = colour
+            x += 5 * scale
+
+    title = "BERRY BEATS"
+    write(title, (256 - len(title) * 5 * 4) // 2, 52, 4, (180, 120, 255), (60, 30, 100))
+    write("SIDE C?", (256 - 7 * 5 * 2) // 2, 100, 2, (232, 80, 90), (60, 20, 30))
+    return Image.fromarray(img, "RGB")
+
+
+BUILD["cut_banana_slips"] = banana_slips
+BUILD["cut_train_dance"] = bg("cut_train_dance", "none", colors=40, tol=0)
+BUILD["cut_end_card"] = end_card
+
+
+BUILD["sky_posters"] = grid_frames("sky_posters", 6, 1, 40)
+
+
+# --- Hand fixes -----------------------------------------------------------------
+
+FONT35 = {
+    "T": ["111", "010", "010", "010", "010"], "H": ["101", "101", "111", "101", "101"], "E": ["111", "100", "110", "100", "111"],
+    "B": ["110", "101", "110", "101", "110"], "O": ["010", "101", "101", "101", "010"], "G": ["011", "100", "101", "101", "011"],
+    "Q": ["010", "101", "101", "110", "011"], "U": ["101", "101", "101", "101", "111"], "N": ["101", "111", "111", "101", "101"],
+    "V": ["101", "101", "101", "101", "010"], "S": ["011", "100", "010", "001", "110"], "M": ["101", "111", "101", "101", "101"],
+    "R": ["110", "101", "110", "101", "101"], "L": ["100", "100", "100", "100", "111"], "D": ["110", "101", "101", "101", "110"],
+}
+
+
+def write35(img, text, cx, y, colour):
+    width = sum(2 if ch == " " else 4 for ch in text) - 1
+    x = cx - width // 2
+    for ch in text:
+        if ch == " ":
+            x += 2
+            continue
+        for gy, row in enumerate(FONT35[ch]):
+            for gx, bit in enumerate(row):
+                if bit == "1":
+                    img[y + gy, x + gx] = colour
+        x += 4
+
+
+def office_with_poster_text():
+    """The generated poster title came out garbled at 256 wide: repaint it in 3x5 capitals."""
+    img = np.array(background("room_bakery_office", 256, 160, "berry_town"))
+    img[24:47, 101:166] = (84, 32, 71)
+    write35(img, "THE BOG QUEEN", 134, 25, (233, 170, 152))
+    write35(img, "VS", 134, 33, (233, 150, 133))
+    write35(img, "THE SUMMER LEGEND", 134, 41, (233, 170, 152))
+    return Image.fromarray(img, "RGB")
+
+
+BUILD["room_bakery_office"] = office_with_poster_text

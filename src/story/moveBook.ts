@@ -267,7 +267,49 @@ function learned(battle: BattleDef): MoveDef {
 /** Moves learned in battle, stop by stop, A to C. */
 export const LEARNED_MOVES: readonly MoveDef[] = BATTLES.map(learned);
 
-export const MOVE_BOOK: readonly MoveDef[] = [...BERRY_MOVES, ...LEARNED_MOVES];
+/**
+ * The two post-game finishers (MOVES.md), taught in the epilogue garden by
+ * talking to Coach and Strawberry. They have no battle: their `battle` is a
+ * story beat, learned with learnPostGameMove (story/moveset.ts), which the
+ * epilogue scene calls. Art: berry_learn_epilogue / berry_hype_learn_epilogue,
+ * row 0 the Bog Queen Stomp, row 1 the Summer Catch.
+ */
+export const POSTGAME_MOVES: readonly MoveDef[] = [
+  {
+    id: 'mv_bog_queen_stomp',
+    name: 'Bog Queen Stomp',
+    description: 'Plant the foot, stomp a mud splash, stomp again, crown pose, point down, grin.',
+    teacher: 'coach',
+    battle: 'epilogue_stomp',
+    fits: FINISH,
+    normal: [28, ...M(27), 32, ...M(16), 35],
+    hype: [14, 15, 2, 9, 35],
+    fx: 'ground',
+    tempo: 1,
+    facing: 0,
+    key: 1,
+    placeholder: true,
+    art: { normal: { sheet: learnSheet('epilogue', false), frames: [0, 1, 2, 3, 4, 5] }, hype: { sheet: learnSheet('epilogue', true), frames: [0, 1, 2, 3, 4, 5] } },
+  },
+  {
+    id: 'mv_summer_catch',
+    name: 'Summer Catch',
+    description: 'Spin, reach out, catch an invisible partner, hold, lower them gently, bow to them.',
+    teacher: 'strawberry',
+    battle: 'epilogue_catch',
+    fits: FINISH,
+    normal: [21, 22, 23, ...M(45), ...M(50), 34],
+    hype: [30, 31, 32, 34],
+    fx: 'spin',
+    tempo: 1,
+    facing: 0,
+    key: 3,
+    placeholder: true,
+    art: { normal: { sheet: learnSheet('epilogue', false), frames: [9, 10, 11, 12, 13, 14] }, hype: { sheet: learnSheet('epilogue', true), frames: [9, 10, 11, 12, 13, 14] } },
+  },
+];
+
+export const MOVE_BOOK: readonly MoveDef[] = [...BERRY_MOVES, ...LEARNED_MOVES, ...POSTGAME_MOVES];
 
 const BY_ID = new Map(MOVE_BOOK.map((move) => [move.id, move]));
 
@@ -277,7 +319,7 @@ export function moveById(id: string): MoveDef | undefined {
 
 /** The move a battle teaches. */
 export function moveForBattle(battleId: string): MoveDef | undefined {
-  return BY_ID.get(moveIdForBattle(battleId));
+  return BY_ID.get(moveIdForBattle(battleId)) ?? POSTGAME_MOVES.find((move) => move.battle === battleId);
 }
 
 /** The teacher's name as shown on screen. */
@@ -316,7 +358,7 @@ export interface TeacherGroup {
 
 export function teacherGroups(): TeacherGroup[] {
   const groups: TeacherGroup[] = [{ teacher: 'berry', name: 'Berry', moves: [...BERRY_MOVES] }];
-  for (const move of LEARNED_MOVES) {
+  for (const move of [...LEARNED_MOVES, ...POSTGAME_MOVES]) {
     const group = groups.find((g) => g.teacher === move.teacher);
     if (group) group.moves.push(move);
     else groups.push({ teacher: move.teacher, name: teacherName(move), moves: [move] });

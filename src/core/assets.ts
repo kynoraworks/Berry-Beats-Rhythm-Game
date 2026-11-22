@@ -1,8 +1,8 @@
 import { Tex } from './config';
 import { LIFE_SHEETS, type LifeTheme } from '../explore/lifePieces';
 
-/** Stops whose learned moves can have real art (stop01 to stop12), and the name of their sheets. */
-const LEARN_STOPS = Array.from({ length: 12 }, (_, i) => `stop${String(i + 1).padStart(2, '0')}`);
+/** Stops whose learned moves can have real art (stop01 to stop12, and the epilogue's two), and the name of their sheets. */
+const LEARN_STOPS = [...Array.from({ length: 12 }, (_, i) => `stop${String(i + 1).padStart(2, '0')}`), 'epilogue'];
 const learnSheet = (stop: string, hype: boolean): string => `${hype ? 'berry_hype_learn' : 'berry_learn'}_${stop}`;
 
 /**
@@ -96,6 +96,8 @@ export const PRESENT_SHEETS: readonly string[] = [
  */
 export const PRESENT_IMAGES: readonly string[] = [
   'stage_grand_stage',
+  // Stop 1's boss is danced in the overgrown garden (its stage).
+  'room_garden_overgrown',
   'trio_photo',
   'station_berry_town',
   'station_peel_street',
@@ -116,6 +118,10 @@ export const PRESENT_IMAGES: readonly string[] = [
   'street_orange_plaza',
   'street_pineapple_hall',
   'street_rooftop',
+  'street_berry_town',
+  'street_graffiti_corner',
+  'street_citrus_labs',
+  'street_the_club',
 ];
 
 export function optionalSheets(): OptionalSheet[] {

@@ -186,10 +186,34 @@ const LIFE: Record<string, Partial<Record<Where, SettingLife>>> = {
 };
 
 /** The life of a place: a station or street of a stop (the depart beat uses its station). */
-export function placeLife(stopId: string, kind: PlaceKind): SettingLife {
+export function placeLife(stopId: string, kind: PlaceKind, place?: PlaceDef): SettingLife {
   if (kind === 'room') return NONE;
   const where: Where = kind === 'street' ? 'street' : 'station';
-  return LIFE[stopId]?.[where] ?? NONE;
+  const life = LIFE[stopId]?.[where] ?? NONE;
+  return place ? clearOf(life, place, where) : life;
+}
+
+/** How far a piece may reach over a sign or a door frame (art pixels). */
+export const LIFE_SLACK = 6;
+
+/**
+ * The spots that keep clear of the place's hotspots (the people Berry talks to,
+ * the doors, the fruit), and whose `covers` hotspot is still there: the
+ * chapters move things around, and a sitting extra never hides one of them.
+ */
+function clearOf(life: SettingLife, place: PlaceDef, where: Where): SettingLife {
+  const clear = keepClear(place);
+  const spots = life.spots.filter((spot) => {
+    if (spot.covers && !place.hotspots.some((h) => h.label === spot.covers)) return false;
+    const piece = placePiece(spot, place.bg, where);
+    return clear.every((c) => {
+      // Things to look at may sit behind an extra; people, doors and the boss may not.
+      if (c.label === spot.covers || c.kind === 'look') return true;
+      const limit = c.kind === 'look' || c.kind === 'door' || c.kind === 'exit' ? LIFE_SLACK : 0;
+      return Math.min(piece.x1, c.range[1]) - Math.max(piece.x0, c.range[0]) <= limit;
+    });
+  });
+  return { ...life, spots };
 }
 
 /** The life of a stop's battle stage. */

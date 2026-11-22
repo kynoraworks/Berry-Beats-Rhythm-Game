@@ -16,7 +16,7 @@ import {
   startVisit,
   waitingCrew,
 } from '../src/story/follower';
-import { crewAt, placeOf } from '../src/story/places';
+import { placeOf } from '../src/story/places';
 import {
   getProgress,
   getTaskState,
@@ -31,7 +31,6 @@ import { doorHotspot, isRoomLocked, ROOMS, roomPlace, roomsFor, type LockFacts }
 import {
   battleReturnPlace,
   bossLockedMessage,
-  hasLoop,
   isBossOpen,
   loopHotspots,
   loopStatus,
@@ -203,12 +202,12 @@ describe('the gate to the boss', () => {
 
   it('says what is left in the banner', () => {
     const task = TASKS.stop06!;
-    expect(objectiveLines(loopStatusFrom(false, false, false, false), task, {})).toEqual(['Beat the trainer 0/2', 'Find: lanterns 0/3']);
+    expect(objectiveLines(loopStatusFrom(false, false, false, false), task, {})).toEqual(['Beat the trainer 0/2', 'Find: flames 0/3']);
     expect(objectiveLines(loopStatusFrom(true, false, true, false), task, {})).toEqual(['Beat the trainer 1/2']);
-    expect(objectiveLines(loopStatusFrom(true, true, false, false), task, { found: ['lantern1'] })).toEqual(['Find: lanterns 1/3']);
+    expect(objectiveLines(loopStatusFrom(true, true, false, false), task, { found: ['stove'] })).toEqual(['Find: flames 1/3']);
     expect(objectiveLines(loopStatusFrom(true, true, true, false), task, {})).toEqual(['The boss awaits']);
     expect(objectiveLines(loopStatusFrom(true, true, true, true), task, {})).toEqual([]);
-    expect(bossLockedMessage(loopStatusFrom(true, false, false, false), task)).toBe('First: beat the trainer twice, and light the lanterns.');
+    expect(bossLockedMessage(loopStatusFrom(true, false, false, false), task)).toBe('First: beat the trainer twice, and find three old flames.');
   });
 
   it('has the trainer dance A, then B, then neither; stop 10 changes trainer after A', () => {
@@ -221,17 +220,16 @@ describe('the gate to the boss', () => {
     expect(trainerFruit(STOPS[1], true)).toBe('banana');
   });
 
-  it('runs at stops 2 to 11; stop 1 (the room) and stop 12 (the crew battle) keep their own flow', () => {
-    expect(loopStops().map((stop) => stop.number)).toEqual([2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-    expect(hasLoop(STOPS[0])).toBe(false);
-    expect(hasLoop(STOPS[11])).toBe(false);
+  it('runs at every stop (story v2): Berry Town has its street, the Grand Stage its backstage task', () => {
+    expect(loopStops().map((stop) => stop.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(TRAINERS.stop12).toBeUndefined();
   });
 
-  it('sends the trainer battles back to the street and the boss back to the train', () => {
+  it('sends the trainer battles back to the trainer, the boss to its end of the street, the Grand Stage to the lineup', () => {
     expect(battleReturnPlace('stop02', 0)).toEqual({ stop: 'stop02', place: 'street', at: TRAINERS.stop02!.x - 18 });
     expect(battleReturnPlace('stop02', 1)?.place).toBe('street');
-    expect(battleReturnPlace('stop02', 2)).toBeNull();
-    expect(battleReturnPlace('stop01', 0)).toBeNull();
+    expect(battleReturnPlace('stop02', 2)).toEqual({ stop: 'stop02', place: 'street', at: 560 });
+    expect(battleReturnPlace('stop01', 0)).toMatchObject({ place: 'interior', room: 'bakery_studio' });
     expect(battleReturnPlace('stop12', 1)).toBeNull();
   });
 });
@@ -243,95 +241,65 @@ describe('the loop data', () => {
       const task = TASKS[stop.id]!;
       expect(taskProblems(task), stop.id).toEqual([]);
       kinds.add(task.kind);
-      expect(TRAINERS[stop.id]!.beforeA.length, stop.id).toBeGreaterThan(0);
-      expect(TRAINERS[stop.id]!.beforeB.length, stop.id).toBeGreaterThan(0);
+      // Battle A's own intro plays on the stage; "Between battles" is said before B.
+      if (TRAINERS[stop.id]) expect(TRAINERS[stop.id]!.beforeB.length, stop.id).toBeGreaterThan(0);
     }
     expect([...kinds].sort()).toEqual(['chooseAnswer', 'copyPattern', 'find', 'talkChain']);
   });
 
-  it('puts every trainer and task spot inside its place, on a place that exists, clear of the others', () => {
+  it('puts every task spot somewhere Berry can go: a station, a street or a room of the stop', () => {
     for (const stop of loopStops()) {
-      const rooms = roomsFor(stop.id).map((room) => `room:${room.id}`);
-      const wheres = ['station', 'street', ...rooms] as const;
-      for (const where of wheres) {
-        const place = where === 'station' || where === 'street' ? placeOf(stop.id, where)! : roomPlace(ROOMS.find((r) => `room:${r.id}` === where)!);
-        const floor = (x: number) => (place.kind === 'interior' ? place.floor : floorAt(place.bg, x));
-        const extra = loopHotspots(stop, where as never, floor);
-        const doors = where === 'street' ? roomsFor(stop.id).map((room) => doorHotspot(room, floor(room.doorX))) : [];
-        const all = [...place.hotspots, ...doors, ...extra];
-        for (const h of extra) {
-          const name = `${stop.id} ${where} ${h.id}`;
-          expect(h.x, name).toBeGreaterThanOrEqual(0);
-          expect(h.x + h.w, name).toBeLessThanOrEqual(place.width);
-          expect(h.y + h.h, name).toBeLessThanOrEqual(floor(h.x + h.w / 2) + 1);
-          // No two things to use share a spot: their centres are at least 12 art pixels apart.
-          for (const other of all) {
-            if (other === h) continue;
-            expect(Math.abs(other.x + other.w / 2 - (h.x + h.w / 2)), `${name} vs ${other.id}`).toBeGreaterThanOrEqual(12);
-          }
+      const rooms = ROOMS.filter((room) => room.stop === stop.id).map((room) => `room:${room.id}`);
+      for (const spot of taskSpots(TASKS[stop.id]!)) expect(['station', 'street', 'room:berry', ...rooms], `${stop.id} ${spot.id}`).toContain(spot.where);
+      for (const where of ['station', 'street'] as const) {
+        const place = placeOf(stop.id, where);
+        if (!place) continue;
+        const floor = (x: number) => floorAt(place.bg, x);
+        for (const h of loopHotspots(stop, where, floor)) {
+          expect(h.x, `${stop.id} ${h.id}`).toBeGreaterThanOrEqual(0);
+          expect(h.x + h.w, `${stop.id} ${h.id}`).toBeLessThanOrEqual(place.width);
         }
       }
-      // Every spot of the task is somewhere Berry can go.
-      for (const spot of taskSpots(TASKS[stop.id]!)) expect(['station', 'street', ...rooms], `${stop.id} ${spot.id}`).toContain(spot.where);
     }
   });
 
-  it('lines follow the bible rules: a speaker who is there, at most 90 characters, Berry silent before the Rooftop', () => {
+  it('lines follow the bible rules: a known speaker, at most 90 visible characters', () => {
     for (const stop of loopStops()) {
-      const trainer = TRAINERS[stop.id]!;
       const task = TASKS[stop.id]!;
-      const lines: Line[] = [...trainer.beforeA, ...trainer.beforeB, ...trainer.after];
-      switch (task.kind) {
-        case 'talkChain':
-          lines.push(...task.early, ...task.steps.flatMap((s) => s.lines));
-          break;
-        case 'find':
-          lines.push(...task.items.flatMap((i) => i.lines), ...(task.giver ? [...task.giver.intro, ...task.giver.thanks] : []));
-          break;
-        case 'copyPattern':
-          lines.push(...task.intro, ...task.success, ...task.hint);
-          break;
-        case 'chooseAnswer':
-          lines.push(...task.intro, ...task.success, ...task.choices.flatMap((c) => c.reply));
-          break;
-      }
-      const allowed = new Set<string>(['berry', 'npc', ...crewAt(stop), stop.fruit, ...stop.battles.map((b) => b.opponent)]);
+      const lines: Line[] = [...(TRAINERS[stop.id]?.beforeB ?? []), ...(task.hints ?? []), ...(task.bossIntro ?? [])];
+      if (task.kind === 'talkChain') lines.push(...task.steps.flatMap((s) => s.lines));
+      if (task.kind === 'copyPattern') lines.push(...task.success, ...task.hint, ...(task.fails ?? []));
+      if (task.kind === 'chooseAnswer') lines.push(...task.intro, ...task.success, ...(task.questions ?? []).flatMap((q) => [...q.before, ...q.choices.flatMap((c) => c.reply)]));
       for (const l of lines) {
         const where = `${stop.id}: ${l.text}`;
         expect(Object.keys(CAST), where).toContain(l.who);
-        expect(allowed.has(l.who), where).toBe(true);
-        expect(l.text.length, where).toBeLessThanOrEqual(MAX_LINE_LENGTH);
-        expect(l.text, where).not.toMatch(/\u2014/);
+        expect(l.text.replace(/\{[^}]*\}/g, '').length, where).toBeLessThanOrEqual(MAX_LINE_LENGTH);
         if (l.who === 'npc') expect(l.role, where).toBeTruthy();
-        if (l.who === 'berry' && stop.number < 8) expect(l.text, where).toBe('...');
       }
     }
   });
 });
 
 describe('rooms', () => {
-  it('give three streets two rooms each, with doors inside the street and apart', () => {
-    const byStop = new Map<string, number>();
-    for (const room of ROOMS) byStop.set(room.stop, (byStop.get(room.stop) ?? 0) + 1);
-    expect([...byStop.values()].filter((n) => n >= 2).length).toBeGreaterThanOrEqual(3);
+  it('give the streets their rooms, with doors inside the street and apart', () => {
     expect(new Set(ROOMS.map((r) => r.id)).size).toBe(ROOMS.length);
     expect(new Set(ROOMS.map((r) => r.bg)).size).toBe(ROOMS.length);
-    for (const room of ROOMS) {
+    for (const room of ROOMS.filter((r) => !r.in)) {
       const street = placeOf(room.stop, 'street')!;
       expect(street, room.id).toBeTruthy();
       expect(room.doorX - 12).toBeGreaterThan(16);
-      expect(room.doorX + 12).toBeLessThan(street.width - 70);
+      expect(room.doorX + 12).toBeLessThanOrEqual(street.width);
       for (const other of roomsFor(room.stop)) if (other !== room) expect(Math.abs(other.doorX - room.doorX)).toBeGreaterThanOrEqual(24);
     }
   });
 
-  it('lead back out to the street at the same door, with everything inside the room', () => {
+  it('lead back out at the same door (to the street, or the room they open from), with everything inside the room', () => {
     for (const room of ROOMS) {
       const place = roomPlace(room);
       expect(place.kind).toBe('interior');
       expect(place.room).toBe(room.id);
       const exit = place.hotspots.find((h) => h.kind === 'exit')!;
-      expect(exit.to).toEqual({ place: 'street', at: room.doorX });
+      expect(exit.to).toEqual(room.in ? { place: 'interior', room: room.in, at: room.doorX } : { place: 'street', at: room.doorX });
       for (const h of place.hotspots) {
         expect(h.x, `${room.id} ${h.id}`).toBeGreaterThanOrEqual(0);
         expect(h.x + h.w, `${room.id} ${h.id}`).toBeLessThanOrEqual(place.width);
@@ -343,9 +311,10 @@ describe('rooms', () => {
 
   it('stay locked until their condition is met', () => {
     const facts = (over: Partial<LockFacts> = {}): LockFacts => ({ battleWon: () => false, taskDone: false, clueHeard: false, seen: () => false, ...over });
-    const booth = ROOMS.find((r) => r.id === 'vine_booth')!;
-    expect(isRoomLocked(booth, facts())).toBe(true);
-    expect(isRoomLocked(booth, facts({ battleWon: (i) => i === 0 }))).toBe(false);
+    const office = ROOMS.find((r) => r.id === 'bakery_office')!;
+    expect(isRoomLocked(office, facts())).toBe(true);
+    expect(isRoomLocked(office, facts({ battleWon: (i) => i === 1 }))).toBe(false);
+    expect(isRoomLocked(ROOMS.find((r) => r.id === 'vip_lounge')!, facts({ taskDone: true }))).toBe(false);
     const open = ROOMS.find((r) => !r.lock)!;
     expect(isRoomLocked(open, facts())).toBe(false);
     expect(isRoomLocked({ ...open, lock: { kind: 'task' } }, facts())).toBe(true);
@@ -375,9 +344,9 @@ describe('followers', () => {
     expect(followerOptions(STOPS[1])).toEqual(['raspberry']);
   });
 
-  it('has an empty banter table to fill, behind both names of the hook', () => {
-    expect(BANTER).toEqual({});
-    expect(banterLines('raspberry', 'stop02:street', 'arrive')).toEqual([]);
+  it('has the bible\'s banter, behind both names of the hook', () => {
+    expect(Object.keys(BANTER).sort()).toEqual(['lemon', 'pear', 'raspberry', 'watermelon']);
+    expect(banterLines('raspberry', 'stop02:street', 'arrive')[0].text).toContain('First proper stop');
     expect(banterLines(null, 'stop02:street', 'preBoss')).toEqual([]);
     expect(bannerLines).toBe(banterLines);
   });

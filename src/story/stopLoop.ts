@@ -167,7 +167,7 @@ function buildTasks(): Partial<Record<StopId, TaskDef>> {
       steps: [
         { spot: spot('banana', 'Banana', 'street', 590, { attach: 'boss' }), lines: step('**Banana**') },
         { spot: spot('clerk1', 'Clerk Date', 'room:stamp_office', 196, { attach: 'resident:clerkDate' }), lines: step('**Clerk Date:**') },
-        { spot: spot('kumquat', 'Kumquat', 'room:juice_bar', 190, { attach: 'resident:kumquat' }), lines: step('**Kumquat:**') },
+        { spot: spot('kumquat', 'Kumquat', 'room:slipnsip', 190, { attach: 'resident:kumquat' }), lines: step('**Kumquat:**') },
         { spot: spot('lime', 'Lime', 'street', 170, { attach: 'trainer' }), lines: step('**Lime:**') },
         { spot: spot('clerk2', 'Clerk Date', 'room:stamp_office', 196, { attach: 'resident:clerkDate' }), lines: step('**Clerk Date** (return') },
       ],

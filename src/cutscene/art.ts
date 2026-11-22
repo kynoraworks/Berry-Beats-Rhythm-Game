@@ -365,3 +365,70 @@ export function crowdRowKey(scene: Phaser.Scene, seed: number, tone: number): st
 
 /** Glowstick colours of the crowd. */
 export const GLOW_COLOURS = [0x5cff8f, 0xff5cc8, 0x6ab7ff, 0xffd84a, 0xff8a1e];
+
+/**
+ * Slice a generated strip into numbered frames ('0', '1', ...) of `frameW` x
+ * `frameH`, once. Returns the number of frames (0 if the texture is not loaded).
+ */
+export function stripFrames(scene: Phaser.Scene, key: string, frameW: number, frameH: number): number {
+  if (!scene.textures.exists(key)) return 0;
+  const texture = scene.textures.get(key);
+  const source = texture.getSourceImage() as { width: number; height: number };
+  const across = Math.max(1, Math.floor(source.width / frameW));
+  const down = Math.max(1, Math.floor(source.height / frameH));
+  const count = across * down;
+  if (!texture.has('0') || texture.get('0').width !== frameW) {
+    for (let i = 0; i < count; i++) {
+      if (!texture.has(String(i))) texture.add(String(i), 0, (i % across) * frameW, Math.floor(i / across) * frameH, frameW, frameH);
+    }
+  }
+  return count;
+}
+
+/** The generated stills and strips the cutscenes know, with their frame sizes (art pixels). */
+export const STRIPS: Record<string, [number, number]> = {
+  prologue_static: [256, 160],
+  prologue_vhs: [256, 160],
+  prologue_crowd_back: [512, 20],
+  prologue_crowd_mid: [512, 32],
+  prologue_crowd_front: [512, 48],
+  prologue_confetti_burst: [64, 64],
+  prologue_mud_splash: [48, 32],
+  prologue_petals: [6, 6],
+  prologue_trio_fade: [22, 17],
+  sky_bird: [9, 6],
+  sky_steam: [16, 16],
+  sky_train: [64, 16],
+  cut_catch: [256, 160],
+  cut_static_finale: [256, 160],
+  cut_envelope: [256, 160],
+  cut_july_tape: [256, 160],
+  cut_lanterns_rise: [256, 160],
+  cut_lemon_footage: [256, 160],
+};
+
+/** Slice every known strip that is loaded. */
+export function sliceStrips(scene: Phaser.Scene): void {
+  for (const [key, [w, h]] of Object.entries(STRIPS)) stripFrames(scene, key, w, h);
+}
+
+/** The little portable telly on its upturned flowerpot, 44x50, for a shed that does not have one drawn in. Screen at (6, 6, 24, 18). */
+export const TELLY_SCREEN = { x: 6, y: 6, w: 24, h: 18 };
+export function tellyKey(scene: Phaser.Scene): string {
+  return canvasTex(scene, 'cs_telly', 44, 50, (ctx) => {
+    // Foil-wrapped aerial.
+    rect(ctx, 0xc8c8d8, 12, 0, 1, 6);
+    rect(ctx, 0xc8c8d8, 26, 0, 1, 6);
+    rect(ctx, 0xe8e8f8, 10, 0, 4, 2);
+    rect(ctx, 0xe8e8f8, 25, 0, 4, 2);
+    rect(ctx, 0x1a1028, 0, 4, 40, 26);
+    rect(ctx, 0x4a4a58, 1, 5, 38, 24);
+    rect(ctx, 0x101014, TELLY_SCREEN.x, TELLY_SCREEN.y, TELLY_SCREEN.w, TELLY_SCREEN.h);
+    rect(ctx, 0x8a8a9a, 32, 9, 4, 3);
+    rect(ctx, 0x8a8a9a, 32, 15, 4, 3);
+    // Upturned flowerpot.
+    rect(ctx, 0x1a1028, 6, 30, 28, 20);
+    rect(ctx, 0xb85a32, 7, 30, 26, 4);
+    rect(ctx, 0x9a4a2a, 9, 34, 22, 15);
+  });
+}

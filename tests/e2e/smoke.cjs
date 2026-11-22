@@ -78,8 +78,12 @@ async function main() {
     await waitForScene('Title');
     await page.keyboard.press('Enter');
     await waitForScene('Menu');
-    // A new game starts in Berry's room.
+    // A new game starts with the prologue (story v2), or in Berry's room.
     await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.__game && window.__game.scene.getScenes(true).some((scene) => ['Prologue', 'Explore'].includes(scene.scene.key)), null, { timeout: 20000 });
+    await page.waitForTimeout(600);
+    // Berry's room, with stop 1's arrival scene (the Coach at the window).
+    await page.goto(`${base}?scene=Explore&stop=stop01&place=room`);
     await waitForScene('Explore');
 
     // With stop 1 won, the story opens on the train; a station and a street load their stand-in art.

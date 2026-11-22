@@ -56,7 +56,7 @@ import { Countdown } from '../play/Countdown';
 import { planCountdown } from '../play/countdownPlan';
 import { ABILITIES } from '../story/abilities';
 import { CAST } from '../story/cast';
-import { cycleBackup, getBackup, listAvailable } from '../story/crew';
+import { cycleBackup, getBackup, listAvailable, setBackup } from '../story/crew';
 import { crewAt } from '../story/places';
 import type { FruitId } from '../story/types';
 import { GIMMICK_TRAITS, NO_RULES, battleRules, type BattleRules } from '../story/gimmicks';
@@ -68,6 +68,9 @@ import { feetY } from '../explore/floors';
 import { markBattleWon, markSeen } from '../story/progress';
 import { windowsFor } from '../core/difficulty';
 import { nextRef, playSegment } from '../story/run';
+import { EASY_OFFER, SOLOISTS_CALLOUT, crewCues, dropToEasyText, isSoloists, loseLineFor, type CrewCue } from '../story/battleStory';
+import { isEasy, lossCount, recordLoss, setEasy } from '../story/progress';
+import { ChoiceBox } from '../explore/ChoiceBox';
 import type { Line } from '../story/types';
 
 type State = 'loading' | 'playing' | 'paused' | 'resuming' | 'ended';
@@ -173,6 +176,8 @@ export class PlayScene extends Phaser.Scene {
   private roundsSettled = 0;
   private introTime = 0;
   private versus: VersusCard | null = null;
+  /** Stop 8's boss: the crew climbing back on at their bars (story/battleStory.ts), still to come. */
+  private crewCues: CrewCue[] = [];
   private errorSum = 0;
   private errorCount = 0;
   private stage!: StageFx;
@@ -309,6 +314,10 @@ export class PlayScene extends Phaser.Scene {
     const isCoach = rivalKind === 'dancer';
     this.rivalLook = rivalProfile(rivalKind);
     this.rivalName = this.rivalLook.name;
+    // A trainer's battle (A or B) is named for the trainer (bible 9.1), danced with their stop's gimmick.
+    const trainerBattle = battleForChart(chart.id);
+    if (trainerBattle?.trainer && !this.playData.practice) this.rivalName = trainerBattle.versus;
+    this.crewCues = this.playData.practice ? [] : crewCues(chart.id);
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
     const scripted = this.playData.scripted ?? null;
@@ -521,6 +530,8 @@ export class PlayScene extends Phaser.Scene {
     const stop = this.story?.stop ?? stopForChart(this.chart.id);
     if (!stop) return NO_RULES;
     // The gimmick is the opponent's: at Orange Plaza, battles A and B are Banana and Plum.
+    // Stop 7's boss is for soloists: the backup's ability is off (the Flair meter has nothing to fire).
+    if (isSoloists(this.chart.id)) return battleRules(battleForChart(this.chart.id)?.gimmick ?? stop.gimmick, null);
     return battleRules(battleForChart(this.chart.id)?.gimmick ?? stop.gimmick, getBackup(crewAt(stop)));
   }
 
@@ -590,7 +601,7 @@ export class PlayScene extends Phaser.Scene {
       const player = ally ? { name: CAST[ally].name, texture: characterSheet(this, ally).texture, color: CAST[ally].css } : undefined;
       // In the crew battle the ally fires their own ability, so the line under them says how.
       const label = ally && ability ? `${ability.name}, once this round\n${isTouch() ? 'Tap the meter' : 'Space'} when Flair is full` : backup;
-      this.versus = new VersusCard(this, this.rivalName, texture, look, label, player);
+      this.versus = new VersusCard(this, this.rivalName, texture, look, isSoloists(this.chart.id) && !this.playData.practice ? SOLOISTS_CALLOUT : label, player);
       playSfx(this.game, 'banner');
     }
     this.hypeAudio?.setCrowd(true);
@@ -782,6 +793,46 @@ export class PlayScene extends Phaser.Scene {
   }
 
   /** Straight back into a lost battle, without its opening conversation. */
+  /**
+   * Stop 8: at bars 16, 24 and 32 an ally climbs back on with their callout,
+   * and becomes the backup for the next battle (the song goes on).
+   */
+  private crewCue(beat: number): void {
+    const cue = this.crewCues[0];
+    if (!cue || beat < (cue.bar - 1) * 4) return;
+    this.crewCues.shift();
+    const name = CAST[cue.ally]?.name ?? cue.ally;
+    this.hud.callout(`${name}: ${cue.line.text.replace(/\{[^}]*\}/g, '')}`, CAST[cue.ally]?.css ?? CSS.yellow);
+    playSfx(this.game, 'crowdCheer');
+    setBackup(cue.ally);
+  }
+
+  /** The Coach's text after three losses, and the offer to dance this battle on Easy. */
+  private offerEasy(text: Line, battleId: string): void {
+    this.startDialogue([text], () => {
+      const box = new ChoiceBox(this, {
+        prompt: `Losses in a row: ${lossCount(battleId)}`,
+        choices: [EASY_OFFER, 'Keep it as it is'],
+        depth: Depth.overlay + 8,
+        onPick: (index) => {
+          if (index !== 0) {
+            this.rematch();
+            return;
+          }
+          setEasy(battleId);
+          const ref = this.playData.story;
+          if (!ref) {
+            this.rematch();
+            return;
+          }
+          music.stop(200);
+          playSegment(this, ref, { autoplay: this.playData.autoplay }).catch(() => this.rematch());
+        },
+      });
+      void box;
+    });
+  }
+
   private rematch(): void {
     if (isLeaving(this)) return;
     this.restart();
@@ -874,8 +925,11 @@ export class PlayScene extends Phaser.Scene {
         hoodDown = segment.hoodDown;
         after = toResults;
       } else {
-        outro = segment.lose;
-        after = () => this.rematch();
+        // One lose line a try, in turn; after three in a row the Coach texts an offer of Easy (bible 9.3).
+        const losses = this.playData.autoplay ? 1 : recordLoss(segment.battle.id);
+        outro = loseLineFor(segment.lose, losses);
+        const text = isEasy(segment.battle.id) || this.playData.difficulty === 'easy' || losses % 3 !== 0 ? null : dropToEasyText(losses, losses / 3 - 1);
+        after = text ? () => this.offerEasy(text, segment.battle.id) : () => this.rematch();
       }
     }
     const wrapUp = () => {
@@ -921,7 +975,6 @@ export class PlayScene extends Phaser.Scene {
     // An empty bar loses the set, whatever the points say.
     if (failed) return lose;
     recordRound(result, this.engine.stats.health);
-    const session = getSession();
     // The crew battle is danced in three sets (story/crewBattle.ts): a lost set is danced again.
     const state = setVerdict();
     if (state === 'lost') return lose;
@@ -934,9 +987,8 @@ export class PlayScene extends Phaser.Scene {
       if (final) markBattleWon(final.battles[2]);
       checkpointSession();
       markSeen('ending');
-      const results = session?.results.slice() ?? [];
-      const order = session?.order.slice() ?? [];
-      return { outro: script?.win ?? [], after: () => { endSession(); goTo(this, SceneKeys.CrewEnd, { results, order }, 600); }, hoodDown: true };
+      // Set three is won: the finale's specials take over (src/scenes/story/FinaleScene.ts), straight from the last note.
+      return { outro: [], after: () => { endSession(); goTo(this, SceneKeys.Finale, {}, 600); }, hoodDown: true };
     }
     return { outro: [], after: () => toLineup({ between: true }), hoodDown: false };
   }
@@ -1342,6 +1394,7 @@ export class PlayScene extends Phaser.Scene {
       this.effects?.update(time, dt);
       if (this.playData.autoplay) this.autoplay(time);
       this.handleEvents(this.engine.update(time));
+      if (this.crewCues.length > 0) this.crewCue(beat);
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
       this.hitLayer?.update(time);
       this.updateBattle(time);
@@ -1536,8 +1589,23 @@ export class PlayScene extends Phaser.Scene {
     this.player.sprite.setFrame(28);
     const rival = this.rival?.sprite;
     if (rival) rival.setFlipX(!rival.flipX).setFrame(rival.texture.frameTotal > 20 ? 5 : 6);
+    // The freeze still of bar 84, when it has landed, over the stage.
+    if (this.textures.exists('prologue_freeze')) {
+      const still = this.add.image(GAME_W / 2, GAME_H / 2, 'prologue_freeze').setScale(PX).setDepth(Depth.overlay + 2).setAlpha(0);
+      this.tweens.resumeAll();
+      this.tweens.add({ targets: still, alpha: 1, duration: 90, onComplete: () => this.tweens.pauseAll() });
+    }
     const note = sustainedNote(this.game, 196);
     const flow = this.playData.scripted?.flow;
+    if (flow?.complete) {
+      // The complete tape: the eight recovered frames instead of the static.
+      this.time.delayedCall(1400, () => {
+        note.stop(400);
+        this.tweens.resumeAll();
+        this.completeTape(() => finishPrologue(this, flow, 800));
+      });
+      return;
+    }
     this.time.delayedCall(1400, () => {
       note.stop(30);
       const hiss = staticSting(this.game);
@@ -1549,6 +1617,27 @@ export class PlayScene extends Phaser.Scene {
         this.scene.start(SceneKeys.KidsGarden, { flow, hiss });
       });
     });
+  }
+
+  /** The last eight frames (the complete tape): the slip, the turn, the catch, both of them laughing mid-fall. */
+  private completeTape(done: () => void): void {
+    const frames = ['The slip.', 'The turn.', 'The catch.', 'Both of them, mid-fall, laughing.'];
+    const label = addBody(this, GAME_W / 2, 600, '', 34, { color: CSS.cream, stroke: true }).setDepth(Depth.overlay + 6);
+    frames.forEach((text, i) =>
+      this.time.delayedCall(i * 1500, () => {
+        label.setText(text);
+        this.stage.flash(0xffffff, 0.2);
+        if (i === 2) {
+          this.rival?.sprite.setFrame(this.rival.sprite.texture.frameTotal > 20 ? 25 : 9);
+          this.player.sprite.setAngle(-20);
+        }
+        if (i === 3) {
+          this.player.sprite.setAngle(0).setFrame(29);
+          this.rival?.sprite.setFrame(this.rival.sprite.texture.frameTotal > 20 ? 29 : 13);
+        }
+      }),
+    );
+    this.time.delayedCall(frames.length * 1500 + 800, done);
   }
 
   // ---------------------------------------------------------------------

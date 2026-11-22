@@ -5,8 +5,8 @@ import { getSettings } from '../core/settings';
 import { playSfx } from '../core/sfx';
 import { Voicer, punctuationPause, voiceFor, type VoiceDef } from '../core/voice';
 import { UI_SCALE, UiButton, addBody, addBox, addIcon, addText, addUiButton } from '../core/ui';
-import { CAST, portraitFrame, speakerName } from '../story/cast';
-import type { Line } from '../story/types';
+import { CAST, portraitArt, portraitFrame, speakerName } from '../story/cast';
+import { isBoldMood, type Line } from '../story/types';
 import { RichTextView } from './RichText';
 import { parseRich, type RichLine } from './textFx';
 
@@ -35,6 +35,14 @@ export interface DialogueOptions {
   /** Called as each line starts, so the stage can light whoever is speaking. */
   onLine: (line: Line) => void;
   onDone: () => void;
+  /**
+   * Berry cut in on a line with a live Cut in prompt (`line.cutIn`): the rest
+   * of it tumbles out of the box and the conversation ends here, without
+   * `onDone`. Without it the prompt is only shown.
+   */
+  onCut?: () => void;
+  /** Objects the box makes after it opens (the tumbling letters), for a scene with two cameras. */
+  onObjects?: (objects: Phaser.GameObjects.GameObject[]) => void;
   /**
    * How a speaker who is not in the cast looks and sounds (the cutscenes' kids,
    * legends and one-off voices, see src/cutscene/speakers.ts). Undefined: the cast's own.
@@ -120,6 +128,9 @@ export class Dialogue {
   private look: SpeakerLook | null = null;
   private open = true;
   private closing = false;
+  /** The Cut in prompt over the box while a long speech types (SYSTEMS 4). */
+  private cutPrompt: Phaser.GameObjects.Text | null = null;
+  private cutTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor(scene: Phaser.Scene, options: DialogueOptions) {
     this.scene = scene;
@@ -186,6 +197,7 @@ export class Dialogue {
     this.scene.events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate);
     this.scene.events.off(Phaser.Scenes.Events.SHUTDOWN, this.destroy, this);
     this.scene.tweens.killTweensOf(this.next);
+    this.clearCutPrompt();
     this.richView.clear();
     this.layer.destroy();
   }
@@ -226,7 +238,7 @@ export class Dialogue {
     this.next.setX(boxX + BOX_W - 44);
     this.setPortrait(line, portraitX + PORTRAIT_BOX / 2);
 
-    this.voice = look ? voiceFor(look.voice) : voiceFor(line.who, line.role);
+    this.voice = look ? voiceFor(look.voice) : voiceFor(line.voice ?? line.who, line.role);
     // Tags ({shake}, {wave}...) and the speaker's own light effect draw the line letter by letter;
     // a plain line stays one text object, exactly as before.
     const rich = parseRich(line.text, this.voice.effect);
@@ -247,6 +259,71 @@ export class Dialogue {
     this.nameText.setX(tagX + tagWidth / 2);
     if (this.rich) this.richView.show(this.rich);
     this.options.onLine(line);
+    this.clearCutPrompt();
+    if (line.cutIn) this.cutTimer = this.scene.time.delayedCall(1500, () => this.showCutPrompt(line.cutIn ?? 'tease', boxX + BOX_W - 96));
+  }
+
+  /** The [Cut in] prompt at the box's right edge: a tease glows and fades; a live one waits for C or a tap. */
+  private showCutPrompt(kind: 'tease' | 'live', x: number): void {
+    if (!this.open) return;
+    const prompt = addText(this.scene, x, BOX_Y - 34, '[Cut in]', 24, { color: CSS.yellow });
+    this.layer.add(prompt);
+    this.cutPrompt = prompt;
+    prompt.setInteractive({ useHandCursor: true }).on(Phaser.Input.Events.POINTER_UP, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.pressCutIn();
+    });
+    prompt.setData('kind', kind).setAlpha(0);
+    this.scene.tweens.add({ targets: prompt, alpha: 1, duration: 200 });
+    if (!this.calm) this.scene.tweens.add({ targets: prompt, scale: 1.12, duration: 300, yoyo: true, repeat: kind === 'live' ? -1 : 1 });
+    if (kind === 'tease') this.scene.tweens.add({ targets: prompt, alpha: 0, delay: 1000, duration: 500, onComplete: () => this.clearCutPrompt() });
+  }
+
+  private clearCutPrompt(): void {
+    this.cutTimer?.remove();
+    this.cutTimer = null;
+    if (this.cutPrompt) {
+      this.scene.tweens.killTweensOf(this.cutPrompt);
+      this.cutPrompt.destroy();
+      this.cutPrompt = null;
+    }
+  }
+
+  /**
+   * Pressing the prompt. Before Berry speaks (a tease) it is only a soft tap.
+   * Live, the line stops where it is and its untyped letters tumble out of the
+   * box and bounce once on the floor of the screen.
+   */
+  private pressCutIn(): void {
+    const prompt = this.cutPrompt;
+    if (!prompt || !this.open) return;
+    if (prompt.getData('kind') !== 'live' || !this.options.onCut) {
+      playSfx(this.scene.game, 'tick');
+      return;
+    }
+    const rest = this.full.slice(this.shown).replace(/\s+/g, ' ').trim().slice(0, 18);
+    const letters: Phaser.GameObjects.Text[] = [];
+    const x0 = this.box.x + 60;
+    [...rest].forEach((char, i) => {
+      if (char === ' ') return;
+      const letter = addText(this.scene, x0 + i * 22, BOX_Y + BOX_H - 60, char, 28, { color: CSS.ink, stroke: false }).setDepth(this.options.depth + 1);
+      letters.push(letter);
+      this.scene.tweens.add({
+        targets: letter,
+        y: GAME_H - 18,
+        x: letter.x + (Math.random() - 0.5) * 40,
+        angle: (Math.random() - 0.5) * 60,
+        duration: this.calm ? 1 : 600,
+        delay: i * 15,
+        ease: 'Bounce.easeOut',
+        onComplete: () => this.scene.tweens.add({ targets: letter, alpha: 0, delay: 500, duration: 300, onComplete: () => letter.destroy() }),
+      });
+    });
+    this.options.onObjects?.(letters);
+    playSfx(this.scene.game, 'djCut');
+    const onCut = this.options.onCut;
+    this.destroy();
+    onCut();
   }
 
   /** The speaker's drawn portrait, or a stand-in in their colour while it is not drawn yet. */
@@ -261,7 +338,15 @@ export class Dialogue {
         this.standLetter.setVisible(false);
         return;
       }
-      this.drawStand(centerX, centerY, look.color, line.mood === 'bold', look.initial ?? look.name.charAt(0), !!look.darkTag);
+      this.drawStand(centerX, centerY, look.color, isBoldMood(line.mood), look.initial ?? look.name.charAt(0), !!look.darkTag);
+      return;
+    }
+    // A portrait sheet of the speaker's own (the Conductor's, Strawberry's), when it is loaded.
+    const own = portraitArt(line);
+    if (own && this.scene.textures.exists(own.key) && this.scene.textures.get(own.key).has(String(own.frame))) {
+      this.portrait.setTexture(own.key, own.frame).setOrigin(0.5).setScale(PORTRAIT_SCALE).setPosition(centerX, centerY).setVisible(true);
+      this.stand.setVisible(false);
+      this.standLetter.setVisible(false);
       return;
     }
     const frame = portraitFrame(line, this.options.hoodDown);
@@ -276,7 +361,7 @@ export class Dialogue {
     }
     const character = CAST[line.who] ?? CAST.npc;
     const initial = (line.who === 'npc' ? speakerName(line) : character.name).replace(/^Dr\.\s*/, '').charAt(0).toUpperCase();
-    this.drawStand(centerX, centerY, character.color, line.mood === 'bold', initial, character.darkTag);
+    this.drawStand(centerX, centerY, character.color, isBoldMood(line.mood), initial, character.darkTag);
   }
 
   /** A bust in the speaker's colour: a head with their initial on shoulders, drawn in blocks. */
@@ -383,6 +468,8 @@ export class Dialogue {
     if (event.code === 'Escape') {
       playSfx(this.scene.game, 'back');
       this.finish();
+    } else if (event.code === 'KeyC' && this.cutPrompt) {
+      this.pressCutIn();
     } else if (this.advanceCodes.has(event.code)) {
       this.advance();
     }

@@ -117,8 +117,9 @@ def mode_downsample(raw: Image.Image, width: int, height: int, colors: int, town
     return palette[out]
 
 
-def background(raw_name: str, w: int, h: int, town: str, colors: int = 40, tol: float = 14, anchor_y: float = 0.5, anchor_x: float = 0.5) -> Image.Image:
-    raw = Image.open(RAW / f"{raw_name}.png").convert("RGB")
+def background(raw_name, w: int, h: int, town: str, colors: int = 40, tol: float = 14, anchor_y: float = 0.5, anchor_x: float = 0.5) -> Image.Image:
+    """raw_name is a raw file's name, or an already opened (cropped) Image."""
+    raw = raw_name.convert("RGB") if isinstance(raw_name, Image.Image) else Image.open(RAW / f"{raw_name}.png").convert("RGB")
     raw = crop_to_aspect(raw, w, h, anchor_y, anchor_x)
     return Image.fromarray(mode_downsample(raw, w, h, colors, town_palette(town), tol).astype(np.uint8), "RGB")
 
@@ -346,7 +347,7 @@ def steam_puffs() -> Image.Image:
                     continue
                 if f >= 4 and (x + y) % 2 == 0:
                     continue  # thinning: checker dither
-                if f == 5 and (x + 2 * y) % 3 == 0:
+                if f == 5 and x % 2 == 1 and y % 2 == 0:
                     continue
                 top = y < cy - r * 0.2
                 img[y, x] = (250, 248, 244, 255) if top else (206, 206, 222, 255)

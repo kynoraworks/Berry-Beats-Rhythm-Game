@@ -200,6 +200,23 @@ export const AMBIENCE: Record<string, AmbienceDef> = {
     sky: sky(30, { clouds: 3 }),
   }),
 
+  // Story v2: Berry Town's own street, and the streets of stops 3, 5 and 7 (simple mixes until tuned).
+  street_berry_town: def({
+    particles: [area('leaves', r(470, 0, 120, 30), 0.9, 6), area('leaves', r(80, 0, 120, 20), 0.6, 4), area('dust', r(40, 70, 560, 60), 1, 10)],
+    shafts: sunFromLeft([120, 300, 480], 110, 0.05),
+    sky: sky(24, { clouds: 3 }),
+  }),
+  street_graffiti_corner: def({
+    particles: [area('dust', r(40, 60, 560, 70), 1, 10)],
+    shafts: sunFromLeft([140, 360], 120, 0.05),
+  }),
+  street_citrus_labs: def({
+    particles: [area('dust', r(40, 60, 560, 70), 0.8, 8)],
+  }),
+  street_the_club: def({
+    particles: [area('dust', r(40, 60, 560, 70), 0.8, 8)],
+  }),
+
   // Stop 2: Peel Street.
   station_peel_street: def({
     particles: [area('dust', r(40, 50, 170, 80), 1, 10)],

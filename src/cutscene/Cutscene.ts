@@ -46,6 +46,8 @@ export interface CutsceneOptions {
   vhs?: { date?: string; label?: string; start?: number };
   /** Called as each speech box line starts. */
   onLine?: (line: Line) => void;
+  /** The static's NO SIGNAL label (off for the finale, where the signal comes back). */
+  noSignal?: boolean;
 }
 
 /** The camera's view of the world container: the world point at the centre of the screen, and the zoom. */
@@ -76,6 +78,7 @@ export class Cutscene {
   private dialogue: Dialogue | null = null;
   private fader: Phaser.GameObjects.Rectangle;
   private ended = false;
+  private wasSkipped = false;
 
   constructor(scene: Phaser.Scene, options: CutsceneOptions) {
     this.scene = scene;
@@ -83,10 +86,15 @@ export class Cutscene {
     this.world = scene.add.container(0, 0).setDepth(CutDepth.world);
     this.letterbox = new Letterbox(scene);
     this.bark = new Bark(scene);
-    this.staticScreen = new StaticScreen(scene);
+    this.staticScreen = new StaticScreen(scene, CutDepth.static, options.noSignal ?? true);
     this.vhs = options.vhs ? new VhsOverlay(scene, options.vhs) : null;
     this.fader = scene.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, 0x000000, 0).setDepth(CutDepth.flash - 1);
-    this.skip = options.skippable ? new HoldToSkip(scene, () => this.end()) : null;
+    this.skip = options.skippable
+      ? new HoldToSkip(scene, () => {
+          this.wasSkipped = true;
+          this.end();
+        })
+      : null;
     this.timeline = new Timeline(options.shots, (action) => this.run(action));
     this.timeline.onEnd = () => this.end();
     scene.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
@@ -163,12 +171,18 @@ export class Cutscene {
     return this.ended;
   }
 
+  /** True when it ended because the player held to skip. */
+  get skipped(): boolean {
+    return this.wasSkipped;
+  }
+
   private applyView(): void {
     const { x, y, zoom } = this.view;
     this.world.setScale(zoom).setPosition(GAME_W / 2 - x * zoom, GAME_H / 2 - y * zoom);
   }
 
-  private run(action: CutAction): StepResult {
+  /** Do one action now, as a step would. */
+  run(action: CutAction): StepResult {
     const scene = this.scene;
     const calm = getSettings().reduceMotion;
     switch (action.do) {

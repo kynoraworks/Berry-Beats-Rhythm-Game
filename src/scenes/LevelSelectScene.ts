@@ -37,7 +37,17 @@ import { firstSegment, rideStraightToBattle } from '../story/flow';
 import { playSegment } from '../story/run';
 import { CREW_ROUNDS, CREW_SETS } from '../story/crewBattle';
 import { ROLE_LABELS, STOPS, stopTeaser, type BattleDef, type StopDef } from '../story/stops';
-import type { FruitId, TimeOfDay } from '../story/types';
+import type { FruitId, Line, TimeOfDay } from '../story/types';
+import { storySong } from '../cutscene/storyFiles';
+import { ChoiceBox } from '../explore/ChoiceBox';
+import { Phone, PostcardCard, TapeViewer } from '../explore/StoryCards';
+import { playNodes } from '../explore/StoryPlayer';
+import { Dialogue } from '../play/Dialogue';
+import { CHAPTERS } from '../story/chapters';
+import { holds, storyState } from '../story/conditions';
+import { nodesOf, topLines } from '../story/lines';
+import { RUMOURS, isRumourHeard, secretsAt, shoebox, syncRumours, truthRevealed } from '../story/mystery';
+import { hasFlag, markSeen, setFlag } from '../story/progress';
 
 interface LevelSelectData {
   levelId?: string;
@@ -155,6 +165,8 @@ export class LevelSelectScene extends Phaser.Scene {
   private train!: Phaser.GameObjects.Sprite;
   private doors!: Doors;
   private light!: TrainLight;
+  /** A story overlay or conversation is open over the train (interlude, phone, notebook, shoebox). */
+  private overlay = false;
 
   constructor() {
     super(SceneKeys.LevelSelect);
@@ -173,6 +185,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.nodes = [];
     this.pips = [];
     this.card = [];
+    this.overlay = false;
   }
 
   create(): void {
@@ -187,6 +200,7 @@ export class LevelSelectScene extends Phaser.Scene {
     }
 
     fadeIn(this);
+    syncRumours();
     music.play('level_select');
     this.train = this.add.sprite(GAME_W / 2, GAME_H / 2, Tex.train).setScale(PX).play(Anim.train);
     // Made straight after the train so it lies under the map and card at the same depth.
@@ -213,19 +227,27 @@ export class LevelSelectScene extends Phaser.Scene {
     this.noteNewlyOpened();
     this.refresh();
 
+    const free = (fn: () => void) => () => {
+      if (!this.overlay) fn();
+    };
     menuKeys(this, {
-      left: () => this.select(this.index - 1),
-      right: () => this.select(this.index + 1),
-      up: () => this.pickBattle(this.sub - 1),
-      down: () => this.pickBattle(this.sub + 1),
-      confirm: () => this.ride(),
+      left: free(() => this.select(this.index - 1)),
+      right: free(() => this.select(this.index + 1)),
+      up: free(() => this.pickBattle(this.sub - 1)),
+      down: free(() => this.pickBattle(this.sub + 1)),
+      confirm: free(() => this.ride()),
       back: () => {
-        if (this.busy) return;
+        if (this.busy || this.overlay) return;
         playSfx(this.game, 'back');
         toMenu();
       },
     });
+    this.addStoryButtons();
+    this.time.delayedCall(450, () => this.playInterlude());
     this.input.keyboard?.on('keydown-B', () => this.changeBackup());
+    this.input.keyboard?.on('keydown-N', () => this.openNotebook());
+    this.input.keyboard?.on('keydown-P', () => this.openShoebox());
+    this.input.keyboard?.on('keydown-T', () => this.openPhone());
     this.input.keyboard?.on('keydown-D', () => this.cycleDifficulty());
     this.input.keyboard?.on('keydown-M', () => this.openMoves());
   }
@@ -453,7 +475,7 @@ export class LevelSelectScene extends Phaser.Scene {
     this.rivalTag.setTint(open ? fruit.tag : 0x3a3458);
     // Stop 12's first two battles are sets of the crew battle: two of Blueberry's crew each.
     const crewSet = stop.role === 'final' && battle.index < 2 ? CREW_SETS[battle.index].map((round) => CAST[CREW_ROUNDS[round].enemy].name) : null;
-    const versus = crewSet ? crewSet.join(', ') : fruit.name;
+    const versus = crewSet ? crewSet.join(', ') : battle.versus;
     this.rivalText.setText(open ? `vs ${versus}` : 'vs ? ? ?').setColor(open && fruit.darkTag ? CSS.ink : CSS.cream);
     for (let size = 22; this.rivalText.width > 220 && size > 14; size -= 2) this.rivalText.setFontSize(size);
 
@@ -480,7 +502,8 @@ export class LevelSelectScene extends Phaser.Scene {
     this.refreshTickets(stop, open);
     const spots = lookHotspots(stop);
     const found = spots.filter((spot) => hasInspected(spot.key)).length;
-    this.exploredText.setText(open && spots.length > 0 ? `Looked at ${found} of ${spots.length}` : '');
+    const secrets = secretsAt(stop.number);
+    this.exploredText.setText(open && spots.length > 0 ? `Looked at ${found} of ${spots.length}${secrets.total > 0 ? `   Secrets ${secrets.found} of ${secrets.total}` : ''}` : '');
 
     this.rideButton.setVisible(battleOpen);
     this.lockedButton.setVisible(!battleOpen);
@@ -541,7 +564,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   /** The train slows, the doors shut with the station's name on them, and they open on its platform. */
   private ride(): void {
-    if (this.busy || isLeaving(this)) return;
+    if (this.busy || this.overlay || isLeaving(this)) return;
     if (!isStopOpen(this.index)) {
       playSfx(this.game, 'locked');
       this.statusText.setText(`Win at ${STOPS[this.index - 1].station} first`).setColor(CSS.miss);
@@ -568,6 +591,11 @@ export class LevelSelectScene extends Phaser.Scene {
     const started = isStopStarted(stop);
     const rematch = rideStraightToBattle(stop, started);
     const arrive = () => {
+      // Back at Berry Town once he has left it, the walk starts on his street.
+      if (stop.number === 1 && started) {
+        this.scene.start(SceneKeys.Explore, { stop: stop.id, place: 'street', at: 44 } satisfies ExploreData);
+        return;
+      }
       if (!rematch) {
         this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id));
         return;
@@ -575,6 +603,109 @@ export class LevelSelectScene extends Phaser.Scene {
       playSegment(this, { stop: stop.id, segment: firstSegment(stop, this.sub, started) }).catch(() => this.scene.start(SceneKeys.Explore, arrivalPlace(stop.id)));
     };
     this.time.delayedCall(quick ? 50 : 1000, () => this.doors.close(stop.station, sub, () => this.time.delayedCall(300, arrive)));
+  }
+
+  // -------------------------------------------------------------------------
+  // The story on the train: interludes, the phone, the notebook, the shoebox
+  // -------------------------------------------------------------------------
+
+  /** WHO WON?, Postcards and Phone in the header (N, P and T on a keyboard). */
+  private addStoryButtons(): void {
+    const y = HEADER_H / 2 - 2;
+    addUiButton(this, 300, y, 'Who won?', () => this.openNotebook(), { width: 170, height: 56, size: 20, sfx: null });
+    addUiButton(this, 480, y, 'Postcards', () => this.openShoebox(), { width: 170, height: 56, size: 20, sfx: null });
+    const phone = addUiButton(this, 990, y, 'Phone', () => this.openPhone(), { width: 150, height: 56, size: 20, sfx: null });
+    if (!hasFlag('julyPlayed') && isCleared(STOPS[0].id)) {
+      const tag = addText(this, 990 + 60, y - 26, '1', 16, { color: CSS.yellow });
+      if (!getSettings().reduceMotion) this.tweens.add({ targets: tag, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
+    }
+    void phone;
+  }
+
+  private overlayDone(): void {
+    this.time.delayedCall(150, () => (this.overlay = false));
+  }
+
+  private openNotebook(): void {
+    if (this.busy || this.overlay || isLeaving(this)) return;
+    this.overlay = true;
+    const pages = RUMOURS.map((page) => ({ page, heard: isRumourHeard(page) }));
+    const last = Math.max(0, pages.map((p) => p.heard).lastIndexOf(true));
+    new TapeViewer(this, { pages, start: last, truth: truthRevealed(), depth: 900, onDone: () => this.overlayDone() });
+  }
+
+  private openShoebox(): void {
+    if (this.busy || this.overlay || isLeaving(this)) return;
+    this.overlay = true;
+    const cards = shoebox();
+    new PostcardCard(this, { cards, start: cards.length - 1, title: `The shoebox (${cards.length} of 11)`, depth: 900, onDone: () => this.overlayDone() });
+  }
+
+  /** Coach's texts so far, and the July message (unread until the Rooftop's water tower, replayable after). */
+  private phoneHistory(): Line[] {
+    const reached = Math.min(STOPS.length, nextStopIndex() + 1);
+    const texts = CHAPTERS.slice(0, reached).flatMap((chapter) => [...chapter.texts, ...(hasSeen(`interlude:${chapter.number}`) ? topLines(chapter.interlude).filter((l) => l.who === 'phone') : [])]);
+    const july = hasFlag('julyPlayed') ? topLines(nodesOf('s08', 'unlock-task', 'the-water-tower-hut')).filter((l) => l.who === 'blueberry').map((l) => ({ ...l, role: 'Blueberry (voicemail)' })) : [];
+    return [...texts.slice(-6), ...july];
+  }
+
+  private openPhone(): void {
+    if (this.busy || this.overlay || isLeaving(this)) return;
+    this.overlay = true;
+    const header = hasFlag('julyPlayed') ? 'SAVED: BLUEBERRY, 14 JULY' : '1 UNREAD VOICE MESSAGE';
+    new Phone(this, { lines: this.phoneHistory(), header, depth: 900, onDone: () => this.overlayDone() });
+  }
+
+  /**
+   * The ride after a stop is cleared (SYSTEMS 15): the bible's train interlude
+   * over the carriage, once, before the route map. Only the latest one plays
+   * (an older save that cleared several stops does not replay them all).
+   */
+  private playInterlude(): void {
+    if (!this.scene.isActive() || isLeaving(this)) return;
+    const cleared = STOPS.filter((stop) => isCleared(stop.id) && stop.number <= 11).map((stop) => stop.number);
+    const latest = cleared.length ? Math.max(...cleared) : 0;
+    for (const n of cleared) if (n < latest) markSeen(`interlude:${n}`);
+    if (!latest || hasSeen(`interlude:${latest}`)) return;
+    const chapter = CHAPTERS[latest - 1];
+    if (!chapter || chapter.interlude.length === 0) return;
+    this.overlay = true;
+    music.play(storySong(latest === 7 ? 'train_between_alone' : 'train_between', 'level_select'));
+    const state = () => storyState(null, latest);
+    playNodes(
+      {
+        say: (lines, next) => this.sayOnTrain(lines, () => next(false)),
+        choose: (labels, pick) => new ChoiceBox(this, { prompt: '', choices: labels, depth: 900, onPick: pick }),
+        state,
+      },
+      chapter.interlude,
+      () => {
+        markSeen(`interlude:${latest}`);
+        // Raspberry knows the Bog Queen after the Lantern Market ride in every case (bible 9.2).
+        if (latest === 6) setFlag('knowsBogQueen');
+        this.overlayDone();
+        music.play('level_select');
+      },
+    );
+  }
+
+  /** Lines on the train: the speech box, and texts on the phone. */
+  private sayOnTrain(lines: Line[], done: () => void): void {
+    const visible = lines.filter((line) => holds(line.cond, storyState()));
+    const split = visible.findIndex((line, i) => i > 0 && (line.who === 'phone') !== (visible[0].who === 'phone'));
+    if (split > 0) {
+      this.sayOnTrain(visible.slice(0, split), () => this.sayOnTrain(visible.slice(split), done));
+      return;
+    }
+    if (visible.length === 0) {
+      done();
+      return;
+    }
+    if (visible[0].who === 'phone') {
+      new Phone(this, { lines: visible, depth: 900, onDone: done });
+      return;
+    }
+    new Dialogue(this, { lines: visible, depth: 900, onLine: () => undefined, onDone: done });
   }
 }
 

@@ -20,6 +20,8 @@ export interface PrologueFlow {
   skippable: boolean;
   /** Watched from Extras. */
   replay?: boolean;
+  /** The complete tape (every rumour found): the battle ends on the eight recovered frames instead of static. */
+  complete?: boolean;
 }
 
 /** The flow for a prologue started now. */

@@ -1,11 +1,11 @@
 import Phaser from 'phaser';
-import { COLORS, CSS, FONT, FONT_BODY, GAME_H, GAME_W } from '../core/config';
+import { COLORS, CSS, FONT, FONT_BODY, GAME_H, GAME_W, PX } from '../core/config';
 import { getSettings } from '../core/settings';
 import { Voicer, voiceFor } from '../core/voice';
 import { addBody, addText } from '../core/ui';
 import { RichTextView } from '../play/RichText';
 import { parseRich } from '../play/textFx';
-import { GLOW_COLOURS, STATIC_FRAMES, pixelKey, scanKey, staticKeys } from './art';
+import { GLOW_COLOURS, STATIC_FRAMES, pixelKey, scanKey, staticKeys, stripFrames } from './art';
 import { speakerColor, speakerName, speakerVoice, type CutLine } from './speakers';
 
 /**
@@ -45,7 +45,9 @@ export class VhsOverlay {
   private rolling = -1;
   private counting = true;
 
-  constructor(scene: Phaser.Scene, options: { date?: string; label?: string; depth?: number; start?: number } = {}) {
+  constructor(scene: Phaser.Scene, options: { date?: string; label?: string; depth?: number; start?: number; compact?: boolean } = {}) {
+    // Compact (over a battle): the PLAY mark under the pause button, the stamp and counter small along the bottom edge.
+    const compact = options.compact ?? false;
     this.clock = options.start ?? 0;
     const scan = scene.add.tileSprite(GAME_W / 2, GAME_H / 2, GAME_W, GAME_H, scanKey(scene)).setScale(1).setAlpha(0.7);
     scan.setTileScale(1, 1);
@@ -55,9 +57,11 @@ export class VhsOverlay {
     this.bandNoise = scene.add.tileSprite(GAME_W / 2, GAME_H + 40, GAME_W, 10, staticKeys(scene)[0]).setAlpha(0.25);
     const triangle = scene.add.triangle(0, 0, 0, 0, 0, 28, 24, 14, 0xffffff).setOrigin(0, 0);
     this.label = addText(scene, 36, 14, options.label ?? 'PLAY', 28, { color: '#ffffff', origin: [0, 0.5] });
-    this.play = scene.add.container(48, 44, [triangle, this.label]);
-    this.stamp = addText(scene, 48, GAME_H - 56, options.date ?? 'SAT 23:41', 28, { color: '#ffffff', origin: [0, 0.5] });
-    this.counter = addText(scene, GAME_W - 48, GAME_H - 56, '', 24, { color: '#ffffff', origin: [1, 0.5] });
+    this.play = scene.add.container(compact ? 24 : 48, compact ? 110 : 44, [triangle, this.label]);
+    if (compact) this.play.setScale(0.7);
+    const bottom = compact ? GAME_H - 14 : GAME_H - 56;
+    this.stamp = addText(scene, compact ? GAME_W / 2 - 150 : 48, bottom, options.date ?? 'SAT 23:41', compact ? 18 : 28, { color: '#ffffff', origin: [0, 0.5] });
+    this.counter = addText(scene, compact ? GAME_W / 2 + 150 : GAME_W - 48, bottom, '', compact ? 18 : 24, { color: '#ffffff', origin: [1, 0.5] });
     for (const text of [this.label, this.stamp, this.counter]) text.setShadow(3, 3, '#000000', 0, false, true);
     this.layer = scene.add.container(0, 0, [scan, vignette, this.band, this.bandNoise, this.play, this.stamp, this.counter]).setDepth(options.depth ?? CutDepth.vhs);
     if (!calm()) scene.tweens.add({ targets: this.play, alpha: 0.25, duration: 520, yoyo: true, repeat: -1, ease: 'Stepped' });
@@ -118,9 +122,11 @@ export class StaticScreen {
   /** Top, bottom, left, right strips and the ragged teeth, for partial coverage. */
   private readonly strips: Phaser.GameObjects.TileSprite[];
   private readonly teeth: Phaser.GameObjects.TileSprite[];
-  private readonly noSignal: Phaser.GameObjects.Text;
+  private readonly noSignal: Phaser.GameObjects.Text | Phaser.GameObjects.Image;
   private readonly keys: string[];
   private readonly flat: boolean;
+  /** The generated static (8 frames of 256x160), when it has landed. */
+  private readonly art: boolean;
   private frame = 0;
   private clock = 0;
   private coverageNow = 1;
@@ -128,16 +134,24 @@ export class StaticScreen {
   constructor(scene: Phaser.Scene, depth: number = CutDepth.static, noSignal = true) {
     this.keys = staticKeys(scene);
     this.flat = calm();
-    this.image = scene.add.image(GAME_W / 2, GAME_H / 2, this.keys[0]).setScale(GAME_W / 128, GAME_H / 80);
+    this.art = stripFrames(scene, 'prologue_static', 256, 160) >= 2;
+    this.image = this.art ? scene.add.image(GAME_W / 2, GAME_H / 2, 'prologue_static', '0').setScale(PX) : scene.add.image(GAME_W / 2, GAME_H / 2, this.keys[0]).setScale(GAME_W / 128, GAME_H / 80);
     if (this.flat) this.image.setTexture(pixelKey(scene)).setDisplaySize(GAME_W, GAME_H).setTint(0x6a6a74);
     const strip = () => {
-      const tile = scene.add.tileSprite(0, 0, 8, 8, this.flat ? pixelKey(scene) : this.keys[0]).setOrigin(0).setTileScale(10, 10).setVisible(false);
+      const tile = this.flat
+        ? scene.add.tileSprite(0, 0, 8, 8, pixelKey(scene))
+        : this.art
+          ? scene.add.tileSprite(0, 0, 8, 8, 'prologue_static', '0')
+          : scene.add.tileSprite(0, 0, 8, 8, this.keys[0]);
+      tile.setOrigin(0).setTileScale(this.art ? PX : 10, this.art ? PX : 10).setVisible(false);
       if (this.flat) tile.setTint(0x6a6a74);
       return tile;
     };
     this.strips = [strip(), strip(), strip(), strip()];
     this.teeth = Array.from({ length: 24 }, strip);
-    this.noSignal = addText(scene, GAME_W - 48, 44, 'NO SIGNAL', 28, { color: '#ffffff', origin: [1, 0.5] }).setShadow(3, 3, '#000000', 0, false, true).setVisible(noSignal);
+    this.noSignal = scene.textures.exists('prologue_no_signal')
+      ? scene.add.image(GAME_W - 48, 44, 'prologue_no_signal').setOrigin(1, 0.5).setScale(4).setVisible(noSignal)
+      : addText(scene, GAME_W - 48, 44, 'NO SIGNAL', 28, { color: '#ffffff', origin: [1, 0.5] }).setShadow(3, 3, '#000000', 0, false, true).setVisible(noSignal);
     this.layer = scene.add.container(0, 0, [this.image, ...this.strips, ...this.teeth, this.noSignal]).setDepth(depth).setVisible(false);
   }
 
@@ -190,8 +204,14 @@ export class StaticScreen {
     if (this.clock > 1 / 24) {
       this.clock = 0;
       this.frame = (this.frame + 1 + Math.floor(Math.random() * 3)) % STATIC_FRAMES;
-      this.image.setTexture(this.keys[this.frame]).setFlipX(Math.random() < 0.5).setFlipY(Math.random() < 0.5);
-      for (const tile of [...this.strips, ...this.teeth]) tile.setTexture(this.keys[this.frame]).setTilePosition(Math.random() * 128, Math.random() * 80);
+      if (this.art) this.image.setFrame(String(this.frame));
+      else this.image.setTexture(this.keys[this.frame]);
+      this.image.setFlipX(Math.random() < 0.5).setFlipY(Math.random() < 0.5);
+      for (const tile of [...this.strips, ...this.teeth]) {
+        if (this.art) tile.setFrame(String(this.frame));
+        else tile.setTexture(this.keys[this.frame]);
+        tile.setTilePosition(Math.random() * 128, Math.random() * 80);
+      }
       if (this.coverageNow < 0.999) this.setCoverage(this.coverageNow);
     }
   }
@@ -312,11 +332,11 @@ export class Bark {
   private pauses: number[] = [];
   private hold = 0;
 
-  constructor(scene: Phaser.Scene, y = 132, depth: number = CutDepth.caption) {
+  constructor(scene: Phaser.Scene, y = 132, depth: number = CutDepth.caption, width = 900) {
     this.scene = scene;
-    this.back = scene.add.rectangle(GAME_W / 2, 0, 900, 92, COLORS.ink, 0.86).setStrokeStyle(4, 0xfff6e0, 0.9);
-    this.tag = addText(scene, GAME_W / 2 - 430, -46, '', 24, { color: CSS.cream, origin: [0, 0.5] });
-    this.body = scene.add.text(GAME_W / 2 - 420, -18, '', { fontFamily: `"${FONT_BODY}"`, fontSize: '30px', color: CSS.cream, wordWrap: { width: 840 }, align: 'left' });
+    this.back = scene.add.rectangle(GAME_W / 2, 0, width, 92, COLORS.ink, 0.86).setStrokeStyle(4, 0xfff6e0, 0.9);
+    this.tag = addText(scene, GAME_W / 2 - width / 2 + 20, -46, '', 24, { color: CSS.cream, origin: [0, 0.5] });
+    this.body = scene.add.text(GAME_W / 2 - width / 2 + 30, -18, '', { fontFamily: `"${FONT_BODY}"`, fontSize: width < 900 ? '26px' : '30px', color: CSS.cream, wordWrap: { width: width - 60 }, align: 'left' });
     this.layer = scene.add.container(0, y, [this.back, this.tag, this.body]).setDepth(depth).setVisible(false);
     this.view = new RichTextView(scene, { like: this.body, container: this.layer, calm: calm() });
     this.voicer = new Voicer(scene.game);

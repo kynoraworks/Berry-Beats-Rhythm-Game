@@ -36,7 +36,7 @@ function precacheManifest(): Plugin {
 }
 
 /** Folders under public/ whose file names the story cutscenes look up (src/cutscene/storyFiles.ts). */
-const STORY_DIRS = ['assets/img', 'assets/audio/story', 'charts'];
+const STORY_DIRS = ['assets/img', 'assets/audio/story', 'assets/audio/sfx', 'charts'];
 const STORY_FILES_ID = 'virtual:story-files';
 
 /**

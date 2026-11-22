@@ -69,8 +69,8 @@ export class ScriptedDirector {
     this.hooks = hooks;
     this.bars = play.cues.source === 'density' ? chartBars(chart) : PROLOGUE_BARS;
     this.events = prologueEvents(play.cues, this.bars);
-    this.bark = new Bark(scene, 150, Depth.overlay + 4);
-    this.vhs = new VhsOverlay(scene, { date: 'SAT 23:44', depth: Depth.overlay + 5, start: 38 });
+    this.bark = new Bark(scene, 268, Depth.overlay + 4, 760);
+    this.vhs = new VhsOverlay(scene, { date: 'SAT 23:44', depth: Depth.overlay + 5, start: 38, compact: true });
     if (play.standIn) {
       addStandInNote(scene);
     }

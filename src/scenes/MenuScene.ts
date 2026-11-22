@@ -7,7 +7,8 @@ import { playSfx, preloadSamples, startDeckHiss, startSfx, type Voice } from '..
 import { UiButton, addBody, addBox, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
 import { DECK, LEAF_FRAMES, MenuTex, TAPE, TAPE_REEL_FRAMES, TAPE_TINT, tapeTexture, type TapeColor } from '../menu/art';
 import { SUB_EM, deckRect, fitText, labelRoom, menuLayout, neighbour, tapeRect, type MenuLayout, type Placement } from '../menu/layout';
-import { getProgress, isStoryComplete, nextStopIndex } from '../story/progress';
+import { getProgress, hasSeen, isStoryComplete, nextStopIndex } from '../story/progress';
+import { prologueFlow } from '../cutscene/flow';
 import { STOPS } from '../story/stops';
 
 /** One tape on the desk: a menu entry. */
@@ -46,6 +47,9 @@ export function buildTracks(): Track[] {
     const next = STOPS[Math.min(nextStopIndex(), STOPS.length - 1)];
     sideA.push({ side: 0, title: 'Continue', sub: `Stop ${next.number}, ${next.station}`, scene: SceneKeys.LevelSelect, data: { levelId: next.id } });
     sideA.push({ side: 0, title: 'Story', sub: 'Pick any stop on the Line', scene: SceneKeys.LevelSelect, data: { levelId: STOPS[0].id } });
+  } else if (!hasSeen('prologue')) {
+    // A new game opens on the prologue: the old final on tape, the shed, the sky, then Berry Town.
+    sideA.push({ side: 0, title: 'Story', sub: 'Start the Line', scene: SceneKeys.Prologue, data: { flow: prologueFlow({ scene: SceneKeys.LevelSelect }) } });
   } else {
     sideA.push({ side: 0, title: 'Story', sub: 'Start the Line', scene: SceneKeys.LevelSelect });
   }
@@ -153,6 +157,7 @@ export class MenuScene extends Phaser.Scene {
     this.input.on(Phaser.Input.Events.POINTER_WHEEL, (_p: Phaser.Input.Pointer, _o: unknown, _dx: number, dy: number) => {
       if (dy !== 0 && !isLeaving(this)) this.move(dy > 0 ? 'right' : 'left');
     });
+    this.input.keyboard?.on('keydown-X', () => hasSeen('prologue') && this.openExtras());
     this.showSyncNoteOnce();
   }
 
@@ -314,6 +319,18 @@ export class MenuScene extends Phaser.Scene {
     if (canFullscreen(this)) {
       this.keep(addUiButton(this, b.fullscreen.x, b.fullscreen.y, 'Fullscreen', () => toggleFullscreen(this), { width: b.fw, height: b.h, size: b.size, icon: 'icon_full' }));
     }
+    // Extras (the prologue tape and the rest) once the prologue has been seen. X opens it too.
+    if (hasSeen('prologue')) {
+      const wide = this.layout.mode === 'wide';
+      const x = wide ? b.title.x : b.fullscreen.x + b.fw / 2 + 16 + b.w / 2;
+      const y = wide ? b.title.y - b.h - 12 : b.fullscreen.y;
+      this.keep(addUiButton(this, x, y, 'Extras', () => this.openExtras(), { width: b.w, height: b.h, size: b.size, sfx: 'select' }));
+    }
+  }
+
+  private openExtras(): void {
+    if (this.busy || isLeaving(this)) return;
+    goTo(this, SceneKeys.Extras, undefined, 200);
   }
 
   // -------------------------------------------------------------------------

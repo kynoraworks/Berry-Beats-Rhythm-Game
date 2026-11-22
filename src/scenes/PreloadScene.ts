@@ -149,12 +149,15 @@ export class PreloadScene extends Phaser.Scene {
         console.error(error);
       }
     } else if (requested === SceneKeys.Explore) {
-      // `?scene=Explore&stop=stop02&place=station` (room, station, street or depart).
+      // `?scene=Explore&stop=stop02&place=station` (room, station, street or depart), or `place=interior&room=slipnsip`; `at=` stands Berry there.
       const place = params.get('place');
       const data: ExploreData = {
         stop: (stopById(params.get('stop') ?? '')?.id ?? 'stop02'),
-        place: place === 'room' || place === 'street' || place === 'depart' ? place : 'station',
+        place: place === 'room' || place === 'street' || place === 'depart' || place === 'interior' ? place : 'station',
       };
+      if (place === 'interior') data.room = params.get('room') ?? undefined;
+      const at = Number(params.get('at'));
+      if (params.get('at') !== null && Number.isFinite(at)) data.at = at;
       this.scene.start(SceneKeys.Explore, data);
       return;
     } else if (requested && known.includes(requested) && requested !== SceneKeys.Results) {

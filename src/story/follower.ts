@@ -2,8 +2,8 @@ import { abilityOf, ABILITIES } from './abilities';
 import { CHAPTERS, chapterOf, type Chapter } from './chapters';
 import { nodesOf, sectionOf, topLines } from './lines';
 import { crewAt } from './places';
-import { lastFollower, rememberFollower } from './progress';
-import type { StopDef } from './stops';
+import { isCleared, lastFollower, rememberFollower } from './progress';
+import { STOPS, type StopDef } from './stops';
 import type { FruitId, Line } from './types';
 
 /**
@@ -14,9 +14,17 @@ import type { FruitId, Line } from './types';
  * come along; with none (the Rooftop), Berry walks alone.
  */
 
-/** The crew Berry can bring at a stop, as the story has it (places.ts crewAt). */
+/**
+ * The crew Berry can bring at a stop, as the story has it (places.ts crewAt),
+ * and the ones who join on the way: Raspberry walks him to the station once
+ * she is beaten at Berry Town, and on the Rooftop the crew follows him once
+ * they are back (bible stop 8, "After").
+ */
 export function followerOptions(stop: StopDef): FruitId[] {
-  return crewAt(stop);
+  const crew = crewAt(stop);
+  if (stop.number === 1 && isCleared(stop.id)) return ['raspberry'];
+  if (stop.number === 8 && isCleared(stop.id)) return STOPS.filter((s) => s.number <= 8 && s.joins).map((s) => s.joins as FruitId);
+  return crew;
 }
 
 /** True when the picker should ask: two or more to choose from. */
@@ -105,9 +113,9 @@ function overlap(a: string[], b: string[]): number {
 /** Bible moments the words do not find on their own. */
 const OVERRIDES: Record<string, string> = {
   'stop02|at the poster': 'hotspot:posterwall',
-  'stop02|in the juice bar': 'room:juice_bar',
+  'stop02|in the juice bar': 'room:slipnsip',
   'stop02|in the stamp office': 'room:stamp_office',
-  'stop03|in the shop': 'room:spray_shop',
+  'stop03|in the shop': 'room:cando_shop',
   'stop04|at customs': 'room:customs_booth',
   'stop04|at the scarf glimpse': 'hotspot:scarf',
   'stop05|in the archive, the top shelf tape': 'hotspot:tapeShelf',

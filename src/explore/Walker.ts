@@ -43,6 +43,8 @@ const FOLLOW_DELAY = 0.22;
 const IDLE_FPS = 3;
 
 export class Walker {
+  /** 1 is a normal walk; stop 6's carried flames make it 0.5. */
+  speedScale = 1;
   readonly sprite: Phaser.GameObjects.Sprite;
   private readonly layout: Layout;
   private readonly texture: string;
@@ -120,7 +122,7 @@ export class Walker {
       return;
     }
     this.sprite.setFlipX(direction < 0);
-    this.place(this.x + direction * SPEED * dt);
+    this.place(this.x + direction * SPEED * this.speedScale * dt);
     this.moving = true;
   }
 
@@ -157,7 +159,7 @@ export class Walker {
     this.clock += dt;
     if (this.target !== null) {
       const delta = this.target - this.x;
-      const step = SPEED * dt;
+      const step = SPEED * this.speedScale * dt;
       if (Math.abs(delta) <= step) {
         this.place(this.target);
         this.target = null;

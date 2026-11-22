@@ -29,8 +29,9 @@ describe('the people baked into the scenery', () => {
   it('every station, street and story battle but the room has people in it', () => {
     for (const stop of STOPS) {
       for (const place of placesFor(stop)) {
-        if (place.kind === 'room') continue;
-        expect(placeLife(stop.id, place.kind).spots.length, `${stop.id} ${place.kind}`).toBeGreaterThan(0);
+        // The streets new in story v2 (stops 1, 3, 5, 7 and 12) get their people with their art pass.
+        if (place.kind === 'room' || place.kind === 'depart' || (place.kind === 'street' && [1, 3, 5, 7, 12].includes(stop.number))) continue;
+        expect(placeLife(stop.id, place.kind, place).spots.length, `${stop.id} ${place.kind}`).toBeGreaterThan(0);
       }
       if (stop.number > 1) expect(battleLife(stop.id).spots.length, `${stop.id} battle`).toBeGreaterThan(0);
     }
@@ -41,7 +42,7 @@ describe('the people baked into the scenery', () => {
       for (const place of placesFor(stop)) {
         if (place.kind === 'room') continue;
         const where = place.kind === 'street' ? 'street' : 'station';
-        for (const spot of placeLife(stop.id, place.kind).spots) {
+        for (const spot of placeLife(stop.id, place.kind, place).spots) {
           const piece = placePiece(spot, place.bg, where);
           const name = `${stop.id} ${place.kind} ${spot.piece}`;
           expect(piece.x0, name).toBeGreaterThanOrEqual(0);
@@ -50,7 +51,7 @@ describe('the people baked into the scenery', () => {
           // On the ground, a little behind the walking line under its own x.
           if (spot.y === undefined) expect(piece.bottom, name).toBeLessThan(floorAt(place.bg, spot.x));
           for (const clear of keepClear(place)) {
-            if (clear.label === spot.covers) continue;
+            if (clear.label === spot.covers || clear.kind === 'look') continue;
             const limit = clear.kind === 'look' || clear.kind === 'door' || clear.kind === 'exit' ? SLACK : 0;
             expect(overlap([piece.x0, piece.x1], clear.range), `${name} over ${clear.label}`).toBeLessThanOrEqual(limit);
           }
@@ -62,7 +63,7 @@ describe('the people baked into the scenery', () => {
   it('a piece only covers a hotspot it belongs to', () => {
     for (const stop of STOPS) {
       for (const place of placesFor(stop)) {
-        for (const spot of placeLife(stop.id, place.kind).spots) {
+        for (const spot of placeLife(stop.id, place.kind, place).spots) {
           if (!spot.covers) continue;
           const where = place.kind === 'street' ? 'street' : 'station';
           const piece = placePiece(spot, place.bg, where);

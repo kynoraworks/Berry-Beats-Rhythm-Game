@@ -5,11 +5,11 @@ import { getSettings } from '../../core/settings';
 import { preloadSamples } from '../../core/sfx';
 import { addBody, addText, goTo } from '../../core/ui';
 import { addActor, pose } from '../../cutscene/actors';
-import { GLOW_COLOURS, artOr, crowdRowKey, pixelKey, puffKey, spotKey } from '../../cutscene/art';
+import { GLOW_COLOURS, artOr, crowdRowKey, pixelKey, puffKey, spotKey, stripFrames } from '../../cutscene/art';
 import { kick, preloadStingers } from '../../cutscene/audio';
 import { Cutscene, type CutShot } from '../../cutscene/Cutscene';
 import { CutDepth } from '../../cutscene/fx';
-import { finishPrologue, loadPrologueBattle, loadStoryArt, prologueFlow, readFlow, type PrologueBattle, type PrologueFlow } from '../../cutscene/flow';
+import { finishPrologue, loadPrologueBattle, loadStoryArt, prologueFlow, type PrologueBattle, type PrologueFlow } from '../../cutscene/flow';
 import { HYPE_LINES } from '../../cutscene/scripts';
 import { at } from '../../cutscene/timeline';
 import type { PlayData } from '../../core/flow';
@@ -43,7 +43,11 @@ export class PrologueScene extends Phaser.Scene {
   init(data: PrologueData): void {
     this.flow = data?.flow ?? prologueFlow({ scene: SceneKeys.LevelSelect });
     this.heart = null;
+    // Development: `?scene=Prologue&part=battle` (or shed, sky) opens that part of the prologue.
+    this.part = data?.flow ? null : new URLSearchParams(window.location.search).get('part');
   }
+
+  private part: string | null = null;
 
   preload(): void {
     loadStoryArt(this);
@@ -59,9 +63,10 @@ export class PrologueScene extends Phaser.Scene {
     this.cut = new Cutscene(this, { shots: this.shots(), onEnd: () => this.toBattle(), skippable: this.flow.skippable, vhs: { date: 'SAT 23:41', start: 0 } });
     this.buildArena();
     this.cut.look(GAME_W / 2, GAME_H / 2 + 60, 1.12);
+    if (this.part === 'battle') void this.toBattle();
+    else if (this.part === 'shed') this.scene.start(SceneKeys.KidsGarden, { flow: this.flow });
+    else if (this.part === 'sky') this.scene.start(SceneKeys.SkyIntro, { flow: this.flow });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.heart?.remove());
-    // Skipping from here skips the whole prologue.
-    if (this.flow.skippable) this.registry.set('prologueSkip', () => finishPrologue(this, this.flow));
   }
 
   override update(_time: number, deltaMs: number): void {
@@ -78,8 +83,8 @@ export class PrologueScene extends Phaser.Scene {
     if (useGrand || stageKey === Tex.room) stage.setTint(0xc89a70);
     cut.add('stage', stage);
     cut.add('dim', this.add.rectangle(GAME_W / 2, GAME_H / 2, GAME_W * 2, GAME_H * 2, 0x0a0614, 0.45));
-    // Old banners hung across the back.
-    for (const [x, text, color] of [[300, 'BOG QUEEN 4 EVER', '#ff5a6a'], [980, 'SUMMER NEVER ENDS', '#ffb0c8']] as const) {
+    // Old banners hung across the back (the generated stage has its own).
+    if (stageKey !== 'prologue_stage') for (const [x, text, color] of [[300, 'BOG QUEEN 4 EVER', '#ff5a6a'], [980, 'SUMMER NEVER ENDS', '#ffb0c8']] as const) {
       const banner = this.add.container(x, 120, [this.add.rectangle(0, 0, 360, 56, 0x2a1020).setStrokeStyle(4, 0xfff6e0), addText(this, 0, 2, text, 26, { color })]);
       banner.setAngle(x < 640 ? -3 : 3);
       cut.add(`banner_${x}`, banner);
@@ -119,8 +124,16 @@ export class PrologueScene extends Phaser.Scene {
     void straw;
     // The lift Strawberry rises on.
     cut.add('lift', this.add.rectangle(STRAW_X, FLOOR + 230, 200, 20, 0x5a4a6a).setStrokeStyle(4, 0x1a1028).setVisible(false));
-    // Three rows of crowd from behind, glowsticks swaying.
-    [0x1a1228, 0x120c1e, 0x0a0614].forEach((tone, row) => {
+    // Three rows of crowd from behind, glowsticks swaying: the generated layers (2 frames on the beat) when they have landed.
+    if (stripFrames(this, 'prologue_crowd_front', 512, 48) >= 2) {
+      (['back', 'mid', 'front'] as const).forEach((layer, row) => {
+        const key = `prologue_crowd_${layer}`;
+        stripFrames(this, key, 512, [20, 32, 48][row]);
+        const crowd = this.add.sprite(GAME_W / 2, GAME_H + 30 - (2 - row) * 60, key, '0').setOrigin(0.5, 1).setScale(PX * (0.8 + row * 0.2));
+        cut.add(`crowd${row}`, crowd);
+        this.time.addEvent({ delay: BEAT * 1000, loop: true, callback: () => crowd.active && crowd.setFrame(crowd.frame.name === '0' ? '1' : '0') });
+      });
+    } else [0x1a1228, 0x120c1e, 0x0a0614].forEach((tone, row) => {
       const y = GAME_H - 150 + row * 70;
       const crowd = this.add.image(GAME_W / 2, y, crowdRowKey(this, 31 + row, tone)).setScale(PX + row).setOrigin(0.5, 0);
       cut.add(`crowd${row}`, crowd);
@@ -305,12 +318,8 @@ export class PrologueScene extends Phaser.Scene {
           at(0, { do: 'tween', target: 'cran', to: { x: CRAN_X }, ms: 900 }),
           at(0, { do: 'tween', target: 'straw', to: { x: STRAW_X }, ms: 900 }),
           at(0.2, { do: 'tween', target: 'lanes', to: { alpha: 1 }, ms: 900 }),
-          at(0.6, { do: 'sfx', name: 'count3' }),
-          at(1.2, { do: 'sfx', name: 'count2' }),
-          at(1.8, { do: 'sfx', name: 'count1' }),
-          at(2.4, { do: 'sfx', name: 'countGo' }),
-          at(2.4, { do: 'title', text: "LET'S DANCE", style: 'slam', ms: 900, size: 100, color: '#ffd84a' }),
-          at(2.4, { do: 'flash', color: 0xffffff, ms: 300, alpha: 0.6 }),
+          // The count-in and "Let's dance!" are the battle's own (PlayScene), straight after.
+          at(2.6, { do: 'flash', color: 0xffffff, ms: 300, alpha: 0.5 }),
         ],
       },
     ];
@@ -366,8 +375,7 @@ export class PrologueScene extends Phaser.Scene {
   private async toBattle(): Promise<void> {
     this.heart?.remove();
     // Skipped: the whole prologue goes by.
-    const skipped = this.cut.timeline.shotIndex < 9 && this.flow.skippable && this.cut.done;
-    if (skipped && this.cut.timeline.current?.id !== 'P10') {
+    if (this.cut.skipped) {
       finishPrologue(this, this.flow);
       return;
     }
@@ -381,7 +389,8 @@ export class PrologueScene extends Phaser.Scene {
     }
     const scripted: ScriptedPlay = { kind: 'prologue', cues: battle.cues, flow: this.flow, standIn: battle.standIn };
     const data: PlayData & { scripted: ScriptedPlay } = {
-      chart: { ...battle.chart, stage: battle.chart.stage ?? 'stage_grand_stage' },
+      // The old final's stage: the generated one when it has landed, else the Grand Stage as it is now.
+      chart: { ...battle.chart, stage: battle.chart.stage ?? (this.textures.exists('prologue_stage') ? 'prologue_stage' : 'stage_grand_stage') },
       returnTo: this.flow.then,
       difficulty: prologueDifficulty(battle),
       scripted,
@@ -392,9 +401,4 @@ export class PrologueScene extends Phaser.Scene {
 
 function prologueDifficulty(battle: PrologueBattle): PlayData['difficulty'] {
   return battle.chart.id.endsWith('.hard') ? 'hard' : battle.chart.id.endsWith('.easy') || battle.chart.difficulty === 1 ? 'easy' : 'normal';
-}
-
-/** Read by the dev URL (`?scene=Prologue`). */
-export function prologueData(data: unknown): PrologueData {
-  return { flow: readFlow(data) };
 }

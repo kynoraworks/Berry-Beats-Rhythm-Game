@@ -25,6 +25,13 @@ const STAGE_WIDTH = 256;
 export const FLOORS: Record<string, FloorProfile> = {
   // Berry's room (also the lesson's and custom maps' stage): the rug in front of the furniture.
   room: [[0, 140]],
+  // Story v2 art (measured with tools/measure_floors.py propose, flattened by eye).
+  room_garden_overgrown: [[0, 142], [256, 142]],
+  street_berry_town: [[0, 148], [640, 148]],
+  street_graffiti_corner: [[0, 152], [640, 152]],
+  street_citrus_labs: [[0, 150], [640, 150]],
+  street_the_club: [[0, 152], [640, 152]],
+  street_grand_stage: [[0, 148], [640, 148]],
 
   // Stations: the platform between the wall base and the yellow safety line.
   station_berry_town: [[0, 143]],

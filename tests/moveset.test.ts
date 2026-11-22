@@ -48,14 +48,14 @@ const noArt = () => false;
 const allArt = () => true;
 
 describe('the move book', () => {
-  it('has one move per battle, keyed by the battle, taught by its opponent', () => {
+  it('has one move per battle, keyed by the battle, taught by its trainer (A, B) or its opponent (C)', () => {
     expect(LEARNED_MOVES).toHaveLength(BATTLES.length);
     for (const battle of BATTLES) {
       const move = moveForBattle(battle.id);
       expect(move, battle.id).toBeDefined();
       expect(move!.battle).toBe(battle.id);
-      expect(move!.teacher).toBe(battle.opponent);
-      expect(teacherName(move!)).toBe(CAST[battle.opponent].name);
+      expect(move!.teacher).toBe(battle.trainer ?? battle.opponent);
+      if (battle.stop !== 'stop12' && battle.stop !== 'stop04') expect(teacherName(move!)).toBe(CAST[battle.trainer ?? battle.opponent].name);
       expect(move!.placeholder).toBe(true);
     }
   });
@@ -88,14 +88,16 @@ describe('the move book', () => {
   });
 
   it('says where a locked move is learned', () => {
-    expect(unlockHint(moveForBattle('stop02b')!)).toBe('Beat Banana at Peel Street (B) to learn');
+    expect(unlockHint(moveForBattle('stop02b')!)).toBe('Beat Lime at Peel Street (B) to learn');
   });
 
   it('groups the tabs by teacher, Berry first, in story order', () => {
     const groups = teacherGroups();
     expect(groups[0].teacher).toBe('berry');
-    expect(groups[1].teacher).toBe('raspberry');
-    expect(groups.find((g) => g.teacher === 'banana')!.moves.map((m) => m.battle)).toEqual(['stop02a', 'stop02b', 'stop02', 'stop10a']);
+    expect(groups[1].teacher).toBe('coach');
+    expect(groups[2].teacher).toBe('raspberry');
+    expect(groups.find((g) => g.teacher === 'banana')!.moves.map((m) => m.battle)).toEqual(['stop02', 'stop10a']);
+    expect(groups.find((g) => g.teacher === 'coach')!.moves.map((m) => m.id)).toEqual(['learn_stop01a', 'learn_stop01b', 'mv_bog_queen_stomp']);
     expect(groups.reduce((n, g) => n + g.moves.length, 0)).toBe(MOVE_BOOK.length);
   });
 });

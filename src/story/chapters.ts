@@ -262,7 +262,7 @@ const PLANS: Record<StopKey, Plan> = {
       { row: 'Poster', id: 'poster', label: 'Framed poster', where: room('bakery_office'), x: R[1], h: 70 },
       { row: 'Desk drawer', id: 'drawer', label: 'Desk drawer', where: room('bakery_office'), x: R[2] },
       { text: 'Gerald the gnome is missing an ear.', id: 'gerald', label: 'Gerald the gnome', where: 'street', x: 214, h: 22 },
-      { text: 'Postcard stand. Blank cards, two for one.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 160, kind: 'postcard' },
+      { text: 'Postcard stand. Blank cards, two for one.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
     ],
     residents: [
       { block: 'mrs-damson', id: 'mrsDamson', label: 'Mrs. Damson', where: 'street', x: 180 },
@@ -283,25 +283,25 @@ const PLANS: Record<StopKey, Plan> = {
     bossX: 590,
     looks: [
       { row: 'Blueberry poster', section: 'station', id: 'poster', label: 'Blueberry poster', where: 'station', x: 72 },
-      { row: 'Postcard stand', section: 'station', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
-      { row: 'Timetable', section: 'station', id: 'timetable', label: 'Timetable', where: 'station', x: 196 },
+      { row: 'Postcard stand', section: 'station', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
+      { row: 'Timetable', section: 'station', id: 'timetable', label: 'Timetable', where: 'station', x: 186 },
       { text: 'Poster wall: Blueberry, "UNDEFEATED". Under it, an older torn poster: "...MER LEGEND".', id: 'posterwall', label: 'Poster wall', where: 'street', x: 100 },
-      { row: 'Strawberry photo', id: 'photo', label: 'Signed photo', where: room('juice_bar'), x: R[0], h: 70 },
-      { row: 'Reserved stool', id: 'stool', label: 'Reserved stool', where: room('juice_bar'), x: R[1] },
-      { row: 'Jukebox', id: 'jukebox', label: 'Jukebox', where: room('juice_bar'), x: R[2] },
-      { row: 'Telly', id: 'telly', label: 'Telly', where: room('juice_bar'), x: R[3], kind: 'tape' },
+      { row: 'Strawberry photo', id: 'photo', label: 'Signed photo', where: room('slipnsip'), x: R[0], h: 70 },
+      { row: 'Reserved stool', id: 'stool', label: 'Reserved stool', where: room('slipnsip'), x: R[1] },
+      { row: 'Jukebox', id: 'jukebox', label: 'Jukebox', where: room('slipnsip'), x: R[2] },
+      { row: 'Telly', id: 'telly', label: 'Telly', where: room('slipnsip'), x: R[3], kind: 'tape' },
       { row: 'Stamp rack', id: 'rack', label: 'Stamp rack', where: room('stamp_office'), x: R[0] },
       { row: 'The clock', id: 'clock', label: 'The clock', where: room('stamp_office'), x: R[1], h: 70 },
       { row: 'Ledger', id: 'ledger', label: 'Ledger', where: room('banana_storeroom'), x: R[2] },
     ],
     residents: [
-      { block: 'kumquat', id: 'kumquat', label: 'Kumquat', where: room('juice_bar'), x: 190, flip: true },
+      { block: 'kumquat', id: 'kumquat', label: 'Kumquat', where: room('slipnsip'), x: 190, flip: true },
       { block: 'clerk-date', id: 'clerkDate', label: 'Clerk Date', where: room('stamp_office'), x: 196, flip: true },
       { block: 'mopper-sloe', id: 'sloe', label: 'Mopper Sloe', where: 'street', x: 336 },
       { block: 'tourists', id: 'tourists', label: 'Tourists', where: 'street', x: 480, who: 'npc' },
     ],
     rooms: [
-      { id: 'juice_bar', label: "Slip 'n' Sip", doorX: 250, wall: 0xffd84a },
+      { id: 'slipnsip', label: "Slip 'n' Sip", doorX: 250, wall: 0xffd84a },
       { id: 'stamp_office', label: 'The Stamp Office', doorX: 410, wall: 0xb8b0a0 },
       { id: 'banana_storeroom', label: "Banana's storeroom", doorX: 624, wall: 0xc8a23a, lock: { kind: 'battle', battle: 'c' } },
     ],
@@ -311,20 +311,20 @@ const PLANS: Record<StopKey, Plan> = {
     bossX: 590,
     looks: [
       { row: 'Battle flyers', section: 'station', id: 'flyers', label: 'Battle flyers', where: 'station', x: 72 },
-      { row: 'Postcard stand', section: 'station', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { row: 'Postcard stand', section: 'station', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Half mural', id: 'mural', label: 'Half mural', where: 'street', x: 100, only: 'beforeBoss', h: 70 },
       { row: 'Mural (after)', id: 'muralDone', label: 'The mural', where: 'street', x: 100, only: 'afterBoss', h: 70 },
-      { row: 'Beige gap', id: 'beige', label: 'Beige gap', where: room('spray_shop'), x: R[1] },
+      { row: 'Beige gap', id: 'beige', label: 'Beige gap', where: room('cando_shop'), x: R[1] },
       { row: 'Sketchbook', id: 'sketchbook', label: 'Sketchbook', where: room('cypher'), x: R[1] },
       { row: 'Torn page', id: 'tornpage', label: 'Torn page', where: room('cypher'), x: R[2], h: 70 },
     ],
     residents: [
-      { block: 'mr-olive', id: 'olive', label: 'Mr. Olive', where: room('spray_shop'), x: 196, flip: true },
+      { block: 'mr-olive', id: 'olive', label: 'Mr. Olive', where: room('cando_shop'), x: 196, flip: true },
       { block: 'nib', id: 'nib', label: 'Nib', where: 'street', x: 340 },
       { block: 'the-fence-sitters', id: 'fenceSitters', label: 'Fence Sitters', where: 'street', x: 404, who: 'npc' },
     ],
     rooms: [
-      { id: 'spray_shop', label: 'Can Do', doorX: 260, wall: 0x6ab8d8 },
+      { id: 'cando_shop', label: 'Can Do', doorX: 260, wall: 0x6ab8d8 },
       { id: 'cypher', label: 'The Cypher', doorX: 470, wall: 0x5a4a6a, onEnter: { from: 'rooms:raspberry-at-the-torn-page', cond: 'follower=raspberry & flag:sawSketch', once: true } },
     ],
   },
@@ -333,7 +333,7 @@ const PLANS: Record<StopKey, Plan> = {
     bossX: 590,
     stationPeople: [{ speaker: 'The Conductor', id: 'conductor', label: 'The Conductor', x: 54, who: 'strawberry' }],
     looks: [
-      { text: 'Postcard stand. Rain on the cards.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. Rain on the cards.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Notice board', id: 'notice', label: 'Notice board', where: 'street', x: 170 },
       { row: 'Dragon scarf', id: 'scarf', label: 'The vines', where: 'street', x: 400, h: 60 },
       { row: 'Confiscated shelf', id: 'shelf', label: 'Confiscated shelf', where: room('customs_booth'), x: R[1] },
@@ -354,7 +354,7 @@ const PLANS: Record<StopKey, Plan> = {
     trainer: { who: 'grapefruit', name: 'Grapefruit', where: 'street', x: 160, sprite: 'grapefruit' },
     bossX: 590,
     looks: [
-      { text: 'Postcard stand. The cards are sterile.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. The cards are sterile.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: "Lemon's fridge", id: 'fridge', label: "Lemon's fridge", where: room('canteen'), x: R[2] },
       { row: 'Tape shelf', id: 'tapeShelf', label: 'Tape shelf', where: room('archive'), x: R[0], h: 70 },
       { row: 'Tape: "GRAND DANCE', id: 'finalTape', label: 'Unlabelled tape', where: room('archive'), x: R[1] },
@@ -375,7 +375,7 @@ const PLANS: Record<StopKey, Plan> = {
     trainer: { who: 'lychee', name: 'Lychee', where: 'street', x: 170, sprite: 'lychee' },
     bossX: 590,
     looks: [
-      { text: 'Postcard stand. Paper lanterns printed on every card.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. Paper lanterns printed on every card.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Wish board', id: 'wishboard', label: 'Wish board', where: 'street', x: 318, h: 70 },
       { row: 'Candle in a jar', id: 'candle', label: 'Candle in a jar', where: 'street', x: 344, h: 30 },
       { row: 'Teapot shelf', id: 'teapots', label: 'Teapot shelf', where: room('teahouse_front'), x: R[1], h: 70 },
@@ -398,7 +398,7 @@ const PLANS: Record<StopKey, Plan> = {
     trainer: { who: 'passionFruit', name: 'Passion Fruit', where: 'street', x: 260, sprite: 'passion_fruit' },
     bossX: 590,
     looks: [
-      { text: 'Postcard stand. Glitter on every card.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. Glitter on every card.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Poster', id: 'poster', label: 'Poster', where: 'street', x: 340, h: 60 },
       { row: 'Hook with just a hood', id: 'hood', label: 'Hook with a hood', where: room('coat_check'), x: R[1], h: 60 },
       { row: 'VIP photo wall', id: 'photos', label: 'Photo wall', where: room('vip_lounge'), x: R[0], h: 70 },
@@ -419,7 +419,7 @@ const PLANS: Record<StopKey, Plan> = {
     trainer: { who: 'mango', name: 'Mango', where: 'street', x: 180, sprite: 'mango' },
     bossX: 590,
     looks: [
-      { text: 'Postcard stand. The cards flap in the wind.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. The cards flap in the wind.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Carved table', id: 'table', label: 'Carved table', where: 'street', x: 280 },
       { row: '"Feeding One', id: 'cookbook', label: 'Cookbooks', where: room('watermelon_kitchen'), x: R[0], h: 70 },
       { row: 'Thank-you wall', id: 'notes', label: 'Thank-you wall', where: room('watermelon_kitchen'), x: R[1], h: 70 },
@@ -440,9 +440,9 @@ const PLANS: Record<StopKey, Plan> = {
   stop09: {
     trainer: { who: 'fig', name: 'Fig', where: 'street', x: 180, sprite: 'fig' },
     bossX: 590,
-    stationPeople: [{ speaker: 'Plum', id: 'teaCart', label: "Plum's tea cart", x: 168, who: 'plum' }],
+    stationPeople: [{ speaker: 'Plum', id: 'teaCart', label: "Plum's tea cart", x: 190, who: 'plum' }],
     looks: [
-      { text: 'Postcard stand. The cards are damp.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 200, kind: 'postcard' },
+      { text: 'Postcard stand. The cards are damp.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Puddle', id: 'puddle', label: 'Puddle', where: 'street', x: 260, h: 20 },
       { row: "Captain's tag", id: 'tag', label: "Captain's tag", where: 'street', x: 330, h: 70 },
       { row: 'Dartboard', id: 'darts', label: 'Dartboard', where: room('workers_hut'), x: R[1], h: 70 },
@@ -460,7 +460,7 @@ const PLANS: Record<StopKey, Plan> = {
     trainer: { who: 'banana', name: 'The qualifier stage', where: 'street', x: 400, sprite: 'banana' },
     bossX: 590,
     looks: [
-      { text: 'Postcard stand. Confetti in the slots.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 176, kind: 'postcard' },
+      { text: 'Postcard stand. Confetti in the slots.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'The red switch', id: 'switch', label: 'Red switch', where: room('juicefm_booth'), x: R[2] },
       { row: 'Young Orange photo', id: 'photo', label: 'Framed photo', where: room('juicefm_booth'), x: R[0], h: 70 },
       { row: 'Entry boxes', id: 'entries', label: 'Entry boxes', where: room('registration_tent'), x: R[0] },
@@ -480,9 +480,9 @@ const PLANS: Record<StopKey, Plan> = {
   stop11: {
     trainer: { who: 'quince', name: 'Quince', where: 'street', x: 250, sprite: 'quince' },
     bossX: 590,
-    stationPeople: [{ speaker: 'Plum', id: 'teaCart', label: "Plum's tea cart", x: 168, who: 'plum' }],
+    stationPeople: [{ speaker: 'Plum', id: 'teaCart', label: "Plum's tea cart", x: 190, who: 'plum' }],
     looks: [
-      { text: 'Postcard stand. Gold-edged cards. Very posh.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 200, kind: 'postcard' },
+      { text: 'Postcard stand. Gold-edged cards. Very posh.', id: 'postcards', label: 'Postcard stand', where: 'station', x: 150, kind: 'postcard' },
       { row: 'Wall of champions', id: 'champions', label: 'Wall of champions', where: 'street', x: 170, h: 70 },
       { row: 'Scuff marks', id: 'scuffs', label: 'Scuff marks', where: room('mirror_room'), x: R[1], h: 16 },
       { row: 'Mirror', id: 'mirror', label: 'Mirror', where: room('mirror_room'), x: R[2], h: 70 },
@@ -820,8 +820,10 @@ function scriptFor(chapter: Chapter): StopScript {
 function roundLines(): Line[] {
   const rows = [...tableRows(nodesOf('s12', 'battle-a', 'round-lines')), ...tableRows(nodesOf('s12', 'battle-b', 'round-lines'))];
   const enemies = rows.map((row) => toLine(row.lines[0]));
-  const blue = topLines(nodesOf('finale', '7-1-intro')).find((line) => line.who === 'blueberry');
-  return blue ? [...enemies, blue] : enemies;
+  const intro = nodesOf('finale', '7-1-intro');
+  const blue = topLines(intro).find((line) => line.who === 'blueberry');
+  const berry = deepLines(intro).find((line) => line.who === 'berry');
+  return [...enemies, ...(blue ? [blue] : []), ...(berry ? [berry] : [])];
 }
 
 /** Each ally's reply to an enemy's round line at the Grand Stage, by round (0 to 3). */

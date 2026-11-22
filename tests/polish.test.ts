@@ -49,8 +49,8 @@ describe('riding back to stop 1', () => {
     expect(firstSegment(home, 0, false)).toBe(0);
   });
 
-  it('goes straight to Raspberry once she has been beaten', () => {
-    expect(rideStraightToBattle(home, true)).toBe(true);
+  it('rides back to Berry Town\'s street (story v2), and finds each battle there', () => {
+    expect(rideStraightToBattle(home, true)).toBe(false);
     for (const battle of [0, 1, 2]) {
       const segment = segmentsFor(home)[firstSegment(home, battle, true)];
       expect(segment.kind).toBe('battle');
