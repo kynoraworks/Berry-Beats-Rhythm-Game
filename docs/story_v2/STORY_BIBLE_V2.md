@@ -12,7 +12,7 @@ This file replaces `docs/STORY_BIBLE.md` once integration is done. Until then th
 
 - **Speaker** is the character's display name (Berry, Raspberry, Dr. Lemon, Juice FM). Residents use their name, or a role when they have none.
 - **emotion** is one of: `neutral`, `soft`, `sad`, `bold`, `happy`, `angry`, `shocked`, `smug`. Until more portraits exist, `neutral`, `soft` and `sad` use the neutral portrait and the rest use the bold one (see `SYSTEMS.md`).
-- **Conditions** go in square brackets between the emotion and the colon: `- **Pear** (happy) [if follower=pear]: text`. Grammar in `SYSTEMS.md`: `follower=<id>`, `flag:<name>`, `!flag:<name>`, `postcards>=N`, `rumours>=N`, `visited:<room>`, `stop>=N`, joined with `&`.
+- **Conditions** go in square brackets between the emotion and the colon: `- **Pear** (happy) [if follower=pear]: text`. Grammar in `SYSTEMS.md`: `follower=<id>`, `flag:<name>`, `!flag:<name>`, `flag:<name>=<value>`, counters with `=`, `<`, `<=`, `>=`, `>` (`postcards>=5`), `visited:<room>`, joined with `&`.
 - Every line is 90 characters or fewer, not counting tags. Longer thoughts are split into two lines by the same speaker.
 
 **Text effect tags** wrap words inside a line. The integration agent converts them; unknown tags are dropped.
@@ -101,7 +101,7 @@ Inspiration only. No names, characters or plot are taken from these games. Direc
 
 ### 3.1 The core
 
-**Berry** (hero, 15). A Blackberry in a purple hoodie, hood up, eyes always hidden. Near-silent since July. Dry, observant, kind in actions. As a kid he was the talker of the trio, the one with ideas: he invented the Trio Turn. *Quirk:* answers with gestures and "...", and the punctuation grows ("...?", "...!") before words return. *Arc:* hides, is pulled out, wins alone and loses everyone, speaks, leads, catches his friend, says yes. *Hype Berry:* hood down, eyes still hidden under his fringe, small smile. Only from stop 8 on, and on the Grand Stage.
+**Berry** (hero, 15). A Blackberry in a purple hoodie, hood up, eyes always hidden. Near-silent since July. Dry, observant, kind in actions. As a kid he was the talker of the trio, the one with ideas: he invented the Trio Turn. *Quirk:* answers with gestures and "...", and the punctuation grows ("...?", "...!") before words return. *Arc:* hides, is pulled out, wins alone and loses everyone, speaks, leads, catches his friend, says yes. *Hype Berry:* hood down, eyes still hidden under his fringe, small smile. He appears whenever hype mode is on, as built; before the finale he tugs the hood back up the moment hype ends. From the catch on the Grand Stage, the hood stays down for good.
 
 **Raspberry** (ally, stop 1, 15). Berry's childhood friend. Loud, blunt, loyal, allergic to subtlety. Works Saturdays at Coach's bakery. Has asked Coach "Who won?" every week for eight years. *Quirk:* answers for Berry, then gets annoyed that he lets her. *Arc:* angry at everyone for July, then admits she froze too; reads the envelope in the finale.
 
@@ -408,7 +408,7 @@ On a new game the title screen comes after S10; on later boots, the title screen
 
 ## 6. The twelve stops
 
-Every stop follows the approved loop: **arrive, explore and talk, two mini battles with the town's trainer (A and B), one unlock task, the boss (C), learn moves**. Minis and the task can be done in any order; the boss opens when all three are done. A lost battle shows its lose line and can be retried at once; after three losses in one battle Coach texts an offer to drop it to Easy.
+Every stop follows the approved loop: **arrive, explore and talk, two mini battles with the town's trainer (A and B), one unlock task, the boss (C), learn moves**. Berry learns a move from every battle he wins: a lane move from each trainer battle (A and B) and a finisher from the boss (C), matching `src/story/moveBook.ts` (one move per battle). Minis and the task can be done in any order; the boss opens when all three are done. A lost battle shows its lose line and can be retried at once; after three losses in one battle Coach texts an offer to drop it to Easy.
 
 Each chapter lists: at a glance, arrival, station, follower choice, street layout, rooms, residents, trainer, unlock task, boss, moves learned, follower banter, collectibles (rumour, postcard, secret), and the train interlude to the next stop.
 
@@ -428,7 +428,7 @@ Street positions are x in art pixels along a 640-wide street (rooms are their ow
 | Unlock task | **Find:** old high-tops, the garden key, chalk (0 of 3) |
 | Rooms | Berry's room; Rise and Shine Bakery (shop and back office); the Studio upstairs |
 | Residents | Mrs. Damson, Postmaster Gooseberry, Little Currant, the Sweeper |
-| Moves | Proving Step (Coach), Toe-Touch Pop (Raspberry) |
+| Moves | Count Clap (A) and Proving Step (B) from Coach; Toe-Touch Pop (C) from Raspberry |
 | Rumour | Mrs. Damson: "It was on the news, until it wasn't." |
 | Postcard | 1 |
 | Secret | Coach's back office: the torn poster and the two-word letter |
@@ -586,6 +586,8 @@ Gerald the gnome is a hotspot. **Berry** (neutral): {act}Gerald has lost an ear.
 
 Win:
 - **Coach** (happy): Lovely. Your feet remember. They're just shy about it.
+- **Coach** (smug): Have the count clap. Clap on two and four. Rule two, but with hands.
+- `MOVE LEARNED: Count Clap (Coach)`
 
 Lose:
 - **Coach** (soft): Too much flour. Again, lighter.
@@ -665,6 +667,12 @@ Lose:
 - **Raspberry** (smug) [at Gerald]: Put Gerald back how you found him. He's got a reputation.
 - **Raspberry** (soft) [at the bakery door]: I'll miss the Saturday shift. Don't tell Coach. She'll make it a thing.
 
+#### Collectibles
+
+- **Rumour 1 (Mrs. Damson):** "Strawberry won. It was on the news, until it wasn't." Tape: a news anchor announces "And the winner is...", then a programme about otters. *True detail:* the broadcast really was cut.
+- **Postcard 1:** written at the station stand (below).
+- **Secret:** Coach's back office (flag:sawPoster, flag:sawLetter); the phone's unread message (seen, not played).
+
 #### Station: departure
 
 > Berry Town station: one platform, a bench, a postcard stand, a timetable. The 6:15 waits, purple and cream, puffing. Coach is on the platform with a tin.
@@ -735,7 +743,7 @@ Lose:
 | Unlock task | **Talk chain:** get the ticket validated (Banana, Clerk Date, Kumquat, Lime, Clerk Date) |
 | Rooms | Slip 'n' Sip juice bar; the Stamp Office; Banana's storeroom (after the boss) |
 | Residents | Kumquat, Clerk Date, Mopper Sloe, two Tourists |
-| Moves | Rail Slide (Lime), Peel Moonwalk (Banana) |
+| Moves | Kickflip Kick (A) and Rail Slide (B) from Lime; Peel Moonwalk (C) from Banana |
 | Rumour | Kumquat |
 | Postcard | 2 |
 | Secret | Banana's ledger |
@@ -763,10 +771,10 @@ Lose:
 
 #### Follower choice
 
-> First time the prompt appears. A row of portraits under "Who's coming with you?" Only Raspberry is there.
+> With only Raspberry in the crew there is no picker (as built: it asks from two allies up). She simply comes along, and says so as they leave the station.
 
 - **Raspberry** (bold): Oh, I'm coming. That's not a question. That's a formality.
-- **Raspberry** (neutral): The prompt will get harder. You'll have to choose favourites. Choose me.
+- **Raspberry** (neutral): When there's more of us you'll have to pick favourites. Pick me.
 
 #### Street layout, left to right
 
@@ -842,6 +850,8 @@ Lose:
 
 Win:
 - **Lime** (neutral): Huh. Six. That's high, from me. Don't make it weird.
+- **Lime** (neutral): Kickflip kick. No board, just the kick. Your kick: six. Take it.
+- `MOVE LEARNED: Kickflip Kick (Lime)`
 
 Lose:
 - **Lime** (neutral): Two out of ten. You watched where it started. Watch where it lands.
@@ -959,7 +969,7 @@ Wrong turn (talk to Banana again before validation):
 | Unlock task | **Copy the pattern:** the corner's tag, 8 arrows |
 | Rooms | Can Do spray shop; The Cypher (basement) |
 | Residents | Mr. Olive, Nib the tagger, the Fence Sitters |
-| Moves | Spray Arc (Peach), Windmill Finish (Pear) |
+| Moves | The Reveal (A) and Spray Arc (B) from Peach; Windmill Finish (C) from Pear |
 | Rumour | Peach |
 | Postcard | 3 |
 | Secret | Blueberry's sketch in the Cypher |
@@ -983,6 +993,8 @@ Wrong turn (talk to Banana again before validation):
 | Postcard stand | Postcard 3. |
 
 #### Follower choice
+
+> No picker: Raspberry comes along.
 
 - **Raspberry** (smug): Still just me. I'm thriving. This is my golden age.
 
@@ -1051,6 +1063,8 @@ Wrong turn (talk to Banana again before validation):
 
 Win:
 - **Peach** (happy): You held back! Then you {sparkle}revealed{/sparkle}. Gorgeous. A little drippy.
+- **Peach** (neutral): The reveal. Step back, frame it with your hands. Admire yourself, sweetie.
+- `MOVE LEARNED: The Reveal (Peach)`
 
 Lose:
 - **Peach** (sad): You spent all your paint in the first line, sweetie. Hold it. Hold it.
@@ -1163,7 +1177,7 @@ Lose:
 | Unlock task | **Choose the answer:** the bunch's three riddles |
 | Rooms | Customs booth; The Vineyard Cafe |
 | Residents | Officer Elderberry, Seedless, the Cafe Owner, the Map Reader |
-| Moves | Stem Swing (Bing and Morello), Grapevine (Grape) |
+| Moves | High Five, Low Five (A) and Stem Swing (B) from the twins; Grapevine (C) from Grape |
 | Rumour | Grape |
 | Postcard | 4 |
 | Secret | The receipt in the cafe; the dragon scarf glimpse |
@@ -1184,7 +1198,7 @@ Lose:
 
 #### Follower choice
 
-> The prompt now has two portraits. The one not chosen waits by the station with their idle animation.
+> The picker appears for the first time (two portraits, "Who comes with you?") as Berry leaves the station. The one not chosen waits by the station's exit with their idle animation; talk to them there to swap.
 
 - **Raspberry** (bold) [chosen]: Obviously. Pear, guard the bench.
 - **Pear** (neutral) [chosen]: {slow}Cool... I'll walk slow, you walk slow. We'll get there.{/slow}
@@ -1275,6 +1289,9 @@ Lose:
 Win:
 - **Bing** (happy): Two at once! Sweet!
 - **Morello** (neutral): Fine. Adequate. Sweet-ish.
+- **Bing** (happy): High five!
+- **Morello** (smug): Low five. {pause} Too slow. That's the move. Keep it.
+- `MOVE LEARNED: High Five, Low Five (Bing and Morello)`
 
 Lose:
 - **Morello** (smug): You hit one and forgot the other. Classic single behaviour.
@@ -1419,7 +1436,7 @@ Lose:
 | Unlock task | **Copy the pattern:** the main lab's door code |
 | Rooms | Canteen; the Archive |
 | Residents | Robot B-33, the Intern, Mrs. Satsuma, the Clipboard Tech |
-| Moves | Bitter Twist (Grapefruit), Eureka Jump (Dr. Lemon) |
+| Moves | Clipboard Tut (A) and Bitter Twist (B) from Grapefruit; Eureka Jump (C) from Dr. Lemon |
 | Rumour | Dr. Lemon |
 | Postcard | 5 |
 | Secret | The Archive tapes: Top Shelf footage and the old final, eight frames short |
@@ -1508,6 +1525,8 @@ Lose:
 
 Win:
 - **Grapefruit** (neutral): Data recorded. You did fine. {pause} That was me being excited.
+- **Grapefruit** (neutral): Clipboard tut. Tut like you're ticking boxes. It's my only cardio.
+- `MOVE LEARNED: Clipboard Tut (Grapefruit)`
 
 Lose:
 - **Grapefruit** (sad): You looked at the wobble. Never look at the wobble. I've been here six years.
@@ -1627,7 +1646,7 @@ Lose:
 | Unlock task | **Find:** three flames to light the square (0 of 3) |
 | Rooms | The Dumpling House; Plum's Tea House (front and back room) |
 | Residents | Auntie Longan, the Dumpling Cook, the Wish Board Kid, the Fanning Elder |
-| Moves | Lantern Float (Lychee), Fan Rest (Plum) |
+| Moves | Tiny Bow (A) and Lantern Float (B) from Lychee; Fan Rest (C) from Plum |
 | Rumour | Plum |
 | Postcard | 6 |
 | Secret | The photo in Plum's back room; Blueberry's wish on the wish board |
@@ -1732,6 +1751,8 @@ Lose:
 
 Win:
 - **Lychee** (happy): {small}You waited! Nobody waits for me.{/small}
+- **Lychee** (soft): {small}A tiny bow. For when you can't say thank you.{/small}
+- `MOVE LEARNED: Tiny Bow (Lychee)`
 
 Lose:
 - **Lychee** (sad): {small}You pressed in the quiet. The quiet isn't empty. It's just quiet.{/small}
@@ -1873,7 +1894,7 @@ Lose:
 | Unlock task | **Choose the answer:** the doorman's three questions |
 | Rooms | Coat check; the VIP lounge |
 | Residents | Kiwi at the coat check, the Bartender, the Queue Fan |
-| Moves | Strobe Pop (Passion Fruit), Dragon Death Drop (Dragon Fruit) |
+| Moves | Tear Wipe (A) and Strobe Pop (B) from Passion Fruit; Dragon Death Drop (C) from Dragon Fruit |
 | Rumour | Dragon Fruit |
 | Postcard | 7 |
 | Secret | The VIP photo, the scarf on the hook, the scouting notebook |
@@ -1963,6 +1984,8 @@ Lose:
 
 Win:
 - **Passion Fruit** (happy): You read them late! Like a love letter you were scared to open!
+- **Passion Fruit** (sad): The tear wipe. Wipe, point, flourish. For when the feelings arrive early.
+- `MOVE LEARNED: Tear Wipe (Passion Fruit)`
 
 Lose:
 - **Passion Fruit** (sad): You flinched at the light. We all flinch. {shake}I flinch.{/shake}
@@ -2130,7 +2153,7 @@ Lose:
 | Unlock task | **Find:** three ingredients for the midnight meal; the third is in the water tower |
 | Rooms | Watermelon's kitchen; the water tower hut |
 | Residents | the Cook, the Diner, the Guest, the DJ |
-| Moves | Pan Flip (Mango), Big Hold Hug (Watermelon) |
+| Moves | Order Up (A) and Pan Flip (B) from Mango; Big Hold Hug (C) from Watermelon |
 | Rumour | Watermelon |
 | Postcard | 8 |
 | Secret | The carved table; the July message |
@@ -2153,7 +2176,9 @@ Lose:
 
 #### Follower choice
 
-> The prompt appears with no portraits in it. "Nobody's coming with you." The waiting spot by the station is an empty bench.
+> No picker: there is nobody to pick. Berry walks alone. The waiting spot by the station's exit is an empty bench, and walking past it plays one line:
+
+- **Berry** (neutral): {act}He looks at the empty bench for a moment.{/act}
 
 #### Street layout, left to right (the food court)
 
@@ -2212,6 +2237,8 @@ At the far right edge, beyond the boss stage, the crew can be seen sitting on a 
 
 Win:
 - **Mango** (happy): {fast}You held it! I'd have dropped it! I drop everything! I dropped a whole fish once!{/fast}
+- **Mango** (bold): {fast}ORDER UP! Spin the ticket, point at the table! That's a move now! I made it up!{/fast}
+- `MOVE LEARNED: Order Up (Mango)`
 
 Lose:
 - **Mango** (shocked): {fast}You let go! Same! Again! Again again!{/fast}
@@ -2372,7 +2399,7 @@ The backup ability becomes whoever arrived last; the player can cycle as normal.
 | Unlock task | **Copy the pattern:** follow the echo in the dark, three rounds (4, 6, 8 arrows) |
 | Rooms | The workers' hut; the Echo Room |
 | Residents | Foreman Chestnut, the Sleeping Worker, Plum's tea cart (platform) |
-| Moves | Busker Shuffle (Fig), Shell Krump (Coconut) |
+| Moves | Hat Tip (A) and Busker Shuffle (B) from Fig; Shell Krump (C) from Coconut |
 | Rumour | Fig |
 | Postcard | 9 |
 | Secret | The captain's tag; Pear finishes a song |
@@ -2464,6 +2491,8 @@ The backup ability becomes whoever arrived last; the player can cycle as normal.
 
 Win:
 - **Fig** (happy): Not bad at all for a hooded lad. {echo}lad{/echo} Best tip I've had. And that's quite sad.
+- **Fig** (smug): Take the hat tip, free of charge. Tip it small or tip it large. {echo}large{/echo}
+- `MOVE LEARNED: Hat Tip (Fig)`
 
 Lose:
 - **Fig** (sad): You tried to fill it all too fast. Slow and clean is how you last. {echo}last{/echo}
@@ -2613,7 +2642,7 @@ Lose:
 | Unlock task | **Talk chain:** five crew signatures for the entry form |
 | Rooms | The Juice FM booth; the registration tent |
 | Residents | Ms. Clementine, the Hot Cider Vendor, the Foam Finger Fan, the Confetti Tech |
-| Moves | Split Decision (Banana), Charleston Pause (Plum), Mic Drop Samba (Orange) |
+| Moves | Split Decision (A) from Banana; Charleston Pause (B) from Plum; Mic Drop Samba (C) from Orange |
 | Rumour | Orange |
 | Postcard | 10 |
 | Secret | The red switch; Blueberry's July entry form |
@@ -2732,6 +2761,12 @@ Win:
 Lose:
 - **Orange** (bold): Banana takes it! Slippery! Reset, folks!
 
+#### Between battles
+
+- **Banana** (neutral): Plum's next. She's slower than me, but she never falls over. Rude, honestly.
+- **Plum** (smug): I heard that, young one. I hear everything. I'm very old and very patient.
+- **Orange** (bold): Two qualifiers down, one to go! The one is me! I'm the one!
+
 #### Battle B: Qualifier, Plum (rematch)
 
 - **Orange** (bold): From the Lantern Market, she's older than my jokes, it's {big}PLUM!{/big}
@@ -2834,7 +2869,7 @@ Lose:
 | Unlock task | **Choose the answer:** Quince's etiquette test, to open Dame Pineapple's study |
 | Rooms | The mirror room; Dame Pineapple's study |
 | Residents | Lord Medlar, the Waiter, the Usher, Plum's tea cart (platform) |
-| Moves | Butler's Bow (Quince), Crown Turn (Pineapple) |
+| Moves | Tray Sweep (A) and Butler's Bow (B) from Quince; Crown Turn (C) from Pineapple |
 | Rumour | Quince |
 | Postcard | 11 |
 | Secret | The captain's notebook; the blank plaque; the ledger |
@@ -2923,6 +2958,8 @@ Lose:
 
 Win:
 - **Quince** (happy): {slow}Splendid. You may now use the good cutlery.{/slow}
+- **Quince** (neutral): {slow}The tray sweep. Low, level, never spill. Ahem.{/slow}
+- `MOVE LEARNED: Tray Sweep (Quince)`
 
 Lose:
 - **Quince** (neutral): {slow}A miss, sir. Two, technically. Ahem.{/slow}
@@ -3103,7 +3140,7 @@ Lose:
 | Unlock task | **Lineup and backstage talks:** set the ally order, talk to each ally in the dressing room |
 | Rooms | The crew dressing room; the broadcast booth (Blueberry's door is a hotspot, not a room) |
 | Residents | the Stagehand, the Camera Operator, Security |
-| Moves | The Trio Turn (Blueberry, with Raspberry) after set three |
+| Moves | Bunch Up (A, Grape and Coconut); Spike Vogue (B, Pineapple and Dragon Fruit); The Trio Turn (C, Blueberry with Raspberry) |
 | Rumour | The envelope (opened in the ending) |
 | Postcard | 12 (not written: handed over) |
 
@@ -3220,6 +3257,9 @@ Lose:
 **Set one win**
 - **Orange** (bold): Set one to the hoodie's crew! Fruit City, are you awake?!
 - **Grape** (sad): We lost again. (Again!) (I like them though.) (Me too.) (Don't tell the captain.)
+- **Grape** (happy): Have the bunch up! (Huddle!) (Shoulders!) And Coconut says...
+- **Coconut** (neutral): Shell. Keep it.
+- `MOVE LEARNED: Bunch Up (Grape and Coconut)`
 
 **Set one lose**
 - **Blueberry** (smug): One set down, hoodie. My crew's only warming up.
@@ -3243,13 +3283,15 @@ Lose:
 - **Blueberry** (neutral): {slow}...Okay.{/slow} Two sets. Fine. {pause} It's just us now.
 - **Dragon Fruit** (soft): Darling. In July I told him crews hold you back.
 - **Dragon Fruit** (soft): {pause} I was wrong. {sparkle}Crews hold you up.{/sparkle} Don't tell anyone I said that.
+- **Pineapple** (neutral): {slow}Take the spike vogue. Sharp hands, sharp chin. Correctly.{/slow}
+- `MOVE LEARNED: Spike Vogue (Pineapple and Dragon Fruit)`
 
 **Set two lose**
 - **Orange** (bold): Set two to the champion's crew! Reset and go again!
 
 #### Moves learned at the Grand Stage
 
-The four Top Shelf members were beaten (and taught) at their own stops; the sets give no new moves. The Trio Turn is learned in the ending.
+Each set won teaches a lane move from the pair Berry's crew beat (Bunch Up, Spike Vogue). The Trio Turn, the game's last finisher, is learned in the ending.
 
 ---
 
