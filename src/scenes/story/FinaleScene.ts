@@ -212,7 +212,7 @@ export class FinaleScene extends Phaser.Scene {
         duration: 0.1,
         steps: [
           at(0, { do: 'letterbox', on: false, ms: 400 }),
-          at(0, { do: 'camera', x: GAME_W / 2, y: FLOOR - 40, zoom: 1, ms: 600 }),
+          at(0, { do: 'camera', x: GAME_W / 2, y: 420, zoom: 0.92, ms: 600 }),
           at(0.05, { do: 'call', fn: () => this.showChoice() }),
         ],
       },
@@ -372,7 +372,7 @@ export class FinaleScene extends Phaser.Scene {
 
   /** The lanes come back with two prompts: BOW, big and glowing; CATCH, small and growing. */
   private showChoice(): () => boolean {
-    const y = 620;
+    const y = 600;
     const xs = this.lanesX();
     const lanes = this.add.container(0, 0).setDepth(CutDepth.fx + 2);
     xs.forEach((x, lane) => lanes.add(this.add.rectangle(x, y + 60, 86, 86, LANE_COLORS[lane], 0.25).setStrokeStyle(5, LANE_COLORS[lane])));
@@ -490,16 +490,16 @@ export class FinaleScene extends Phaser.Scene {
     this.prompts.clear();
     this.cut.get<Phaser.GameObjects.Text>('choiceHint').setText('Hold any lane (or hold the screen): CATCH');
     const xs = this.lanesX();
-    const x = (xs[1] + xs[2]) / 2;
-    // One long hold note across the middle lanes, falling into the receptors.
-    const bar = this.add.rectangle(x, -300, 150, 560, 0x8ad8ff, 0.9).setStrokeStyle(6, 0x1a1028).setOrigin(0.5, 1).setDepth(CutDepth.fx + 2);
-    const head = addText(this, 0, 0, 'CATCH', 40, { color: '#1a1028' });
-    const fill = this.add.rectangle(x, 700, 150, 0, 0xfff6e0, 0.9).setOrigin(0.5, 1).setDepth(CutDepth.fx + 3);
+    const x = xs[3];
+    // One long hold note in the CATCH lane, falling into its receptor.
+    const bar = this.add.rectangle(x, -300, 86, 560, 0x8ad8ff, 0.6).setStrokeStyle(6, 0x1a1028).setOrigin(0.5, 1).setDepth(CutDepth.fx + 2);
+    const head = addText(this, 0, 0, 'CATCH', 32, { color: CSS.cream });
+    const fill = this.add.rectangle(x, 700, 86, 0, 0xfff6e0, 0.8).setOrigin(0.5, 1).setDepth(CutDepth.fx + 3);
     this.holdUi = this.add.container(0, 0, [bar, fill]).setDepth(CutDepth.fx + 2);
-    head.setPosition(x, -330).setDepth(CutDepth.fx + 4);
+    head.setPosition(x, -330).setDepth(CutDepth.fx + 4).setShadow(3, 3, '#1a1028', 0, false, true);
     this.holdBar = fill;
     this.tweens.add({ targets: [bar], y: 700, duration: 900, ease: 'Sine.easeOut' });
-    this.tweens.add({ targets: head, y: 370, duration: 900, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: head, y: 120, duration: 900, ease: 'Sine.easeOut' });
     this.cut.add('catchHead', head, false);
     this.hold = new CatchHold(CATCH_SECONDS);
     // The long chord the song holds under the scene; it swells while held.
