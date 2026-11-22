@@ -148,7 +148,7 @@ export class Phone extends Overlay {
     const top = y + 300;
     const bubble = this.add(this.scene.add.rectangle(x + 16, top, w - 32, 104, COLORS.cream).setOrigin(0).setStrokeStyle(3, COLORS.ink));
     const from = this.add(addBody(this.scene, x + 30, top + 16, speakerName(line).replace(/\s*\(text\)$/, ''), 16, { origin: [0, 0.5], color: '#2f6a9a', bold: true }));
-    const text = this.add(addBody(this.scene, x + 30, top + 32, stripTags(line.text), 19, { origin: [0, 0], color: CSS.ink, wrapWidth: w - 64 }));
+    const text = this.add(addBody(this.scene, x + 30, top + 32, stripTags(line.text), 19, { origin: [0, 0], align: 'left', color: CSS.ink, wrapWidth: w - 64 }));
     this.bubbles.push(bubble, from, text);
     playSfx(this.scene.game, 'talkBlip');
     const voice = voiceFor(line.voice ?? 'phone');
@@ -197,7 +197,7 @@ export class PostcardCard extends Overlay {
     this.add(addBody(scene, x + w * 0.66, y + 150, 'To: Blueberry', 22, { origin: [0, 0.5], color: '#6a5a86' }));
     this.parts.push(
       this.add(addText(scene, GAME_W / 2, y - 34, '', 26, { color: CSS.yellow })),
-      this.add(addBody(scene, x + 40, y + 50, '', 30, { origin: [0, 0], color: '#3a2a6a', wrapWidth: w * 0.62 - 70, lineSpacing: 10 })),
+      this.add(addBody(scene, x + 40, y + 50, '', 30, { origin: [0, 0], align: 'left', color: '#3a2a6a', wrapWidth: w * 0.62 - 70, lineSpacing: 10 })),
       this.add(addBody(scene, x + 40, y + h - 46, '', 20, { origin: [0, 0.5], color: '#6a5a86' })),
       this.add(addBody(scene, GAME_W / 2, y + h + 34, '', 18, { color: CSS.grey })),
     );
@@ -271,10 +271,10 @@ export class TapeViewer extends Overlay {
     for (let i = 0; i < 3; i++) this.lines.push(this.add(scene.add.rectangle(x + 40, y + 220 + i * 90, 520, 6, 0xffffff, 0.08).setOrigin(0)));
     this.texts.push(
       this.add(addBody(scene, x + 40, y + 100, '', 26, { origin: [0, 0.5], bold: true })),
-      this.add(addBody(scene, x + 40, y + 150, '', 22, { origin: [0, 0.5], color: CSS.lilac, wrapWidth: GAME_W - 320 })),
-      this.add(addBody(scene, x + 64, y + 236, '', 22, { origin: [0, 0], color: CSS.cream, wrapWidth: 470, lineSpacing: 6 })),
+      this.add(addBody(scene, x + 40, y + 150, '', 22, { origin: [0, 0.5], align: 'left', color: CSS.lilac, wrapWidth: GAME_W - 320 })),
+      this.add(addBody(scene, x + 64, y + 236, '', 22, { origin: [0, 0], align: 'left', color: CSS.cream, wrapWidth: 470, lineSpacing: 6 })),
       this.add(addText(scene, x + 70, y + 226, '', 18, { color: CSS.cream })),
-      this.add(addBody(scene, x + 600, y + 220, '', 22, { origin: [0, 0], color: CSS.grey, wrapWidth: GAME_W - 240 - 640 })),
+      this.add(addBody(scene, x + 600, y + 220, '', 22, { origin: [0, 0], align: 'left', color: CSS.grey, wrapWidth: GAME_W - 240 - 640 })),
       this.add(addBody(scene, GAME_W / 2, y + 500, '', 18, { color: CSS.grey })),
     );
     if (!getSettings().reduceMotion) {

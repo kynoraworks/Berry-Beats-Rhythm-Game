@@ -49,6 +49,9 @@ export interface PrologueBattle {
   standIn: boolean;
 }
 
+/** Seconds into prologue_last_final.mp3 of bar 1's downbeat, as measured by the music agent. */
+const PROLOGUE_FIRST_BEAT = 0.058;
+
 /** The stand-in when neither the prologue's song nor its chart has landed: the Pineapple Hall battle, the fastest song on the Line. */
 const STAND_IN_CHART = 'stop11';
 
@@ -75,7 +78,8 @@ export async function loadPrologueBattle(): Promise<PrologueBattle> {
   const song = storySong('prologue_last_final', '', { title: 'The Last Final', bpm: PROLOGUE_BPM });
   if (song) {
     const meta = cueFile as { offset?: unknown } | undefined;
-    const offset = typeof meta?.offset === 'number' ? meta.offset : 0;
+    // The shipped song's first downbeat (tools/story_v2_music.py), until the cue file says otherwise.
+    const offset = typeof meta?.offset === 'number' ? meta.offset : PROLOGUE_FIRST_BEAT;
     const chart = buildPrologueChart(song, offset, difficulty);
     return { chart, cues: resolveCues(chart, cueFile), standIn: false };
   }

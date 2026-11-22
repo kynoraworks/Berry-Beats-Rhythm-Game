@@ -78,10 +78,21 @@ async function main() {
     await waitForScene('Title');
     await page.keyboard.press('Enter');
     await waitForScene('Menu');
-    // A new game starts with the prologue (story v2), or in Berry's room.
+    // A new game opens on the prologue (story v2): the old final on tape.
     await page.keyboard.press('Enter');
-    await page.waitForFunction(() => window.__game && window.__game.scene.getScenes(true).some((scene) => ['Prologue', 'Explore'].includes(scene.scene.key)), null, { timeout: 20000 });
-    await page.waitForTimeout(600);
+    await waitForScene('Prologue');
+    // Once it has been seen it can be skipped (hold Enter for a second); the story then starts in Berry's room.
+    await page.evaluate(() =>
+      localStorage.setItem('berrybeats.story.v1', JSON.stringify({ cleared: [], allies: [], talked: [], inspected: [], seen: ['prologue'] })),
+    );
+    await page.goto(`${base}?scene=Prologue`);
+    await waitForScene('Prologue');
+    // The cutscene is up once its art has loaded.
+    await page.waitForFunction(() => !!window.__game.scene.getScene('Prologue').cut, null, { timeout: 20000 });
+    await page.keyboard.down('Enter');
+    await page.waitForTimeout(1500);
+    await page.keyboard.up('Enter');
+    await waitForScene('Explore');
     // Berry's room, with stop 1's arrival scene (the Coach at the window).
     await page.goto(`${base}?scene=Explore&stop=stop01&place=room`);
     await waitForScene('Explore');
@@ -122,7 +133,7 @@ async function main() {
     server.close();
   }
   if (problems.length > 0) throw new Error(`Smoke test failed:\n  ${[...new Set(problems)].join('\n  ')}`);
-  console.log('Smoke test passed: title, menu, Berry\'s room, the train, the moves screen, a station, a street, the crew battle lineup, the tutorial and results all loaded without errors.');
+  console.log('Smoke test passed: title, menu, the prologue and its skip, Berry\'s room, the train, the moves screen, a station, a street, the crew battle lineup, the tutorial and results all loaded without errors.');
 }
 
 main().catch((error) => {

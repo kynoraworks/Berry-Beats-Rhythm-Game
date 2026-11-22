@@ -410,6 +410,7 @@ export class HoldToSkip {
   private keys = new Set<string>();
   private pointer = false;
   private fired = false;
+  private lastAt: number | null = null;
   private readonly onSkip: () => void;
   static readonly SECONDS = 1;
 
@@ -440,7 +441,11 @@ export class HoldToSkip {
   update(dt: number): void {
     if (this.fired) return;
     const holding = this.keys.size > 0 || this.pointer;
-    this.held = holding ? this.held + dt : Math.max(0, this.held - dt * 3);
+    // Measured on the wall clock: a busy device's long frames still count in full.
+    const now = performance.now();
+    const real = this.lastAt === null ? dt : Math.min(0.5, (now - this.lastAt) / 1000);
+    this.lastAt = now;
+    this.held = holding ? this.held + real : Math.max(0, this.held - real * 3);
     const share = Math.min(1, this.held / HoldToSkip.SECONDS);
     this.label.setAlpha(holding ? 1 : 0.6);
     const g = this.ring.clear();

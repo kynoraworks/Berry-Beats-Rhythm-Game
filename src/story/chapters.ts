@@ -567,6 +567,8 @@ function lookOf(stop: StopKey, plan: LookPlan): LookSpot {
       secret = /secret/i.test(row.cells[0]) || (row.sets ?? []).some((flag) => /^(saw|scarf)/.test(flag));
     }
   } else if (plan.text) lines = describe(plan.text);
+  // The juice bar's telly plays Kumquat's tape once she has told it; until then it is just a telly.
+  if (plan.kind === 'tape') lines = describe('A small telly with a VHS player.');
   // The phone and the CAPTAIN door have a choice in their row: kept as nodes for the story player.
   if (plan.kind === 'phone') nodes = phoneNodes(lines);
   if (plan.id === 'captain' && stop === 'stop12') nodes = captainNodes(lines);

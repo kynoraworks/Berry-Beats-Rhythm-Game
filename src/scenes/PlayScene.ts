@@ -39,6 +39,7 @@ import { actorArt } from '../cutscene/actors';
 import { staticSting, sustainedNote } from '../cutscene/audio';
 import { HoldToSkip, StaticScreen } from '../cutscene/fx';
 import { finishPrologue } from '../cutscene/flow';
+import { stripFrames } from '../cutscene/art';
 import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
 import { BASE_SCROLL_SPEED, Depth, PLAYER_FIELD_CENTER, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
@@ -1555,6 +1556,14 @@ export class PlayScene extends Phaser.Scene {
         const key = addText(this, PLAYER_FIELD_CENTER, RECEPTOR_Y - 150, '[ SPACE ]', 36, { color: CSS.yellow }).setDepth(Depth.hud + 2);
         this.tweens.add({ targets: key, scale: 0.86, duration: 90, yoyo: true, repeat: 1 });
         this.tweens.add({ targets: key, alpha: 0, delay: 900, duration: 300, onComplete: () => key.destroy() });
+        // The generated mud splash (6 frames) up each lane, when it has landed.
+        if (stripFrames(this, 'prologue_mud_splash', 48, 32) >= 6) {
+          PLAYER_LANES.forEach((lane, i) => {
+            const splash = this.add.sprite(lane, RECEPTOR_Y - 40, 'prologue_mud_splash', '0').setScale(PX).setDepth(Depth.effects).setOrigin(0.5, 1);
+            let frame = 0;
+            this.time.addEvent({ delay: 70 + i * 6, repeat: 6, callback: () => (++frame < 6 ? splash.setFrame(String(frame)) : splash.destroy()) });
+          });
+        }
         for (let i = 0; i < (calm ? 12 : 40); i++) {
           const lane = PLAYER_LANES[i % 4];
           const mud = this.add.rectangle(lane + Phaser.Math.Between(-30, 30), RECEPTOR_Y + 10, Phaser.Math.Between(8, 18), Phaser.Math.Between(8, 18), i % 3 ? 0x6b4a1e : 0x8a6a3a).setDepth(Depth.effects);

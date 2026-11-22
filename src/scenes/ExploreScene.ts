@@ -1034,8 +1034,9 @@ export class ExploreScene extends Phaser.Scene {
         choose: (labels, pick) =>
           this.openModal(
             new ChoiceBox(this, {
-              prompt: '',
-              choices: labels.map((label) => (label.startsWith('[') ? label : label)),
+              // Before the Rooftop Berry answers with gestures; from there, with words.
+              prompt: this.stop.number < 8 ? 'Berry...' : 'Berry:',
+              choices: labels,
               depth: DEPTH.modal,
               onPick: (index) => {
                 this.closeModal();

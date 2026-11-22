@@ -612,11 +612,11 @@ export class LevelSelectScene extends Phaser.Scene {
   /** WHO WON?, Postcards and Phone in the header (N, P and T on a keyboard). */
   private addStoryButtons(): void {
     const y = HEADER_H / 2 - 2;
-    addUiButton(this, 300, y, 'Who won?', () => this.openNotebook(), { width: 170, height: 56, size: 20, sfx: null });
-    addUiButton(this, 480, y, 'Postcards', () => this.openShoebox(), { width: 170, height: 56, size: 20, sfx: null });
-    const phone = addUiButton(this, 990, y, 'Phone', () => this.openPhone(), { width: 150, height: 56, size: 20, sfx: null });
+    addUiButton(this, 296, y, 'Who won?', () => this.openNotebook(), { width: 150, height: 56, size: 20, sfx: null });
+    const phone = addUiButton(this, 830, y, 'Phone', () => this.openPhone(), { width: 150, height: 56, size: 20, sfx: null });
+    addUiButton(this, 990, y, 'Postcards', () => this.openShoebox(), { width: 150, height: 56, size: 20, sfx: null });
     if (!hasFlag('julyPlayed') && isCleared(STOPS[0].id)) {
-      const tag = addText(this, 990 + 60, y - 26, '1', 16, { color: CSS.yellow });
+      const tag = addText(this, 830 + 60, y - 26, '1', 16, { color: CSS.yellow });
       if (!getSettings().reduceMotion) this.tweens.add({ targets: tag, scale: 1.2, duration: 500, yoyo: true, repeat: -1 });
     }
     void phone;
@@ -675,7 +675,7 @@ export class LevelSelectScene extends Phaser.Scene {
     playNodes(
       {
         say: (lines, next) => this.sayOnTrain(lines, () => next(false)),
-        choose: (labels, pick) => new ChoiceBox(this, { prompt: '', choices: labels, depth: 900, onPick: pick }),
+        choose: (labels, pick) => new ChoiceBox(this, { prompt: latest < 8 ? 'Berry...' : 'Berry:', choices: labels, depth: 900, onPick: pick }),
         state,
       },
       chapter.interlude,

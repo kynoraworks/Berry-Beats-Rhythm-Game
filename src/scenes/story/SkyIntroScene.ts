@@ -63,7 +63,7 @@ export class SkyIntroScene extends Phaser.Scene {
   }
 
   preload(): void {
-    loadStoryArt(this);
+    loadStoryArt(this, ['sky_', 'room_garden_overgrown', 'room_berry']);
   }
 
   create(): void {

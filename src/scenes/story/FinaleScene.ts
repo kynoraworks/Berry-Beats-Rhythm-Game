@@ -99,7 +99,7 @@ export class FinaleScene extends Phaser.Scene {
   }
 
   preload(): void {
-    loadStoryArt(this);
+    loadStoryArt(this, ['cut_catch', 'cut_static_finale', 'cut_cap_off', 'cut_envelope', 'cut_saved_seat', 'prologue_static', 'prologue_no_signal', 'strawberry', 'conductor', 'legends_portraits']);
   }
 
   create(): void {

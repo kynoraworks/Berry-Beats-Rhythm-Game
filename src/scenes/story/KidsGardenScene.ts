@@ -56,7 +56,7 @@ export class KidsGardenScene extends Phaser.Scene {
   }
 
   preload(): void {
-    loadStoryArt(this);
+    loadStoryArt(this, ['prologue_', 'room_shed', 'kid_', 'kids_']);
   }
 
   create(): void {

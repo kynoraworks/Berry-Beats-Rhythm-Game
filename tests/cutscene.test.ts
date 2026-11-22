@@ -383,3 +383,37 @@ describe('prologue battle script', () => {
     expect(events.filter((e) => e.kind === 'hype')).toHaveLength(2);
   });
 });
+
+describe('the music agent cue file', () => {
+  it('reads prologue_cues.json as tools/story_v2_music.py writes it', async () => {
+    const { prologueEvents } = await import('../src/cutscene/prologueCues');
+    const beat = 60 / 172;
+    const offset = 0.058;
+    const t = (b: number, q = 1) => offset + ((b - 1) * 4 + (q - 1)) * beat;
+    const file = {
+      song: 'prologue_last_final',
+      bpm: 172,
+      offset,
+      firstDownbeat: offset,
+      bar1Beat: 0,
+      hype: [9, 17, 34, 43, 51, 81].map((bar, i) => ({ bar, on: i % 2 === 0, time: t(bar) })),
+      bogStomp: { bar: 34, time: t(34) },
+      rivalFlash: { bar: 26, time: t(26) },
+      burst: { fromBar: 49, toBar: 50, start: t(49), end: t(51) },
+      freeze: { bar: 84, beatInBar: 3.5, time: t(84, 3.5) },
+      static: { bar: 85, beatInBar: 1, time: t(85) },
+    };
+    const chart = buildPrologueChart('prologue_last_final', offset, 'normal');
+    const cues = resolveCues(chart, file);
+    expect(cues.source).toBe('file');
+    expect(cues.bar1Beat).toBeCloseTo(0);
+    expect(cues.hype.map((c) => [c.bar, c.on])).toEqual([[9, true], [17, false], [34, true], [43, false], [51, true], [81, false]]);
+    expect(cues.freeze).toEqual({ bar: 84, beat: 3.5 });
+    const events = prologueEvents(cues);
+    expect(events.find((e) => e.kind === 'stomp')?.bar).toBe(34);
+    expect(events.find((e) => e.kind === 'burst')?.bar).toBe(49);
+    expect(events[events.length - 1].kind).toBe('freeze');
+    expect(hypeAt(cues.hype, 35)).toBe(true);
+    expect(hypeAt(cues.hype, 45)).toBe(false);
+  });
+});

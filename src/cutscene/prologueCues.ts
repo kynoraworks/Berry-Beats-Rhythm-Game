@@ -45,6 +45,8 @@ export interface PrologueCues {
   freeze: { bar: number; beat: number };
   /** Chart beat where bar 1 starts. */
   bar1Beat: number;
+  /** Bars the cue file moves from the bible's (the song's real moments): Bog Stomp, Strawberry's flash, the burst. */
+  marks?: { stomp?: number; flash?: number; burst?: number };
   /** Where the cues came from, for the dev overlay and tests. */
   source: 'file' | 'bible' | 'density';
 }
@@ -146,7 +148,15 @@ export function parseCues(raw: unknown, chart: Pick<Chart, 'bpm' | 'offset'>): P
   }
   if (hype.length === 0) return null;
   hype.sort((a, b) => a.bar - b.bar);
-  return { hype, freeze, bar1Beat, source: 'file' };
+  // The music agent's marks for the battle's set pieces, when given ({bogStomp: {bar}}, {rivalFlash: {bar}}, {burst: {fromBar}}).
+  const markBar = (v: unknown): number | undefined => {
+    if (typeof v !== 'object' || v === null) return num(v) ?? undefined;
+    const record = v as Record<string, unknown>;
+    return num(record.bar) ?? num(record.fromBar) ?? num(record.from_bar) ?? undefined;
+  };
+  const marks = { stomp: markBar(root.bogStomp ?? root.bog_stomp ?? root.stomp), flash: markBar(root.rivalFlash ?? root.rival_flash ?? root.flash), burst: markBar(root.burst) };
+  const anyMark = marks.stomp !== undefined || marks.flash !== undefined || marks.burst !== undefined;
+  return { hype, freeze, bar1Beat, source: 'file', ...(anyMark ? { marks } : {}) };
 }
 
 // ---------------------------------------------------------------------------
@@ -437,9 +447,9 @@ export function prologueEvents(cues: PrologueCues, bars: number = PROLOGUE_BARS)
   const events: PrologueEvent[] = [
     ...cues.hype.map((cue) => ({ bar: cue.bar, kind: 'hype' as const, on: cue.on })),
     ...calloutsFor(cues, bars).map((callout) => ({ bar: callout.bar, kind: 'callout' as const, callout })),
-    { bar: at(BOG_STOMP.bar), kind: 'stomp' },
-    { bar: at(RIVAL_FLASH_BAR), kind: 'flash' },
-    { bar: at(BURST_BARS[0]), kind: 'burst' },
+    { bar: cues.marks?.stomp ?? at(BOG_STOMP.bar), kind: 'stomp' },
+    { bar: cues.marks?.flash ?? at(RIVAL_FLASH_BAR), kind: 'flash' },
+    { bar: cues.marks?.burst ?? at(BURST_BARS[0]), kind: 'burst' },
     { bar: at(45), kind: 'halfTime' },
     { bar: at(81), kind: 'finisher' },
     { bar: freezeBar, kind: 'freeze' },

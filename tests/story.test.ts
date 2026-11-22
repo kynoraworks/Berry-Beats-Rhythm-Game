@@ -96,8 +96,8 @@ describe('the bible is the script', () => {
   });
 
   it('uses no em or en dashes, in the bible or the script', () => {
-    expect(MARKDOWN).not.toMatch(/[–—]/);
-    for (const line of gameLines()) expect(line.text).not.toMatch(/[–—]/);
+    expect(MARKDOWN).not.toMatch(/[\u2013\u2014]/);
+    for (const line of gameLines()) expect(line.text).not.toMatch(/[\u2013\u2014]/);
   });
 
   it('writes conditions in the grammar the game reads', () => {

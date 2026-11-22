@@ -11,7 +11,7 @@ import { SONGS, getSong, type SongDef } from '../core/songs';
 const PRESENT = new Set(files);
 
 /** Prefixes of the images the story cutscenes may use, loaded in their scenes' preload. */
-export const STORY_IMAGE_PREFIXES = ['prologue_', 'sky_', 'kids_', 'kid_', 'shed_', 'garden_', 'finale_', 'credits_', 'epilogue_', 'postcredits_', 'cranberry', 'strawberry', 'conductor', 'orange_young', 'static_', 'vhs_', 'telly', 'train_side', 'line_panorama', 'berry_town_', 'trio_photo', 'golden_', 'envelope', 'lychee', 'room_shed', 'room_garden', 'room_berry', 'cut_', 'ui_'];
+export const STORY_IMAGE_PREFIXES = ['prologue_', 'sky_', 'kids_', 'kid_', 'shed_', 'garden_', 'finale_', 'credits_', 'epilogue_', 'postcredits_', 'cranberry', 'strawberry', 'conductor', 'orange_young', 'static_', 'vhs_', 'telly', 'train_side', 'line_panorama', 'berry_town_', 'trio_photo', 'golden_', 'envelope', 'lychee', 'room_shed', 'room_garden', 'room_berry', 'cut_', 'ui_', 'legends_'];
 
 /** True if public/assets/img/<key>.png exists. */
 export function hasImage(key: string): boolean {

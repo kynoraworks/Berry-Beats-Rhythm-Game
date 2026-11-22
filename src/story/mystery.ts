@@ -1,7 +1,7 @@
 import { CHAPTERS, type LookSpot } from './chapters';
 import { bible, nodesOf, partOf, tableRows } from './lines';
 import { getFlag, hasFlag, isBattleWon, postcardsWritten, rumoursHeard, unlockRumour } from './progress';
-import { BATTLES } from './stops';
+import { BATTLES, STOPS } from './stops';
 import type { Line } from './types';
 
 /**
@@ -125,7 +125,7 @@ export interface Postcard {
 
 export const POSTCARDS: readonly Postcard[] = CHAPTERS.filter((chapter) => chapter.postcard).map((chapter) => ({
   stop: chapter.number,
-  station: chapter.meta.Station ?? '',
+  station: STOPS[chapter.number - 1]?.station ?? '',
   text: chapter.postcard as string,
 }));
 

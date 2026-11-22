@@ -50,7 +50,7 @@ export class PrologueScene extends Phaser.Scene {
   private part: string | null = null;
 
   preload(): void {
-    loadStoryArt(this);
+    loadStoryArt(this, ['prologue_', 'cranberry', 'strawberry', 'orange_young', 'legends_portraits']);
   }
 
   create(): void {
@@ -394,6 +394,10 @@ export class PrologueScene extends Phaser.Scene {
       returnTo: this.flow.then,
       difficulty: prologueDifficulty(battle),
       scripted,
+      // Development: `?scene=Prologue&part=battle&autoplay=1` plays itself.
+      autoplay: this.part === 'battle' && new URLSearchParams(window.location.search).get('autoplay') === '1',
+      // Development: `&at=110` starts that many seconds in (to see the freeze without playing the whole song).
+      startAt: this.part === 'battle' ? Number(new URLSearchParams(window.location.search).get('at')) || undefined : undefined,
     };
     goTo(this, SceneKeys.Play, data, 200);
   }
