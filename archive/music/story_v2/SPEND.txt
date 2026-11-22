@@ -1,0 +1,20 @@
+Story v2 music: Higgsfield spend log
+Credit cap for this work: 220 credits. Price: elevenlabs_music_v2_5 = 0.1453 credits per second (17.44 for 120 s), mirelo_text_to_audio about 0.25 per second.
+Balance before any generation: 1809.87 (2026-11-22)
+
+key | model | seconds | job id | cost | note
+prologue_last_final | elevenlabs_music_v2_5 | 120 | (none) | 0 | batch 1 item refused: rate limit, max 6 concurrent jobs; resubmitted alone later
+kids_garden | elevenlabs_music_v2_5 | 45 | 8acc011f-3865-4b5c-b323-d709a17fc7f3 | 6.54 (quote) | batch 1
+sky_the_line | elevenlabs_music_v2_5 | 50 | 33fc7c1c-330b-4aa9-aa84-0cf0cb75a8dc | 7.27 (quote) | batch 1
+town_berry_town | elevenlabs_music_v2_5 | 75 | 8f23bc66-f3d6-46f3-8e1b-361b7fd4397e | 10.90 (quote) | batch 1
+town_rooftop_alone | elevenlabs_music_v2_5 | 76 | 95cee03b-462b-4fea-9ce4-b8ae12e9103f | 11.04 (quote) | batch 1
+town_grand_stage | elevenlabs_music_v2_5 | 72 | 6a07515d-70a8-41e1-88bb-d25b86ea01be | 10.46 (quote) | batch 1
+train_between | elevenlabs_music_v2_5 | 65 | 73496599-1dbd-4cae-ac6d-aee8bdd24b99 | 9.45 (quote) | batch 1
+train_between_alone | elevenlabs_music_v2_5 | 65 | 8b9ceb64-9241-43a3-b5b5-12224c57003d | 9.45 (quote) | batch 1
+credits_same_garden | elevenlabs_music_v2_5 | 150 | ae72b164-a17c-4464-a22b-652b5e46f7a0 | 21.80 (quote) | batch 1
+prologue_last_final | elevenlabs_music_v2_5 | 120 | 54ff2017-e73b-4a6b-81ee-a000f7be6c6e | 17.44 (quote) | resubmitted alone (attempt 1)
+sting_static | mirelo_text_to_audio | 1.5 | 327a5eb0-98c5-41d7-b750-997703c97405 | about 0.4 | stings batch
+sting_conductor | elevenlabs_music_v2_5 | 6 | 63334569-7d94-411e-8b7b-89aec9899a38 | 0.87 (quote) | stings batch
+sting_move_learned | elevenlabs_music_v2_5 | 3 | (none) | 0 | stings batch item refused: rate limit; resubmitted alone later
+sting_unlock | elevenlabs_music_v2_5 | 3 | 2d361b6f-fa99-46f8-899b-4d2202abe023 | 0.44 (quote) | stings batch
+sting_low_point | elevenlabs_music_v2_5 | 6 | 4e4457d3-5282-46f1-8d61-b5a63c24164f | 0.87 (quote) | stings batch
