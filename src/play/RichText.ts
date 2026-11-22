@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BIG_SCALE, layoutRich, type RichLine } from './textFx';
+import { glyphScale, layoutRich, type RichLine } from './textFx';
 
 /**
  * Draws a line with text effects (play/textFx.ts) letter by letter. Letters
@@ -15,6 +15,8 @@ const SPARKLE_STEP_MS = 110;
 const SHAKE_STEP_MS = 50;
 /** Pixels at full strength. */
 const SHAKE_PX = 2.5;
+/** What a {glitch} letter flickers to. */
+const GLITCH_CHARS = ['#', '%', '&', '?', '!', '/', '=', '*', '0', '1', 'X', 'Z'];
 const WAVE_PX = 4;
 
 interface Atlas {
@@ -103,6 +105,8 @@ export class RichTextView {
   private shown = 0;
   private clock = 0;
   private ink = 0x000000;
+  private atlas: Atlas | null = null;
+  private atlasKey: string | null = null;
 
   constructor(scene: Phaser.Scene, options: RichTextOptions) {
     this.scene = scene;
@@ -117,6 +121,8 @@ export class RichTextView {
     const size = parseFloat(String(style.fontSize)) || 32;
     const atlas = atlasFor(this.scene, style.fontFamily, size, style.fontStyle || 'normal');
     if (!atlas) return;
+    this.atlas = atlas;
+    this.atlasKey = atlas.key;
     this.line = line;
     this.ink = Phaser.Display.Color.HexStringToColor(style.color as string).color;
     const wrap = style.wordWrapWidth ?? Number.POSITIVE_INFINITY;
@@ -127,15 +133,18 @@ export class RichTextView {
     layout.glyphs.forEach((place, index) => {
       const char = line.plain[index];
       const frame = /\s/.test(char) ? null : glyph(atlas, char);
-      const big = line.styles[index]?.big ?? false;
+      const scale = glyphScale(line.styles[index]);
       const rowShift = align === 'center' && Number.isFinite(wrap) ? (wrap - layout.widths[place.line]) / 2 : 0;
-      const x = like.x + place.x + rowShift - 2 * (big ? BIG_SCALE : 1);
+      const x = like.x + place.x + rowShift - 2 * scale;
       // Bottom-aligned, so big letters grow upward from the row's baseline.
       const y = like.y + place.line * rowH - Math.round(atlas.cellH * 0.12) + atlas.cellH;
       let image: Phaser.GameObjects.Image | null = null;
       if (frame) {
         image = this.scene.add.image(x, y, atlas.key, frame).setOrigin(0, 1).setVisible(false);
-        if (big) image.setScale(BIG_SCALE);
+        if (scale !== 1) image.setScale(scale);
+        const look = line.styles[index];
+        if (look?.echo) image.setAlpha(0.55);
+        else if (look?.act) image.setAlpha(0.85);
         this.options.container.add(image);
       }
       this.letters.push({ image, x, y, index });
@@ -154,6 +163,11 @@ export class RichTextView {
     if (!this.line) return;
     this.clock += deltaMs;
     this.paint();
+  }
+
+  /** The atlas frame for a character (painted on first use). */
+  private glyphFrame(char: string): string | null {
+    return this.atlas ? glyph(this.atlas, char) : null;
   }
 
   clear(): void {
@@ -184,6 +198,14 @@ export class RichTextView {
       }
       if (!calm && style.wave > 0) dy += Math.round(Math.sin(seconds * 7 - letter.index * 0.55) * WAVE_PX * style.wave);
       image.setPosition(letter.x + dx, letter.y + dy);
+      // {glitch}: now and then the letter shows another glyph for a frame, like bad signal.
+      const glitch = style.glitch ?? 0;
+      if (glitch > 0 && this.atlasKey) {
+        const flicker = !calm && hash(letter.index + 7, shakeStep) < 0.18 * glitch;
+        const char = flicker ? GLITCH_CHARS[Math.floor(hash(letter.index, shakeStep + 3) * GLITCH_CHARS.length)] : line.plain[letter.index];
+        const frame = this.glyphFrame(char);
+        if (frame && image.frame.name !== frame) image.setFrame(frame);
+      }
       let tint = style.colour ?? this.ink;
       if (style.sparkle > 0) {
         const step = calm ? 0 : sparkleStep + letter.index;

@@ -48,22 +48,22 @@ export function segmentsFor(stop: StopDef): Segment[] {
     battle,
     chartId: battle.id,
     chartUrl: battle.chartUrl,
-    stage: stop.stage,
+    stage: battle.stage ?? stop.stage,
     before: battle.script.intro,
     win: battle.script.win,
     lose: battle.script.lose,
     hoodDown: stop.role === 'final' && battle.index === 2,
   }));
   if (stop.script.tutorial) {
-    // Stop 1: the Coach's lesson in Berry's room, then Raspberry finds him there.
-    // (The neighbour's line is said at Berry's door, before the Coach arrives.)
+    // Stop 1: the Coach's lesson in Berry's room (after she climbs in through the window).
+    // Her battles A and B are danced in the Studio, Raspberry's C in the garden.
     const lesson: LessonSegment = {
       kind: 'lesson',
       chartId: TUTORIAL.id,
       chartUrl: TUTORIAL.chartUrl,
       stage: TUTORIAL.stage,
       before: stop.script.tutorial,
-      after: [],
+      after: stop.script.tutorialAfter ?? [],
     };
     return [lesson, ...battles];
   }
@@ -87,12 +87,11 @@ export function battleSegment(stop: StopDef, battle: number): number {
 }
 
 /**
- * Riding back to stop 1 once Raspberry has been beaten at least once is a
- * rematch: the train goes straight to her battle, past the room, the
- * neighbour and the lesson.
+ * Riding to a stop never skips its walk any more: stop 1 has a street of its
+ * own (story v2), so a rematch there is found where it was danced.
  */
-export function rideStraightToBattle(stop: StopDef, started: boolean): boolean {
-  return started && segmentsFor(stop).some((segment) => segment.kind === 'lesson');
+export function rideStraightToBattle(_stop: StopDef, _started: boolean): boolean {
+  return false;
 }
 
 /**

@@ -1,8 +1,8 @@
 import { Tex } from '../core/config';
 import { rivalLevelAt, type Difficulty } from '../core/difficulty';
 import { CAST } from './cast';
-import { SCRIPT } from './script';
-import type { BattleScript, FruitId, GimmickId, StopRole, StopScript, TimeOfDay } from './types';
+import { SCRIPT } from './chapters';
+import type { BattleScript, CharacterId, FruitId, GimmickId, StopRole, StopScript, TimeOfDay } from './types';
 
 export type StopId = 'stop01' | 'stop02' | 'stop03' | 'stop04' | 'stop05' | 'stop06' | 'stop07' | 'stop08' | 'stop09' | 'stop10' | 'stop11' | 'stop12';
 
@@ -25,8 +25,22 @@ export interface BattleDef {
   letter: string;
   /** What the battle is called on the train, e.g. "Ticket check". */
   name: string;
-  /** Who dances against Berry (stop 12: the first enemy of the set). */
+  /** Who dances against Berry (stop 12: the first enemy of the set). Their gimmick and sprite. */
   opponent: FruitId;
+  /**
+   * The trainer of battles A and B (bible 9.1), when it is not the opponent: who
+   * is named on the train and in the battle. Their dance art is `sprite` (a lite
+   * sheet, 18 frames); until it is drawn the opponent's sheet stands in.
+   */
+  trainer?: CharacterId;
+  /** Name shown for the opponent ("Lime", "Bing and Morello", "Grape, Coconut"). */
+  versus: string;
+  /** The dance sheet key art can fill for the trainer (public/assets/img/<sprite>.png). */
+  sprite?: string;
+  /** Background danced on, when not the stop's stage (stop 1: the Studio and the garden). */
+  stage?: string;
+  /** Stop 7's boss: soloists only, the backup's ability is off. */
+  soloists?: boolean;
   /** The opponent's gimmick, as in their own stop. */
   gimmick: GimmickId;
   /** The song it is danced to. */
@@ -88,6 +102,10 @@ export interface StopDef {
 interface BattleSeed {
   name: string;
   opponent?: FruitId;
+  trainer?: CharacterId;
+  versus?: string;
+  sprite?: string;
+  stage?: string;
 }
 
 interface StopSeed {
@@ -102,8 +120,15 @@ interface StopSeed {
   stage?: string;
   /** False for stops without a street. An existing stage is the street when the stop has one. */
   street?: boolean;
+  /** The stop has a street of its own (640 wide) even though it dances on a reused stage. */
+  ownStreet?: boolean;
   /** Battles A, B and C (docs/STORY_BIBLE.md, "Three battles per stop"). */
   battles: [BattleSeed, BattleSeed, BattleSeed];
+}
+
+/** A trainer's battle (A or B): danced against the stop's fruit's gimmick, named for the trainer. */
+function trainer(name: string, who: CharacterId, versus: string, sprite?: string): BattleSeed {
+  return { name, trainer: who, versus, sprite: sprite ?? CAST[who].sprite ?? who };
 }
 
 const SEEDS: StopSeed[] = [
@@ -115,9 +140,8 @@ const SEEDS: StopSeed[] = [
     journey: 'Ordinary World, Call, Mentor',
     arc: 'The Coach teaches the beat, Raspberry confronts Berry for hiding since summer, they battle, then the Coach hands over a ticket. Raspberry joins.',
     song: 'berry_town',
-    battles: [{ name: 'Round one' }, { name: 'Round two' }, { name: 'Round three' }],
-    stage: Tex.room,
-    street: false,
+    battles: [{ name: 'Warm-up', trainer: 'coach', versus: 'Coach', sprite: 'instructor', stage: 'room_bakery_studio' }, { name: 'Proving', trainer: 'coach', versus: 'Coach', sprite: 'instructor', stage: 'room_bakery_studio' }, { name: 'The garden', stage: 'room_garden_overgrown' }],
+    stage: 'room_garden_overgrown',
   },
   {
     station: 'Peel Street',
@@ -127,7 +151,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Crossing the Threshold',
     arc: 'First stop outside home. Berry barely speaks. A slapstick warm-up under a poster of Blueberry.',
     song: 'peel_street',
-    battles: [{ name: 'Ticket check' }, { name: 'Mind the peel' }, { name: 'The stamp' }],
+    battles: [trainer('Rail slide', 'lime', 'Lime'), trainer('Full grind', 'lime', 'Lime'), { name: 'The stamp' }],
   },
   {
     station: 'Graffiti Corner',
@@ -137,8 +161,9 @@ const SEEDS: StopSeed[] = [
     journey: 'Allies',
     arc: "Pear joins. A wall mural shows a step-slide that looks like Berry's.",
     song: 'graffiti_corner',
-    battles: [{ name: 'The cypher' }, { name: 'Finish strong' }, { name: 'The back half' }],
+    battles: [trainer('First coat', 'peach', 'Peach'), trainer('The reveal', 'peach', 'Peach'), { name: 'The back half' }],
     stage: Tex.stageStreet,
+    ownStreet: true,
   },
   {
     station: 'Vine Crossing',
@@ -148,7 +173,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Enemies',
     arc: "First of Blueberry's crew. Grape says the step is their captain's.",
     song: 'vine_crossing',
-    battles: [{ name: 'One grape' }, { name: 'Two grapes' }, { name: 'The whole bunch' }],
+    battles: [trainer('Two at once', 'bing', 'Bing and Morello', 'cherries'), trainer('Across the bridge', 'bing', 'Bing and Morello', 'cherries'), { name: 'The whole bunch' }],
   },
   {
     station: 'Citrus Labs',
@@ -158,8 +183,9 @@ const SEEDS: StopSeed[] = [
     journey: 'Allies',
     arc: "Lemon joins, with footage of Blueberry's crew using Berry's footwork.",
     song: 'citrus_labs',
-    battles: [{ name: 'Calibration' }, { name: 'Trial two' }, { name: 'Full meltdown' }],
+    battles: [trainer('Calibration', 'grapefruit', 'Grapefruit'), trainer('Double trouble', 'grapefruit', 'Grapefruit'), { name: 'Full meltdown' }],
     stage: Tex.stageLab,
+    ownStreet: true,
   },
   {
     station: 'Plum Lantern Market',
@@ -169,7 +195,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Tests, false high',
     arc: "The crew's best night. Plum asks who is missing from Berry's dance. A scout in a dragon scarf takes notes.",
     song: 'lantern_market',
-    battles: [{ name: 'First lantern' }, { name: 'Best of three' }, { name: 'Last lantern' }],
+    battles: [trainer('First quiet', 'lychee', 'Lychee'), trainer('Off the beat', 'lychee', 'Lychee'), { name: 'Last lantern' }],
   },
   {
     station: 'The Club',
@@ -179,8 +205,9 @@ const SEEDS: StopSeed[] = [
     journey: 'Ordeal, low point',
     arc: 'Berry wins alone and the crew walks out because he never says what he feels. The crowd goes silent.',
     song: 'the_club',
-    battles: [{ name: 'The door' }, { name: 'Soloists only' }, { name: 'The main floor' }],
+    battles: [trainer('The door', 'passionFruit', 'Passion Fruit', 'passion_fruit'), trainer('Strobe hour', 'passionFruit', 'Passion Fruit', 'passion_fruit'), { name: 'The main floor' }],
     stage: Tex.stageClub,
+    ownStreet: true,
   },
   {
     station: 'Rooftop',
@@ -190,7 +217,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Reward',
     arc: 'Berry speaks his first full line and admits what happened in July. The crew returns. Watermelon makes five.',
     song: 'rooftop',
-    battles: [{ name: 'Table for one' }, { name: 'Big feelings' }, { name: 'Last dance' }],
+    battles: [trainer('Order up', 'mango', 'Mango'), trainer('Two pans', 'mango', 'Mango'), { name: 'Last dance' }],
     // A rooftop food court: its own street (street_rooftop), danced at its far end, Watermelon's grill (stage_rooftop).
   },
   {
@@ -201,7 +228,7 @@ const SEEDS: StopSeed[] = [
     journey: 'The Road Back',
     arc: "Blueberry's crew blocks the line. Coconut says the captain never laughs anymore.",
     song: 'the_tunnel',
-    battles: [{ name: 'First gate' }, { name: 'Second gate' }, { name: 'Third gate' }],
+    battles: [trainer('Half a hat', 'fig', 'Fig'), trainer('Lights out', 'fig', 'Fig'), { name: 'The gate' }],
   },
   {
     station: 'Orange Plaza',
@@ -221,7 +248,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Resurrection II',
     arc: 'Pineapple reveals the captain keeps asking about a hoodie who never answered.',
     song: 'pineapple_hall',
-    battles: [{ name: 'Etiquette' }, { name: 'The mirror room' }, { name: 'The main hall' }],
+    battles: [trainer('Etiquette', 'quince', 'Quince'), trainer('Every miss, twice', 'quince', 'Quince'), { name: 'The main hall' }],
   },
   {
     station: 'Grand Stage',
@@ -231,8 +258,7 @@ const SEEDS: StopSeed[] = [
     journey: 'Return with the Elixir',
     arc: 'Five against five. Berry vs Blueberry. Berry finally says yes, the hood comes down, the trio reunites.',
     song: 'grand_stage',
-    battles: [{ name: 'Set one', opponent: 'grape' }, { name: 'Set two', opponent: 'pineapple' }, { name: 'Set three' }],
-    street: false,
+    battles: [{ name: 'Set one', opponent: 'grape', versus: 'Grape, Coconut' }, { name: 'Set two', opponent: 'pineapple', versus: 'Pineapple, Dragon Fruit' }, { name: 'Set three' }],
   },
 ];
 
@@ -271,14 +297,19 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
     const boss = index === 2;
     const opponent = seed.battles[index].opponent ?? seed.fruit;
     const chartId = boss ? id : `${id}${key}`;
+    const own = seed.battles[index];
     return {
       id: chartId,
       stop: id,
       index,
       key,
       letter: key.toUpperCase(),
-      name: seed.battles[index].name,
+      name: own.name,
       opponent,
+      ...(own.trainer ? { trainer: own.trainer, sprite: own.sprite } : {}),
+      versus: own.versus ?? CAST[opponent].name,
+      ...(own.stage ? { stage: own.stage } : {}),
+      ...(number === 7 && boss ? { soloists: true } : {}),
       gimmick: CAST[opponent].gimmick ?? 'even',
       song: boss || !ownSongs ? seed.song : `${seed.song}_${key}`,
       ownSong: boss || ownSongs,
@@ -300,7 +331,7 @@ export const STOPS: readonly StopDef[] = SEEDS.map((seed, i) => {
     chartUrl: `charts/${id}.json`,
     stage: seed.stage ?? `stage_${seed.slug}`,
     stationBg: `station_${seed.slug}`,
-    streetBg: seed.street === false ? null : (seed.stage ?? `street_${seed.slug}`),
+    streetBg: seed.street === false ? null : seed.ownStreet || !seed.stage || seed.stage.startsWith('room_') ? `street_${seed.slug}` : seed.stage,
     time: timeOfDay(number),
     gimmick: CAST[seed.fruit].gimmick ?? 'even',
     rivalLevel: RIVAL_LEVELS[i],

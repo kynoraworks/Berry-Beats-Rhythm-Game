@@ -70,6 +70,14 @@ for _stop, (_a, _b) in SUB_TRACKS.items():
     STOP_TRACKS[f"{STOP_SONGS[_stop - 1]}_b"] = _b
 TRACKS = OST_TRACKS + list(STOP_TRACKS)
 ARTIST = {name: "Nicole Yazmin" for name in OST_TRACKS} | {name: "Berry Beats (generated)" for name in STOP_TRACKS}
+# The story v2 prologue battle, "The Last Final" (archive/music/story_v2, shipped by
+# tools/story_v2_music.py to public/assets/audio/story/). AUDIO_FILES maps a song key to
+# its file under public/assets/audio when the two differ.
+STORY_TRACKS = {"prologue_last_final": 172}
+AUDIO_FILES = {"prologue_last_final": "story/prologue_last_final"}
+STOP_TRACKS.update(STORY_TRACKS)
+TRACKS += list(STORY_TRACKS)
+ARTIST.update({name: "Berry Beats (generated)" for name in STORY_TRACKS})
 # These two were exported as loops that start exactly on beat 1 at sample 0
 # (their length is a whole number of beats), so they calibrate the detector.
 LOOP_TRACKS = ("level_select", "pause")
@@ -154,7 +162,7 @@ class Track:
 
     def __init__(self, name: str):
         self.name = name
-        self.x = decode(AUDIO_DIR / f"{name}.mp3")
+        self.x = decode(AUDIO_DIR / f"{AUDIO_FILES.get(name, name)}.mp3")
         self.duration = len(self.x) / SR
         nfft, hop = FAST
         freqs, mag = stft_mag(self.x, nfft, hop, 12000)
@@ -938,6 +946,40 @@ def variant(plan: Plan, which: str) -> Plan:
 
 
 PLANS += [variant(p, which) for p in [p for p in PLANS if p.chart_id.startswith("stop")] for which in ("easy", "hard")]
+
+
+# The story v2 prologue, "The Last Final" (docs/story_v2/STORY_BIBLE_V2.md 5.2). The player
+# dances Cranberry against Strawberry (rival "dancer" until the game has a strawberry kind).
+# It is a no-fail showcase, so it is busy. The sections follow the song as measured
+# (archive/music/story_v2/prologue_cues.json): drop 1 at bar 9, a one-bar stop at 33 and the
+# slam back in at 34, the breakdown 43 to 48, the riser 49 to 50, drop 2 at 51, the loudest
+# section 59 to 66, three single hits 81 to 83 and the hook's first beats in bar 84. Bars
+# here are 0-based (the bible's bar 1 is 0).
+PROLOGUE = Plan(
+    "prologue", "prologue_last_final", "The Last Final", "dancer", 3, max_nps=10, solo_holds=False,
+    sections=[
+        S(0, 4, "player", grid=4, notes=4),
+        S(4, 8, "trade", grid=2, notes=5, rival_notes=5, unit=2),
+        S(8, 16, "both", grid=2, notes=7, rival_notes=4, doubles=0.25),
+        S(16, 20, "player", grid=4, notes=3),
+        S(20, 24, "player", grid=2, notes=4, holds=3, hold_sustain=0.08, hold_min=2, max_hold=4, hold_tonal=0.03),
+        S(24, 28, "trade", grid=2, notes=6, rival_notes=6, unit=1),
+        S(28, 32, "both", grid=2, notes=7, rival_notes=4, bursts=1),
+        S(32, 33, "player", grid=4, notes=1),
+        S(33, 42, "both", grid=2, notes=7, rival_notes=4, doubles=1.5, double_accent=0.8),
+        S(42, 44, "player", grid=4, notes=2, holds=1, hold_sustain=0.08, hold_min=2, max_hold=4, hold_tonal=0.03),
+        S(44, 48, "rest"),
+        S(48, 50, "player", grid=1, notes=5, runs=1, floor=0.12),
+        S(50, 58, "both", grid=1, notes=9, rival_notes=5, bursts=2, runs=1, doubles=0.5),
+        S(58, 66, "both", grid=1, notes=9, rival_notes=5, bursts=2, runs=2, doubles=1, double_accent=1.0),
+        S(66, 74, "trade", grid=1, notes=8, rival_notes=7, unit=2, bursts=2, runs=1),
+        S(74, 80, "both", grid=1, notes=9, rival_notes=6, doubles=1, bursts=2, runs=1),
+        S(80, 83, "player", grid=4, notes=1, floor=0.1),
+        S(83, 84, "player", grid=2, notes=4, floor=0.1),
+    ],
+    rank_lanes=True,
+)
+PLANS += [PROLOGUE, variant(PROLOGUE, "easy"), variant(PROLOGUE, "hard")]
 
 
 # Nicole Yazmin's original soundtrack, one beat map per song for the Beat Maps menu.

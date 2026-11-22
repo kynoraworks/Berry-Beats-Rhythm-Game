@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { TimeOfDay } from '../story/types';
-import { ROOM_FLOOR, ROOM_W, type RoomDef } from '../story/rooms';
+import { ROOM_FLOOR, ROOM_W, lookHotspot, type RoomDef } from '../story/rooms';
 
 /**
  * Placeholder interiors for rooms that have no drawn background yet: a wall
@@ -100,7 +100,7 @@ export function interiorBackground(scene: Phaser.Scene, room: RoomDef, time: Tim
   rect(ctx, css(shade(wall, -0.65)), exitX - 13, floor - 60, 26, 58);
   rect(ctx, css(shade(wall, 0.35)), exitX + 7, floor - 32, 3, 3);
   // Furniture behind each thing to look at, and a rug.
-  for (const spot of room.hotspots ?? []) {
+  for (const spot of (room.looks ?? []).map((look) => lookHotspot(look, floor))) {
     rect(ctx, INK, spot.x - 1, spot.y - 1, spot.w + 2, spot.h + 2);
     rect(ctx, css(shade(wall, -0.42)), spot.x, spot.y, spot.w, spot.h);
     for (let y = spot.y + 8; y < spot.y + spot.h - 2; y += 10) rect(ctx, css(shade(wall, -0.6)), spot.x + 2, y, spot.w - 4, 2);

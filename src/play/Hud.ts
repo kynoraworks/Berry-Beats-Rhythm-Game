@@ -498,6 +498,20 @@ export class Hud {
     paint(this.rivalPips, rows.rival, this.rivalColor);
   }
 
+  /** A scripted tug of war (the prologue): -1 all rival, +1 all player; null for the real one. */
+  private scriptedDuel: number | null = null;
+
+  /** Drive the duel bars from a script instead of the score (null hands them back). */
+  setScriptedDuel(value: number | null): void {
+    this.scriptedDuel = value === null ? null : Phaser.Math.Clamp(value, -1, 1);
+  }
+
+  /** Show or hide the score and multiplier (the prologue hides them at the end). */
+  setScoreVisible(visible: boolean): void {
+    this.scoreText.setVisible(visible);
+    this.multiplierText.setVisible(visible);
+  }
+
   private roundNumber(index: number): string {
     return String((this.options.crew ? this.options.crew.round : index) + 1);
   }
@@ -524,6 +538,12 @@ export class Hud {
       // Not a scored battle: the bar is the song's accuracy and the ring the song's progress.
       playerAcc = stats.judged > 0 ? accuracy(stats) : 0;
       left = 1 - Phaser.Math.Clamp(progress, 0, 1);
+      label = '';
+    }
+    if (this.scriptedDuel !== null) {
+      playerAcc = 50 + 46 * this.scriptedDuel;
+      rivalAcc = 50 - 46 * this.scriptedDuel;
+      playerLit = rivalLit = true;
       label = '';
     }
     this.shownPlayerAcc += (playerAcc - this.shownPlayerAcc) * Math.min(1, dt * 8);

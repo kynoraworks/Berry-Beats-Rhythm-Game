@@ -1,0 +1,6 @@
+start balance 1809.87 (2026-11-22). cap 200 -> floor 1609.87
+batch 1: coach_a strawberry_a kidberry_a kidrasp_a kidblue_a = 6.25 (total 6.25)
+batch 2 (5 accepted, 6 rejected by the 8-concurrent limit, not charged): coach_a2 ycoach_a strawberry_b strawberry_md strawberry_mf = 6.25 (total 12.5)
+batch 3: conductor_a strawberry_me strawberry_mg bluex_a berryx_a portraits_kids = 7.5 (total 20.0)
+batch 4 (4 accepted, 4 rejected by the concurrency limit): coach b d g h = 5.0 (total 25.0)
+batch 5 (via requests.json refs): coach c e f, ycoach b = 5.0 (total 30.0)

@@ -15,7 +15,7 @@ import type { CharacterId } from './types';
  * archive/generated-sprites/moves2/PROMPTS.md and src/play/characters.ts.
  *
  * Real art for a learned move drops in by drawing its stop's sheets and
- * adding their keys to PRESENT_SHEETS in src/core/assets.ts: the move then
+ * adding their keys to PRESENT_SHEETS in src/core/assets.ts (tools/build_learn.py packs them): the move then
  * dances the new frames, and its placeholder frames are no longer used.
  *
  *   public/assets/img/berry_learn_<stop>.png       normal Berry (hood up)
@@ -115,7 +115,30 @@ export const DEFAULT_LOADOUT: Readonly<Loadout> = {
  * story writer can point a battle at a new trainer here: an id from the cast,
  * or any id with a display name.
  */
-export const TEACHERS: Readonly<Record<string, { teacher: string; name?: string }>> = {};
+export const TEACHERS: Readonly<Record<string, { teacher: string; name?: string }>> = {
+  stop01a: { teacher: 'coach' },
+  stop01b: { teacher: 'coach' },
+  stop02a: { teacher: 'lime' },
+  stop02b: { teacher: 'lime' },
+  stop03a: { teacher: 'peach' },
+  stop03b: { teacher: 'peach' },
+  stop04a: { teacher: 'bing', name: 'Bing and Morello' },
+  stop04b: { teacher: 'bing', name: 'Bing and Morello' },
+  stop05a: { teacher: 'grapefruit' },
+  stop05b: { teacher: 'grapefruit' },
+  stop06a: { teacher: 'lychee' },
+  stop06b: { teacher: 'lychee' },
+  stop07a: { teacher: 'passionFruit' },
+  stop07b: { teacher: 'passionFruit' },
+  stop08a: { teacher: 'mango' },
+  stop08b: { teacher: 'mango' },
+  stop09a: { teacher: 'fig' },
+  stop09b: { teacher: 'fig' },
+  stop11a: { teacher: 'quince' },
+  stop11b: { teacher: 'quince' },
+  stop12a: { teacher: 'grape', name: 'Grape and Coconut' },
+  stop12b: { teacher: 'pineapple', name: 'Pineapple and Dragon Fruit' },
+};
 
 interface Lesson {
   name: string;
@@ -138,77 +161,77 @@ const finish = (name: string, description: string, normal: number[], hype: numbe
  * (their signature moves in PROMPTS.md). Placeholders: Berry's nearest frames.
  */
 const LESSONS: Record<string, readonly [Lesson, Lesson, Lesson]> = {
-  // Raspberry: cheer and krump.
+  // Coach's warm-up and bakery (A, B); Raspberry's cheer and krump (C).
   stop01: [
-    lane('Toe Touch', 'A cheer jump: tuck, then a toe touch in the air.', M(14, 15), [12, 13], 'hop', 0.9),
-    lane('Chest Pop', 'A krump chest pop that snaps and shakes.', [20, ...M(17)], [14, 0], 'shake', 0.7),
-    finish('Krump Stomp', 'Chest pop, arm swing, stomp, jab, power pose.', [...M(17), 28, ...M(27), 32, ...M(16)], [14, 15, 2, 9, 35], 'bounce', 0.9, 2),
+    lane('Count Clap', 'Knees bend, clap low on the beat, point forward on the and.', M(14, 15), [12, 13], 'hop', 0.9),
+    lane('Proving Step', 'Step left, touch in, then press down as if kneading dough.', [20, ...M(17)], [14, 0], 'shake', 0.7, -1),
+    finish('Toe-Touch Pop', 'Cheer prep, a toe-touch jump, a high V, a chest pop and a fist pump.', [...M(17), 28, ...M(27), 32, ...M(16)], [14, 15, 2, 9, 35], 'bounce', 0.9, 2),
   ],
-  // Banana: the slip-and-slide moonwalk and the banana split.
+  // Lime's skate tricks (A, B); Banana's slip-and-slide moonwalk (C).
   stop02: [
-    lane('Moonwalk', 'Glide backwards like the floor is a banana peel.', M(12, 13, 12), [19, 18], 'glide', 1.3),
-    lane('Peel Slip', 'Slip, wobble, catch it with style.', [27, ...M(9)], [22, 23], 'tilt'),
-    finish('Banana Split', 'A jump into the splits and back up.', [...M(15), ...M(42), ...M(44), 40, ...M(29)], [13, 16, 32, 29], 'ground', 1, 3),
+    lane('Kickflip Kick', 'Crouch on one foot, flick the other out sideways, hop and land.', M(12, 13, 12), [19, 18], 'glide', 1.3, 1),
+    lane('Rail Slide', 'Lean back and glide right on one foot, arms out as if on a rail.', [27, ...M(9)], [22, 23], 'tilt', 1, 1),
+    finish('Peel Moonwalk', 'Heel up, slide back, twice; a wobble like a slip, then a shrug.', [...M(15), ...M(42), ...M(44), 40, ...M(29)], [13, 16, 32, 29], 'ground', 1, 3),
   ],
-  // Pear: b-boy floor work.
+  // Peach's framing and spray painting (A, B); Pear's b-boy power moves (C).
   stop03: [
-    lane('Six-Step', 'Floor work: six steps round the hands.', M(43, 44), [15, 23], 'ground', 1.2),
-    lane('Hollowback', 'A handstand that arches into a hollowback.', [44, ...M(46)], [28, 29], 'stretch', 1.1),
-    finish('Windmill', 'Shoulders on the floor, legs sweeping round.', M(42, 43, 44, 45, 46), [24, 25, 25, 26, 29], 'spin', 1.2, 2),
+    lane('The Reveal', 'Step back, frame the face like a picture, then open the hands wide.', M(43, 44), [15, 23], 'ground', 1.2),
+    lane('Spray Arc', 'Shake an invisible can and sweep it over the head, left to right.', [44, ...M(46)], [28, 29], 'stretch', 1.1, 1),
+    finish('Windmill Finish', 'Drop to the floor, windmill round, hollowback freeze, spring up.', M(42, 43, 44, 45, 46), [24, 25, 25, 26, 29], 'spin', 1.2, 2),
   ],
-  // Grape: the bunch's line dance.
+  // Bing and Morello's partner games (A, B); Grape's line dance (C).
   stop04: [
-    lane('Grapevine', 'Step, cross behind, step: the line dance classic.', M(36, 37, 39), [2, 1, 5], 'slide'),
-    lane('Heel Clap', 'Heel tap and a clap, bouncing in time.', M(53, 3), [5, 0], 'bounce'),
-    finish('Bunch Ripple', 'A ripple down the line into a pyramid.', [...M(40, 41), 25, 26, ...M(53)], [4, 21, 13, 33], 'bounce', 0.8, 3),
+    lane('High Five, Low Five', 'A high five with nobody, then a low five. Too slow.', M(36, 37, 39), [2, 1, 5], 'slide', 1, 1),
+    lane('Stem Swing', "Hold a partner's hand that is not there and swing low, side to side.", M(53, 3), [5, 0], 'bounce', 1, -1),
+    finish('Grapevine', 'Step, cross behind, step, heel tap, clap and a hip bump.', [...M(40, 41), 25, 26, ...M(53)], [4, 21, 13, 33], 'bounce', 0.8, 3),
   ],
-  // Dr. Lemon: the robot and tutting.
+  // Grapefruit's grumpy tutting (A, B); Dr. Lemon's tutting and eureka (C).
   stop05: [
-    lane('The Robot', 'Stiff, exact, mechanical snaps.', M(30, 35), [9, 10], 'none', 0.5),
-    lane('Tut Box', 'Hands and arms drawing boxes in the air.', M(31, 32, 33), [21, 4], 'tilt', 0.6),
-    finish('Eureka', 'Tutting that ends in a jump and a eureka.', M(33, 34, 15, 51), [9, 5, 13, 34], 'shake', 0.7, 3),
+    lane('Clipboard Tut', 'One forearm flat like a clipboard, the other hand ticks the boxes.', M(30, 35), [9, 10], 'none', 0.5, -1),
+    lane('Bitter Twist', 'Back to the crowd, twist round with arms folded, point down.', M(31, 32, 33), [21, 4], 'tilt', 0.6),
+    finish('Eureka Jump', 'Tutting boxes, goggle hands, a jump with arms up and one finger: idea!', M(33, 34, 15, 51), [9, 5, 13, 34], 'shake', 0.7, 3),
   ],
-  // Plum: the fan dance and old-school swing.
+  // Lychee's bows and lanterns (A, B); Plum's fan dance (C).
   stop06: [
-    lane('Fan Sweep', 'A slow, graceful sweep of an imaginary fan.', [19, ...M(36)], [21, 4], 'tilt', 1.5),
-    lane('Swing Kick', 'A swing-out with a little kick.', [43, ...M(38)], [17, 31], 'hop'),
-    finish('Charleston', 'Rock step, triple step, Charleston and a ta-da.', [...M(38, 39, 38, 39), 30], [17, 1, 17, 1, 33], 'bounce', 1.1, 4),
+    lane('Tiny Bow', 'Hands together, a small bow, then a smaller one.', [19, ...M(36)], [21, 4], 'tilt', 1.5),
+    lane('Lantern Float', 'Cupped hands lift from the hips to above the head and let go.', [43, ...M(38)], [17, 31], 'hop'),
+    finish('Fan Rest', 'Flick a fan open, hide behind it, rest on purpose, snap it shut, bow.', [...M(38, 39, 38, 39), 30], [17, 1, 17, 1, 33], 'bounce', 1.1, 4),
   ],
-  // Dragon Fruit: voguing and waacking.
+  // Passion Fruit's club drama (A, B); Dragon Fruit's voguing and waacking (C).
   stop07: [
-    lane('Vogue Hands', 'Frame the face, strike the pose.', M(5, 2), [5, 35], 'stretch', 0.8),
-    lane('Waack', 'Arms whipping round in a blur.', M(7, 4), [7, 10], 'spin', 0.7),
-    finish('Death Drop', 'A spin, a whip and a dramatic drop to the floor.', [...M(8), 21, 22, ...M(45, 46)], [30, 31, 32, 16], 'whirl', 1, 4),
+    lane('Tear Wipe', 'Wrist to the brow, wipe, and point dramatically into the distance.', M(5, 2), [5, 35], 'stretch', 0.8, -1),
+    lane('Strobe Pop', 'Hard frozen photographs: arms up-right, down-left, then out.', M(7, 4), [7, 10], 'spin', 0.7, 1),
+    finish('Dragon Death Drop', 'Vogue hands, a waack, a spin, a death drop to the floor, then rise.', [...M(8), 21, 22, ...M(45, 46)], [30, 31, 32, 16], 'whirl', 1, 4),
   ],
-  // Watermelon: stomps, belly bounces and the spatula.
+  // Mango's waiter and cook moves (A, B); Watermelon's big warm chef style (C).
   stop08: [
-    lane('Belly Bounce', 'Heavy stomp with a belly bounce.', [9, 10], [3, 12], 'bounce', 1.2),
-    lane('Pan Flip', 'Flip the pan, catch it high.', [...M(4), 29], [17, 13], 'hop'),
-    finish("Chef's Kiss", "Spatula twirl, toss, catch and a chef's kiss.", [21, 22, 23, 24, ...M(53), 42], [30, 31, 13, 35], 'hop', 1, 5),
+    lane('Order Up', 'Spin the ticket, slap it on the counter, point at the table.', [9, 10], [3, 12], 'bounce', 1.2, 1),
+    lane('Pan Flip', 'Hold an invisible pan, flip it up and look up, worried.', [...M(4), 29], [17, 13], 'hop'),
+    finish('Big Hold Hug', "Arms wide, a self-hug on the beat, a belly bounce and a chef's kiss.", [21, 22, 23, 24, ...M(53), 42], [30, 31, 13, 35], 'hop', 1, 5),
   ],
-  // Coconut: tunnel krump.
+  // Fig the busker (A, B); Coconut's krump (C).
   stop09: [
-    lane('Jab', 'A krump jab, short and hard.', [...M(10), 35], [10, 11], 'shake', 0.6, 1),
-    lane('Arm Swing', 'Arms swinging wide from side to side.', M(19, 22), [7, 10], 'slide'),
-    finish('Buck Pose', 'Jabs and stomps into the buck pose.', [28, ...M(17), 20, ...M(35, 51)], [9, 2, 14, 35], 'ground', 1.1, 4),
+    lane('Hat Tip', 'Pinch the hood like a cap brim, tip it and bow.', [...M(10), 35], [10, 11], 'shake', 0.6),
+    lane('Busker Shuffle', 'Shuffle left, shuffle right, squeeze an invisible accordion.', M(19, 22), [7, 10], 'slide', 1, -1),
+    finish('Shell Krump', 'Chest pop, arm swing, stomp, two jabs and the buck pose.', [28, ...M(17), 20, ...M(35, 51)], [9, 2, 14, 35], 'ground', 1.1, 4),
   ],
-  // Orange Plaza: the qualifiers (Banana, then Plum) and Orange's festival samba.
+  // Orange Plaza: the rematches (Banana's splits, Plum's Charleston) and Orange's samba (C).
   stop10: [
-    lane('Slip-Slide', 'A sideways slide that nearly slips.', M(0, 1), [19, 20], 'glide'),
-    lane('Paper Fan', 'A gentle turn behind a paper fan.', [...M(52), 0], [35, 0], 'tilt', 1.4),
-    finish('Salsa Spin', 'Salsa basic, a spin with the mic and a mic drop.', [...M(0, 1), 21, 22, 23, ...M(50)], [0, 1, 30, 31, 34], 'spin', 0.9, 2),
+    lane('Split Decision', 'Jump, land in the floor splits and look round.', M(0, 1), [19, 20], 'glide'),
+    lane('Charleston Pause', 'Two Charleston kicks, then stop dead with jazz hands.', [...M(52), 0], [35, 0], 'tilt', 1.4, 1),
+    finish('Mic Drop Samba', 'Samba steps, a salsa spin, hold out the mic and drop it.', [...M(0, 1), 21, 22, 23, ...M(50)], [0, 1, 30, 31, 34], 'spin', 0.9, 2),
   ],
-  // Pineapple: ballroom.
+  // Quince the butler (A, B); Pineapple's ballroom (C).
   stop11: [
-    lane('Box Step', 'The waltz box step, proud and upright.', M(6, 13), [18, 19], 'slide', 1.3),
-    lane('Promenade', 'A tango walk, chin up.', [...M(1), 34], [7, 8], 'glide', 1.2, -1),
-    finish('Tango Dip', 'Promenade, pivot, lunge and a deep dip.', [...M(1, 6), 33, ...M(45, 50)], [8, 16, 32, 34], 'tilt', 1.2, 3),
+    lane('Tray Sweep', 'Carry an invisible tray, sweep it low and level, then high.', M(6, 13), [18, 19], 'slide', 1.3, 1),
+    lane("Butler's Bow", 'Arm behind the back, a formal bow and a grand sweep of the other arm.', [...M(1), 34], [7, 8], 'glide', 1.2),
+    finish('Crown Turn', 'Chin up, a tango walk, a full turn, a dip and a crown of arms.', [...M(1, 6), 33, ...M(45, 50)], [8, 16, 32, 34], 'tilt', 1.2, 3),
   ],
-  // The Grand Stage: Blueberry's crew in sets, then the captain himself.
+  // The Grand Stage: the Top Shelf pairs (A, B), then Blueberry with Raspberry (C).
   stop12: [
-    lane('Crew Pyramid', 'Up on the shoulders of the crew.', [25, ...M(15)], [13, 5], 'stretch'),
-    lane('Ballroom Turn', 'A full turn, chin up.', [21, 23], [30, 33], 'spin'),
-    finish('Scissor Kick', "The captain's spin, scissor kick, freeze and point.", [21, 22, 23, 43, ...M(51), 41], [30, 31, 17, 28, 34], 'hop', 1, 3),
+    lane('Bunch Up', 'Huddle low, spring up in a bunch shape, then a hard krump jab.', [25, ...M(15)], [13, 5], 'stretch'),
+    lane('Spike Vogue', 'Frame the face, spike one arm up-left and stop exactly, chin up.', [21, 23], [30, 33], 'spin', 1, -1),
+    finish('The Trio Turn', 'Step-slide, spin, drop back into a catch and land with arms out.', [21, 22, 23, 43, ...M(51), 41], [30, 31, 17, 28, 34], 'hop', 1, 3),
   ],
 };
 

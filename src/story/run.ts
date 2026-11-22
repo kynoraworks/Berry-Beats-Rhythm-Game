@@ -12,6 +12,7 @@ import { battleRules } from './gimmicks';
 import { CAST } from './cast';
 import type { RuledPlayData } from '../scenes/PlayScene';
 import { battleReturnPlace, isBossOpen } from './stopLoop';
+import { isEasy } from './progress';
 import type { ReturnTarget } from '../core/flow';
 
 /**
@@ -28,13 +29,14 @@ export async function playSegment(scene: Phaser.Scene, ref: StoryRef, options: {
     goTo(scene, SceneKeys.Lineup, { intro: true, set, autoplay: options.autoplay });
     return;
   }
-  // The Coach's lesson is the same on every difficulty; battles have a beat map per difficulty.
-  const difficulty = segment.kind === 'battle' ? getSettings().difficulty : undefined;
+  // The Coach's lesson is the same on every difficulty; battles have a beat map per difficulty
+  // (Easy for a battle the Coach's text switched to Easy after three losses).
+  const difficulty = segment.kind === 'battle' ? (isEasy(segment.battle.id) ? 'easy' : getSettings().difficulty) : undefined;
   const chart = await loadStoryChart(chartUrlFor(segment.chartUrl, difficulty));
   if (!scene.sys.isActive()) return;
   const data: PlayData = {
     chart,
-    returnTo: segmentReturn(stop.id, segment.kind === 'battle' ? segment.battle.index : null),
+    returnTo: segment.kind === 'lesson' ? { scene: SceneKeys.Explore, data: { stop: stop.id, place: 'room', at: 118 } } : segmentReturn(stop.id, segment.battle.index),
     story: ref,
     autoplay: options.autoplay,
     difficulty,
@@ -52,10 +54,11 @@ export function segmentReturn(stopId: string, battleIndex: number | null): Retur
   return back ? { scene: SceneKeys.Explore, data: back } : { scene: SceneKeys.LevelSelect, data: { levelId: stopId } };
 }
 
-/** The segment after this one in the same stop, or null at the end of the stop. */
+/** The segment after this one in the same stop, or null at the end of the stop (and after the lesson, back to the room). */
 export function nextRef(ref: StoryRef): StoryRef | null {
   const stop = stopById(ref.stop);
   if (!stop) return null;
+  if (segmentsFor(stop)[ref.segment]?.kind === 'lesson') return null;
   return ref.segment + 1 < segmentsFor(stop).length ? { stop: ref.stop, segment: ref.segment + 1 } : null;
 }
 

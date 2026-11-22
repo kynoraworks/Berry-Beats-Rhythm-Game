@@ -1,0 +1,14 @@
+start balance 1809.87; hype ref upload media c670f690-1d46-4d12-b9e1-c49bfac173a9
+batch 1 normal stop01-03: 6 x 1.25 = 7.5 (total 7.5)
+batch 2: hype stop01_c 02 03, normal stop04_ab 05_ab 06_ab: 8 x 1.25 = 10.0 (total 17.5); 4 more hit the 8-job rate limit, not charged
+batch 3: hype stop01_ab, normal stop04_c 06_c 07_ab 07_c 08_c: 6 x 1.25 = 7.5 (total 25.0)
+batch 4: normal stop05_c 10_c: 2 x 1.25 = 2.5 (total 27.5)
+batch 5: normal stop09_ab 09_c 11_ab, hype stop04_c: 4 x 1.25 = 5.0 (total 32.5)
+batch 6: hype stop04_ab 05_ab 05_c: 3 x 1.25 = 3.75 (total 36.25)
+batch 7: normal stop08_ab 10_ab 11_c: 3 x 1.25 = 3.75 (total 40.0)
+batch 8: normal stop12_ab 12_c epilogue_a epilogue_b: 4 x 1.25 = 5.0 (total 45.0)
+batch 9: hype stop06_ab 06_c 07_ab 07_c: 4 x 1.25 = 5.0 (total 50.0)
+batch 10: hype stop08_c 09_ab 10_c 11_ab: 4 x 1.25 = 5.0 (total 55.0)
+batch 11: hype stop08_ab 09_c 10_ab 11_c: 4 x 1.25 = 5.0 (total 60.0)
+batch 12: hype stop12_ab 12_c epilogue_a epilogue_b: 4 x 1.25 = 5.0 (total 65.0)
+end: my spend 65.0 credits (52 sheets, no rerolls); account balance 1422.95 after (the account is shared with other sessions running at the same time, so the drop from 1809.87 is not all this work)

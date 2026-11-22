@@ -64,6 +64,15 @@ export const SceneKeys = {
   Composer: 'Composer',
   UiKit: 'UiKit',
   Moves: 'Moves',
+  // Story v2 cutscenes (src/cutscene, src/scenes/story).
+  Prologue: 'Prologue',
+  KidsGarden: 'KidsGarden',
+  SkyIntro: 'SkyIntro',
+  Finale: 'Finale',
+  Credits: 'Credits',
+  Epilogue: 'Epilogue',
+  PostCredits: 'PostCredits',
+  Extras: 'Extras',
 } as const;
 
 /** Texture keys. Frame sizes are noted where the texture is a spritesheet. */

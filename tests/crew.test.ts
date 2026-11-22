@@ -23,7 +23,7 @@ import {
   tally,
   type RoundResult,
 } from '../src/story/crewBattle';
-import { SCRIPT } from '../src/story/script';
+import { SCRIPT } from '../src/story/chapters';
 
 const win = (won: boolean): RoundResult => ({ playerAccuracy: won ? 80 : 60, rivalAccuracy: won ? 60 : 80, playerScore: 0, won });
 

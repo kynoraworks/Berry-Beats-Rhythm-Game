@@ -107,6 +107,14 @@ export class NoteField {
       .setDepth(Depth.effects);
   }
 
+  /** Notes drawn glowing gold (the prologue's Bog Stomp), by id; null for none. */
+  private glow: ReadonlySet<number> | null = null;
+
+  setGlow(ids: ReadonlySet<number> | null): void {
+    this.glow = ids;
+    if (!ids) for (const sprite of this.active.values()) sprite.clearTint();
+  }
+
   setEffects(effects: FieldEffects): void {
     this.effects = effects;
   }
@@ -236,6 +244,10 @@ export class NoteField {
         sprite.setFrame(note.lane).setVisible(true);
         this.active.set(note.id, sprite);
       }
+      if (this.glow) {
+        if (this.glow.has(note.id)) sprite.setTint(0xffe066);
+        else sprite.clearTint();
+      }
       if (this.projection) this.projection.placeNote(sprite, x, headY, alpha);
       else sprite.setPosition(x, headY).setAlpha(alpha);
     }
@@ -244,7 +256,7 @@ export class NoteField {
   private release(id: number): void {
     const sprite = this.active.get(id);
     if (!sprite) return;
-    sprite.setVisible(false);
+    sprite.setVisible(false).clearTint();
     this.active.delete(id);
     this.pool.push(sprite);
   }

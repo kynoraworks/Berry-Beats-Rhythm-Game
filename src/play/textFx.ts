@@ -8,7 +8,13 @@
  *   {slow}..{/slow}            types at half speed
  *   {fast}..{/fast}            types at double speed
  *   {big}..{/big}              bigger letters
- *   {pause} or {pause=ms}      waits before the next letter (300 ms by default)
+ *   {pause} or {pause=s|ms}    waits before the next letter (300 ms by default; under 20 is seconds)
+ *   {small}..{/small}          smaller letters, quieter blips
+ *   {jitter}..{/jitter}        letters twitch at random (a faster, finer shake)
+ *   {glitch}..{/glitch}        letters flicker to random glyphs, like bad signal
+ *   {act}..{/act}              a stage action: dim, slanted, no blips
+ *   {echo}..{/echo}            said again faintly after the line (drawn as a faint repeat)
+ *   {voice=id}..{/voice}       another speaker's voice for these letters
  *
  * Rules: tags may nest and may overlap; a closing tag closes the innermost
  * open tag of its own name. A tag left open runs to the end of the line.
@@ -31,6 +37,16 @@ export interface GlyphStyle {
   big: boolean;
   /** Typing speed multiplier for this letter. */
   speed: number;
+  /** Smaller letters (and quieter blips). */
+  small?: boolean;
+  /** 0 to 1: how often the letter flickers to a random glyph. */
+  glitch?: number;
+  /** A stage action ({act}): drawn dim and slanted, never voiced. */
+  act?: boolean;
+  /** Part of an {echo} span. */
+  echo?: boolean;
+  /** Voice id for these letters ({voice=id}), or undefined for the speaker's own. */
+  voice?: string;
 }
 
 export interface RichLine {
@@ -56,10 +72,12 @@ export interface BaseEffect {
 
 const DEFAULT_PAUSE_MS = 300;
 const MAX_PAUSE_MS = 5000;
+/** A {pause=n} below this is in seconds (the bible's {pause=1.2}); from it up, milliseconds. */
+const PAUSE_SECONDS_BELOW = 20;
 export const SLOW = 0.5;
 export const FAST = 2;
 
-type TagName = 'shake' | 'wave' | 'sparkle' | 'colour' | 'slow' | 'fast' | 'big' | 'pause';
+type TagName = 'shake' | 'wave' | 'sparkle' | 'colour' | 'slow' | 'fast' | 'big' | 'pause' | 'small' | 'jitter' | 'glitch' | 'act' | 'echo' | 'voice';
 const NAMES: Record<string, TagName> = {
   shake: 'shake',
   wave: 'wave',
@@ -70,7 +88,16 @@ const NAMES: Record<string, TagName> = {
   fast: 'fast',
   big: 'big',
   pause: 'pause',
+  small: 'small',
+  jitter: 'jitter',
+  glitch: 'glitch',
+  act: 'act',
+  echo: 'echo',
+  voice: 'voice',
 };
+
+/** The dim colour of an {act} stage action. */
+export const ACT_COLOUR = 0x7a6f8f;
 
 interface Tag {
   name: TagName;
@@ -97,6 +124,8 @@ function readTag(source: string, at: number): Tag | null {
     if (value !== undefined && !/^\d+(\.\d+)?$/.test(value)) return null;
   } else if (name === 'colour') {
     if (!close && (value === undefined || parseColour(value) === null)) return null;
+  } else if (name === 'voice') {
+    if (!close && (value === undefined || !/^[a-zA-Z][\w-]*$/.test(value))) return null;
   } else if (value !== undefined) {
     return null;
   }
@@ -150,6 +179,14 @@ export function parseRich(source: string, base?: BaseEffect): RichLine {
       else if (tag.name === 'colour') style.colour = parseColour(tag.value ?? '');
       else if (tag.name === 'slow') style.speed = SLOW;
       else if (tag.name === 'fast') style.speed = FAST;
+      else if (tag.name === 'small') style.small = true;
+      else if (tag.name === 'jitter') style.shake = Math.max(style.shake, 0.6);
+      else if (tag.name === 'glitch') style.glitch = 1;
+      else if (tag.name === 'act') {
+        style.act = true;
+        if (style.colour === null) style.colour = ACT_COLOUR;
+      } else if (tag.name === 'echo') style.echo = true;
+      else if (tag.name === 'voice') style.voice = tag.value;
     }
     return style;
   };
@@ -174,7 +211,9 @@ export function parseRich(source: string, base?: BaseEffect): RichLine {
       continue;
     }
     if (tag.name === 'pause') {
-      const ms = tag.value === undefined ? DEFAULT_PAUSE_MS : Math.min(MAX_PAUSE_MS, Number(tag.value));
+      // The bible writes seconds ({pause=1.2}); older lines wrote milliseconds ({pause=800}).
+      const value = tag.value === undefined ? DEFAULT_PAUSE_MS : Number(tag.value);
+      const ms = Math.min(MAX_PAUSE_MS, tag.value !== undefined && value < PAUSE_SECONDS_BELOW ? value * 1000 : value);
       pauses[plain.length] += ms;
       tagged = timed = true;
     } else if (tag.close) {
@@ -194,7 +233,7 @@ export function parseRich(source: string, base?: BaseEffect): RichLine {
     }
     i += tag.length;
   }
-  const visual = styles.some((s) => s.shake > 0 || s.wave > 0 || s.sparkle > 0 || s.colour !== null || s.big);
+  const visual = styles.some((s) => s.shake > 0 || s.wave > 0 || s.sparkle > 0 || s.colour !== null || s.big || s.small || (s.glitch ?? 0) > 0 || s.act || s.echo);
   return { plain, styles, pauses, visual, timed, tagged };
 }
 
@@ -221,6 +260,14 @@ export interface Layout {
 
 /** Bigger letters are this much larger. */
 export const BIG_SCALE = 1.35;
+/** Small letters are this much smaller. */
+export const SMALL_SCALE = 0.75;
+
+/** A letter's size factor. */
+export function glyphScale(style: Pick<GlyphStyle, 'big' | 'small'> | undefined): number {
+  if (!style) return 1;
+  return style.big ? BIG_SCALE : style.small ? SMALL_SCALE : 1;
+}
 
 /**
  * Lay a rich line out in rows no wider than `wrapWidth`, breaking between
@@ -231,7 +278,7 @@ export const BIG_SCALE = 1.35;
 export function layoutRich(line: Pick<RichLine, 'plain' | 'styles'>, advance: (char: string) => number, wrapWidth: number): Layout {
   const { plain, styles } = line;
   const glyphs: GlyphPlace[] = new Array(plain.length);
-  const widthOf = (i: number) => advance(plain[i]) * (styles[i]?.big ? BIG_SCALE : 1);
+  const widthOf = (i: number) => advance(plain[i]) * glyphScale(styles[i]);
   const widths: number[] = [];
   let row = 0;
   let x = 0;

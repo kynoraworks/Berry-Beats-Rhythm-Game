@@ -35,6 +35,28 @@ export interface DialogueOptions {
   /** Called as each line starts, so the stage can light whoever is speaking. */
   onLine: (line: Line) => void;
   onDone: () => void;
+  /**
+   * How a speaker who is not in the cast looks and sounds (the cutscenes' kids,
+   * legends and one-off voices, see src/cutscene/speakers.ts). Undefined: the cast's own.
+   */
+  speaker?: (line: Line) => SpeakerLook | undefined;
+}
+
+/** A speaker drawn from outside the cast. */
+export interface SpeakerLook {
+  name: string;
+  /** Name tag colour, and whether its lettering is dark. */
+  tag: number;
+  darkTag?: boolean;
+  /** Colour of the stand-in bust when there is no portrait. */
+  color: number;
+  /** Voice id in core/voice.ts. */
+  voice: string;
+  /** Portrait to show, if one is loaded; otherwise a bust with `initial`. */
+  portrait?: { texture: string; frame: number } | null;
+  initial?: string;
+  /** Portrait on the left (Berry's side). */
+  left?: boolean;
 }
 
 /** Size of a portrait frame, and how much it is enlarged in the box. */
@@ -94,6 +116,8 @@ export class Dialogue {
   private rich: RichLine | null = null;
   private readonly richView: RichTextView;
   private lineStart = 0;
+  /** The current line's speaker from outside the cast, if it is one. */
+  private look: SpeakerLook | null = null;
   private open = true;
   private closing = false;
 
@@ -188,9 +212,11 @@ export class Dialogue {
     this.body.setText('');
     this.richView.clear();
 
-    const character = CAST[line.who];
+    const look = this.options.speaker?.(line);
+    this.look = look ?? null;
+    const character = CAST[line.who] ?? CAST.npc;
     // Berry's portrait sits on the left, everyone else's on the right, like the stage.
-    const onLeft = line.who === 'berry';
+    const onLeft = look?.left ?? line.who === 'berry';
     const portraitX = onLeft ? MARGIN : GAME_W - MARGIN - PORTRAIT_BOX;
     const boxX = onLeft ? MARGIN + PORTRAIT_BOX + GAP : MARGIN;
     this.portraitBox.setX(portraitX);
@@ -200,7 +226,7 @@ export class Dialogue {
     this.next.setX(boxX + BOX_W - 44);
     this.setPortrait(line, portraitX + PORTRAIT_BOX / 2);
 
-    this.voice = voiceFor(line.who, line.role);
+    this.voice = look ? voiceFor(look.voice) : voiceFor(line.who, line.role);
     // Tags ({shake}, {wave}...) and the speaker's own light effect draw the line letter by letter;
     // a plain line stays one text object, exactly as before.
     const rich = parseRich(line.text, this.voice.effect);
@@ -213,10 +239,11 @@ export class Dialogue {
       this.full = this.body.getWrappedText(line.text.replace(LIGATURE, '$1\u200c')).join('\n');
     }
     this.voicer.start(this.voice, rich.plain);
-    this.nameText.setText(speakerName(line)).setColor(character.darkTag ? CSS.ink : CSS.cream);
+    const darkTag = look ? !!look.darkTag : character.darkTag;
+    this.nameText.setText(look?.name ?? speakerName(line)).setColor(darkTag ? CSS.ink : CSS.cream);
     const tagWidth = Math.ceil((this.nameText.width + 48) / UI_SCALE) * UI_SCALE;
     const tagX = onLeft ? boxX + 24 : boxX + BOX_W - 24 - tagWidth;
-    this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(character.tag);
+    this.tag.setX(tagX).setSize(tagWidth / UI_SCALE, 48 / UI_SCALE).setTint(look?.tag ?? character.tag);
     this.nameText.setX(tagX + tagWidth / 2);
     if (this.rich) this.richView.show(this.rich);
     this.options.onLine(line);
@@ -225,6 +252,18 @@ export class Dialogue {
   /** The speaker's drawn portrait, or a stand-in in their colour while it is not drawn yet. */
   private setPortrait(line: Line, centerX: number): void {
     const centerY = GAME_H - MARGIN - PORTRAIT_BOX / 2;
+    const look = this.look;
+    if (look) {
+      const art = look.portrait;
+      if (art && this.scene.textures.exists(art.texture) && this.scene.textures.get(art.texture).has(String(art.frame))) {
+        this.portrait.setTexture(art.texture, art.frame).setOrigin(0.5).setScale(PORTRAIT_SCALE).setPosition(centerX, centerY).setVisible(true);
+        this.stand.setVisible(false);
+        this.standLetter.setVisible(false);
+        return;
+      }
+      this.drawStand(centerX, centerY, look.color, line.mood === 'bold', look.initial ?? look.name.charAt(0), !!look.darkTag);
+      return;
+    }
     const frame = portraitFrame(line, this.options.hoodDown);
     const sheet = this.scene.textures.exists(Tex.portraits) ? this.scene.textures.get(Tex.portraits) : null;
     // A hood-down frame that is not drawn yet falls back to his usual bold face.
@@ -235,13 +274,17 @@ export class Dialogue {
       this.standLetter.setVisible(false);
       return;
     }
+    const character = CAST[line.who] ?? CAST.npc;
+    const initial = (line.who === 'npc' ? speakerName(line) : character.name).replace(/^Dr\.\s*/, '').charAt(0).toUpperCase();
+    this.drawStand(centerX, centerY, character.color, line.mood === 'bold', initial, character.darkTag);
+  }
+
+  /** A bust in the speaker's colour: a head with their initial on shoulders, drawn in blocks. */
+  private drawStand(centerX: number, centerY: number, color: number, bold: boolean, initial: string, darkTag: boolean): void {
     this.portrait.setVisible(false);
-    const character = CAST[line.who];
     const size = PORTRAIT_SIZE * PORTRAIT_SCALE;
     const left = centerX - size / 2;
     const top = centerY - size / 2;
-    const bold = line.mood === 'bold';
-    // A bust in the speaker's colour: a head with their initial on shoulders, drawn in blocks.
     const head = 96;
     const headX = centerX - head / 2;
     const headY = top + 22;
@@ -249,20 +292,19 @@ export class Dialogue {
       .clear()
       .fillStyle(COLORS.ink, 1)
       .fillRect(left, top, size, size)
-      .fillStyle(character.color, bold ? 1 : 0.75)
+      .fillStyle(color, bold ? 1 : 0.75)
       .fillRect(left + 28, top + 132, size - 56, size - 132)
       .fillRect(headX, headY, head, head)
       .fillStyle(0xffffff, 0.2)
       .fillRect(headX, headY, head, 8)
       .fillRect(left + 28, top + 132, size - 56, 8)
       .setVisible(true);
-    const initial = (line.who === 'npc' ? speakerName(line) : character.name).replace(/^Dr\.\s*/, '').charAt(0).toUpperCase();
     this.standLetter
-      .setText(initial)
+      .setText(initial.toUpperCase())
       .setFontFamily(FONT)
       .setFontSize(bold ? 72 : 64)
       .setPosition(centerX, headY + head / 2 + 4)
-      .setColor(character.darkTag ? CSS.ink : CSS.cream)
+      .setColor(darkTag ? CSS.ink : CSS.cream)
       .setVisible(true);
   }
 
@@ -321,7 +363,8 @@ export class Dialogue {
         this.typed -= 1;
         const char = this.full.charAt(this.shown);
         this.shown++;
-        this.voicer.letter(char);
+        // Stage actions ({act}) are read, not said.
+        if (!this.rich?.styles[this.shown - 1]?.act) this.voicer.letter(char);
         const wait = punctuationPause(char, this.full[this.shown], this.full[this.shown - 2]);
         if (wait > 0 && this.shown < this.full.length) {
           this.hold = wait;

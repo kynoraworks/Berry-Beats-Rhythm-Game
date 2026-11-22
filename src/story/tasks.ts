@@ -39,11 +39,27 @@ export interface TaskSpot {
   flip?: boolean;
   /** Items only: art row of the item's bottom, if not on the floor. */
   y?: number;
+  /**
+   * The spot is someone or something already standing there, not drawn again:
+   * 'resident:<id>', 'look:<id>', 'trainer', 'boss', 'crew:<fruit>' or
+   * 'follower:<fruit>' (stop 10's signatures, stop 12's backstage talks).
+   */
+  attach?: string;
+  /** A flag that must be set before it can be found (stop 8's ice: the July message first). */
+  needs?: string;
 }
 
 interface TaskBase {
   /** Short objective for the banner, e.g. "Get the ticket stamped". */
   title: string;
+  /** Idle hints (after 60 s with no progress): from the follower if present, else as a text. */
+  hints?: Line[];
+  /** Said by the boss while the padlock is on, before the task is done (they set the task). */
+  bossIntro?: Line[];
+  /** Said once the task is done (stop 1's gate). */
+  done?: Line[];
+  /** A one-time beat that must have been seen before the task starts (stop 1: meeting Raspberry). */
+  startsAfter?: string;
 }
 
 /** Talk to people in order; each one sends you to the next. */
@@ -54,6 +70,8 @@ export interface TalkChainTask extends TaskBase {
   early: Line[];
   /** Said by someone already talked to (their own lines are said again when this is empty). */
   again?: Line[];
+  /** Talking to this person out of order plays these (stop 2: Banana before validation). */
+  wrongTurn?: { attach: string; lines: Line[] };
 }
 
 /** Find a number of things or people. A counter shows "2 of 3". */
@@ -65,7 +83,9 @@ export interface FindTask extends TaskBase {
   /** How many are needed (all of them when omitted). */
   need?: number;
   /** Someone who asks for them, and thanks you at the end (optional). */
-  giver?: { spot: TaskSpot; intro: Line[]; thanks: Line[] };
+  giver?: { spot: TaskSpot; intro: Line[]; thanks: Line[]; thanksNodes?: import('./bible').BNode[] };
+  /** Carried things slow Berry to half speed until they are all found (stop 6's flames). */
+  carry?: boolean;
 }
 
 /** Someone plays an arrow pattern with the lane sounds; Berry plays it back. */
@@ -82,6 +102,12 @@ export interface CopyPatternTask extends TaskBase {
   success: Line[];
   /** Said after the third miss (and every miss after it); the pad then shows the arrows. */
   hint: Line[];
+  /** A joke after each miss, in turn (lines may carry follower conditions). */
+  fails?: Line[];
+  /** More rounds after the first (stop 9: three rounds of 4, 6 and 8). `pattern` is round one. */
+  rounds?: PadLane[][];
+  /** The pattern is heard, not seen (stop 9); "Show echo arrows" in Options shows it anyway. */
+  audioOnly?: boolean;
 }
 
 export interface Choice {
@@ -101,6 +127,11 @@ export interface ChooseAnswerTask extends TaskBase {
   choices: Choice[];
   /** Said after the right answer, after its reply. */
   success: Line[];
+  /**
+   * Several questions in turn (the bible's riddles and tests): each with lines
+   * before it and its own answers. When given, `question` and `choices` are the first.
+   */
+  questions?: { before: Line[]; question: string; choices: Choice[] }[];
 }
 
 export type TaskDef = TalkChainTask | FindTask | CopyPatternTask | ChooseAnswerTask;
@@ -137,10 +168,18 @@ export function taskSpots(task: TaskDef): TaskSpot[] {
 
 export type TalkOutcome = 'advance' | 'done' | 'again' | 'early';
 
-/** Talking to one of the chain's people. */
+/**
+ * Talking to one of the chain's people, by spot id or by who they are (their
+ * `attach`: the same person can be two steps, like the clerk at stop 2).
+ */
 export function talkChain(task: TalkChainTask, state: TaskState, spotId: string): { state: TaskState; lines: Line[]; outcome: TalkOutcome } {
-  const index = task.steps.findIndex((step) => step.spot.id === spotId);
   const step = Math.min(state.step ?? 0, task.steps.length);
+  const matches = (i: number) => task.steps[i].spot.id === spotId || (task.steps[i].spot.attach !== undefined && task.steps[i].spot.attach === spotId);
+  let index = -1;
+  if (step < task.steps.length && matches(step)) index = step;
+  else index = task.steps.findIndex((_, i) => matches(i));
+  // Going back to the one who sent you (stop 2's Banana) before the chain is done.
+  if (!state.done && index >= 0 && index < step && task.wrongTurn?.attach === spotId) return { state, lines: task.wrongTurn.lines, outcome: 'early' };
   if (index < 0) return { state, lines: [], outcome: 'again' };
   if (state.done || index < step) {
     const lines = task.again && task.again.length > 0 ? task.again : task.steps[index].lines;
@@ -218,12 +257,25 @@ export function patternStepMs(task: CopyPatternTask, hinted: boolean): number {
 // Choose the answer
 // ---------------------------------------------------------------------------
 
-/** Picking one of the answers. A wrong one gets its line and the question again. */
-export function chooseAnswer(task: ChooseAnswerTask, state: TaskState, index: number): { state: TaskState; lines: Line[]; correct: boolean } {
-  const choice = task.choices[index];
-  if (!choice) return { state, lines: [], correct: false };
-  if (!choice.correct) return { state, lines: choice.reply, correct: false };
-  return { state: { ...state, done: true }, lines: [...choice.reply, ...task.success], correct: true };
+/** The question being asked now (0 for a one-question task). */
+export function currentQuestion(task: ChooseAnswerTask, state: TaskState): { before: Line[]; question: string; choices: Choice[] } {
+  const list = task.questions ?? [{ before: [], question: task.question, choices: task.choices }];
+  return list[Math.min(state.step ?? 0, list.length - 1)];
+}
+
+/**
+ * Picking one of the answers. A wrong one gets its line and the question
+ * again; a right one moves to the next question, and the last one completes
+ * the task (`done` in the state, then the success lines).
+ */
+export function chooseAnswer(task: ChooseAnswerTask, state: TaskState, index: number): { state: TaskState; lines: Line[]; correct: boolean; finished: boolean } {
+  const total = task.questions?.length ?? 1;
+  const choice = currentQuestion(task, state).choices[index];
+  if (!choice) return { state, lines: [], correct: false, finished: false };
+  if (!choice.correct) return { state, lines: choice.reply, correct: false, finished: false };
+  const step = (state.step ?? 0) + 1;
+  if (step < total) return { state: { ...state, step }, lines: choice.reply, correct: true, finished: false };
+  return { state: { ...state, step, done: true }, lines: [...choice.reply, ...task.success], correct: true, finished: true };
 }
 
 // ---------------------------------------------------------------------------
@@ -258,11 +310,13 @@ export function taskProblems(task: TaskDef): string[] {
       if (task.items.length < 1) problems.push('nothing to find');
       break;
     case 'copyPattern':
-      if (task.pattern.length < 4 || task.pattern.length > 8) problems.push('a pattern is 4 to 8 arrows');
+      for (const pattern of [task.pattern, ...(task.rounds ?? [])]) if (pattern.length < 4 || pattern.length > 8) problems.push('a pattern is 4 to 8 arrows');
       break;
     case 'chooseAnswer':
-      if (task.choices.length < 2 || task.choices.length > 3) problems.push('2 or 3 answers');
-      if (task.choices.filter((c) => c.correct).length !== 1) problems.push('exactly one right answer');
+      for (const q of task.questions ?? [{ choices: task.choices }]) {
+        if (q.choices.length < 2 || q.choices.length > 3) problems.push('2 or 3 answers');
+        if (q.choices.filter((c) => c.correct).length !== 1) problems.push('exactly one right answer');
+      }
       break;
   }
   return problems;

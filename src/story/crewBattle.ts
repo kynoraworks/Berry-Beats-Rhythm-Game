@@ -1,6 +1,6 @@
 import { beatToSec, type Chart, type ChartNote, type FruitId } from '../core/chart';
 import { CAST } from './cast';
-import { SCRIPT } from './script';
+import { SCRIPT } from './chapters';
 import type { AbilityId, GimmickId, Line } from './types';
 
 /**

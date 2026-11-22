@@ -1,0 +1,25 @@
+# tag job_id grid aspect (all gpt_image_2_6, high, 1k, transparent, 1.25 credits each)
+coach_a afce2d66-6608-4822-b55b-d030a8fc460a 3x2
+strawberry_a 72dcb4cb-df63-4958-b7a8-71fcd78f9757 3x3
+kidberry_a 4a8400f4-bff6-4a77-996a-96229b8f5294 3x3
+kidrasp_a 106d19c6-c820-44a9-b9a9-8c29e62328d8 3x3
+kidblue_a 7c61f1d2-7413-4e91-a87b-696b7e4e6c5e 3x3
+coach_a2 43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c 3x2
+ycoach_a f79db099-0ce2-44d5-9770-a5ac45f8aeee 3x2
+strawberry_b 87b34d19-c738-4463-9e29-c1fe3c4f24fb 3x3
+strawberry_md 3147a5ca-3904-476d-8e13-d0a4692502ec 3x2
+strawberry_mf fd756135-e306-4794-a975-17351899d7d3 3x2
+conductor_a 5fb9be22-6c5e-4d8f-ac8a-c251d05fee96 3x2
+strawberry_me a23565bb-474c-4e07-9705-ba6c72716d6d 3x2
+strawberry_mg 2fb4053f-db83-496d-aa97-0920d5640c71 3x2
+bluex_a 709f58a7-bf23-4da5-9e6a-a5f5d21cb1e9 3x2
+berryx_a 22b885fa-1091-4ec4-82a3-2f1ddd2d12bb 3x3
+portraits_kids 16007acd-ca39-4ed1-9cfa-a8ad04937bcd 3x2
+coach_b 56e8bdb6-19b6-4920-ae25-a8c06b3367f3 3x2
+coach_d 4ccb2914-359a-4c3b-b79c-f56432288d30 3x2
+coach_g cdf6ec36-9e57-43c0-b3c1-a21ecd27d1c3 3x2
+coach_h becddf34-bc1a-43d7-8e8d-6d342d63c661 3x2
+coach_c 3f3756d0-f9e5-4780-acac-4a211d5102d1 3x2
+coach_e c857f752-4020-40e0-9313-a03de94cc3d8 3x2
+coach_f 71dab861-86fb-49ec-a55b-0756701e7f48 3x2
+ycoach_b 42994e53-a61c-4c9d-96ed-691c03d2d9d0 3x2

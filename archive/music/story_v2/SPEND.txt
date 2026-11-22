@@ -18,3 +18,22 @@ sting_conductor | elevenlabs_music_v2_5 | 6 | 63334569-7d94-411e-8b7b-89aec9899a
 sting_move_learned | elevenlabs_music_v2_5 | 3 | (none) | 0 | stings batch item refused: rate limit; resubmitted alone later
 sting_unlock | elevenlabs_music_v2_5 | 3 | 2d361b6f-fa99-46f8-899b-4d2202abe023 | 0.44 (quote) | stings batch
 sting_low_point | elevenlabs_music_v2_5 | 6 | 4e4457d3-5282-46f1-8d61-b5a63c24164f | 0.87 (quote) | stings batch
+sting_move_learned | elevenlabs_music_v2_5 | 3 | 938f6cc9-f560-4277-8b1b-0f9b74b8e573 | 0.44 (quote) | resubmitted
+sting_broadcast | elevenlabs_music_v2_5 | 5 | bdf59b6d-93ec-46cd-8603-354a614461a5 | 0.73 (quote) |
+sting_envelope | elevenlabs_music_v2_5 | 6 | 48eea1fb-bf02-4d89-b643-eed447750ebd | 0.87 (quote) |
+prologue_last_final (take 2) | elevenlabs_music_v2_5 | 120 | 5df8af63-61b3-4ee1-9b38-f6ca11297109 | 17.44 (quote) | regenerated once: take 1 tempo was solid (172.0) but bars 33 to 76 were one flat section, too little contrast for hype on/off; take 2 prompt uses timestamps
+(checked against the transactions list: every P1 job above was billed once at its quote; sting_static billed 0.38, sting_conductor and sting_low_point and sting_envelope 0.88 each. P1 total incl. prologue take 2: 126.44. Other agents spend on the same account at the same time (GPT Image, Kling), so the balance alone does not show this work's spend.)
+P2 town loops are generated at 60 s each instead of the 62 to 90 s in MUSIC_LIST, to stay under the 220 cap after the prologue regeneration (a loop only needs a bar-aligned loop point; 60 s is 20 to 31 bars).
+town_peel_street | elevenlabs_music_v2_5 | 60 | c03cfd40-849c-476e-a303-ac7f04ca5276 | 8.72 (quote) | P2 batch 1
+town_graffiti_corner | elevenlabs_music_v2_5 | 60 | cbe123a8-5983-4ddf-bd3c-add3458c6c21 | 8.72 (quote) | P2 batch 1
+town_vine_crossing | elevenlabs_music_v2_5 | 60 | 6cb14f4b-44d7-4579-9c50-3a338fe91285 | 8.72 (quote) | P2 batch 1
+town_citrus_labs | elevenlabs_music_v2_5 | 60 | c4ada965-37e1-43a2-9235-f90dcc548517 | 8.72 (quote) | P2 batch 1
+town_lantern_market | elevenlabs_music_v2_5 | 60 | 65746907-f0e9-4225-bfe1-c0f857572e52 | 8.72 (quote) | P2 batch 1
+town_the_club | elevenlabs_music_v2_5 | 60 | a30bc141-4700-4f2d-9f87-e79af457c19e | 8.72 (quote) | P2 batch 1
+town_rooftop_full | elevenlabs_music_v2_5 | 60 | a34f1adb-818c-4738-b5b0-7e33fbd75560 | 8.72 (quote) | P2 batch 2
+town_the_tunnel | elevenlabs_music_v2_5 | 60 | 0d8219ac-8413-4385-9b50-d51a1b8afdab | 8.72 (quote) | P2 batch 2
+town_orange_plaza | elevenlabs_music_v2_5 | 60 | 28dc23d3-b76d-4585-b92a-ab48cf2d2724 | 8.72 (quote) | P2 batch 2
+town_pineapple_hall | elevenlabs_music_v2_5 | 60 | 5f5dba1b-4bae-450b-ac81-7b4f21770ff3 | 8.72 (quote) | P2 batch 2
+sting_rumour | mirelo_text_to_audio | 3 | 9c03321a-9c18-4e5c-aac9-12e5e5309392 | about 0.75 | P2 batch 2
+sting_postcard | elevenlabs_music_v2_5 | 3 | 673ce78a-52c0-4c45-9296-1c7b2a3c5b0d | 0.44 (quote) | P2 batch 2 (asked 3 s, the model minimum; trimmed to about 2.5 s)
+sting_juicefm | elevenlabs_music_v2_5 | 4 | f3c539fb-6542-4a2f-aa87-e166bf8a9c9d | 0.58 (quote) | P2, alone

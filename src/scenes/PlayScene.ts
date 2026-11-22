@@ -33,10 +33,15 @@ import { TouchLanes } from '../core/touchLanes';
 import { onBackGesture } from '../core/backGesture';
 import { SCHEME_INFO } from '../core/touchSchemes';
 import { FocusGroup, UiButton, addBody, addBox, addDim, addText, addUiButton, fadeIn, goTo, isLeaving, menuKeys } from '../core/ui';
-import { createPlayer, createRival, type Dancer } from '../play/characters';
+import { createPlayer, createRival, createSheetDancer, type Dancer } from '../play/characters';
+import { SCRIPTED_TURNS, ScriptedDirector, type ScriptedPlay } from '../play/scripted';
+import { actorArt } from '../cutscene/actors';
+import { staticSting, sustainedNote } from '../cutscene/audio';
+import { HoldToSkip, StaticScreen } from '../cutscene/fx';
+import { finishPrologue } from '../cutscene/flow';
 import { Dialogue, consumeSkipIntro, skipNextIntro } from '../play/Dialogue';
 import { Hud } from '../play/Hud';
-import { BASE_SCROLL_SPEED, Depth, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
+import { BASE_SCROLL_SPEED, Depth, PLAYER_FIELD_CENTER, PLAYER_LANES, PLAYER_X, RECEPTOR_Y, RIVAL_LANES, RIVAL_X } from '../play/layout';
 import { NoteField } from '../play/NoteField';
 import { rivalProfile, rivalTexture, type RivalProfile } from '../play/rivals';
 import { BattleEffects } from '../play/BattleEffects';
@@ -78,7 +83,7 @@ let devAutoHit = false;
  * Play data with battle rules set by the caller (the crew battle sets each
  * round's gimmick and ability). Without them a story stop's own apply.
  */
-export type RuledPlayData = PlayData & { rules?: BattleRules; crew?: CrewRoundPlay };
+export type RuledPlayData = PlayData & { rules?: BattleRules; crew?: CrewRoundPlay; scripted?: ScriptedPlay };
 
 /** What the results screen gets on top of the usual: how often the Flair was fired. */
 export type FlairResults = ResultsData & { flairUsed?: number; abilityName?: string };
@@ -211,6 +216,12 @@ export class PlayScene extends Phaser.Scene {
   private autoUsed = false;
   private autoTag: Phaser.GameObjects.Text | null = null;
   private autoButton: UiButton | null = null;
+  /** The prologue's scripted battle (src/play/scripted.ts), when this is it. */
+  private director: ScriptedDirector | null = null;
+  /** The freeze frame is up: nothing moves but the tape counter and the static. */
+  private frozen = false;
+  private staticScreen: StaticScreen | null = null;
+  private skipRing: HoldToSkip | null = null;
 
   constructor() {
     super(SceneKeys.Play);
@@ -276,6 +287,10 @@ export class PlayScene extends Phaser.Scene {
     this.missReactor = new MissReactor(seededRandom(`${data.chart.id}:misses`));
     this.lastCombo = 0;
     this.perfectRun = 0;
+    this.director = null;
+    this.frozen = false;
+    this.staticScreen = null;
+    this.skipRing = null;
   }
 
   create(): void {
@@ -296,10 +311,12 @@ export class PlayScene extends Phaser.Scene {
     this.rivalName = this.rivalLook.name;
     // A scored battle needs notes on both sides. The Coach only demonstrates, and a
     // test play from the middle of a song would start with rounds already half over.
-    const isBattle = hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && segment?.kind !== 'lesson';
+    const scripted = this.playData.scripted ?? null;
+    const isBattle = !scripted && hasRival && !isCoach && rivalChart.length > 0 && chart.notes.length > 0 && startAt === 0 && segment?.kind !== 'lesson';
     const crew = this.crew;
     // A lesson cannot be failed: the Coach just keeps counting.
-    const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson';
+    // The prologue is a showcase, not a test: it cannot be failed either.
+    const noFail = settings.noFail || !!this.playData.practice || segment?.kind === 'lesson' || !!scripted;
 
     this.engine = new Engine(toTimedNotes(chart, chart.notes), { noFail });
     // Easy gives a little more timing slack (core/difficulty.ts).
@@ -339,7 +356,13 @@ export class PlayScene extends Phaser.Scene {
     this.playerField = new NoteField(this, PLAYER_LANES, this.engine.notes);
     // Feet go on the stage art's own floor line under each dancer.
     const stageFloor = this.stage.layers.background.texture.key;
-    this.player = createPlayer(this, playerX, feetY(stageFloor, playerX), crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
+    if (scripted) {
+      // The prologue: the player dances as Cranberry, in her own sheet once it is drawn (the Coach's until then).
+      const cran = actorArt(this, 'cranberry');
+      this.player = createSheetDancer(this, playerX, feetY(stageFloor, playerX), cran.texture, cran.layout === 'lite' ? 'lite' : 'berry', 1, { seed: chart.id, calm: settings.reduceMotion });
+    } else {
+      this.player = createPlayer(this, playerX, feetY(stageFloor, playerX), crew?.ally ?? 'berry', { seed: chart.id, calm: settings.reduceMotion });
+    }
     this.player.setSchedule(this.engine.notes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
     const rounds = this.battle && this.battle.rounds.length > 1 ? this.battle.rounds.length : 0;
     const session = crew ? getSession() : null;
@@ -347,7 +370,7 @@ export class PlayScene extends Phaser.Scene {
       rivalScore: isBattle,
       rounds,
       rival: rivalKind,
-      player: crew?.ally ?? 'berry',
+      player: scripted ? 'coach' : (crew?.ally ?? 'berry'),
       crew: crew ? { round: crew.round, results: session?.results ?? [] } : null,
       gimmick: this.rules.gimmick,
       calm: settings.reduceMotion,
@@ -355,7 +378,15 @@ export class PlayScene extends Phaser.Scene {
     this.hud.setBattle(this.battle, 60 / chart.bpm);
     if (this.rivalEngine) {
       this.rivalField = new NoteField(this, RIVAL_LANES, this.rivalEngine.notes, true);
-      this.rival = createRival(this, rivalKind, RIVAL_X, feetY(stageFloor, RIVAL_X), { seed: chart.id, calm: settings.reduceMotion });
+      if (scripted) {
+        // Strawberry, the Summer Legend: her sheet when drawn, else Raspberry's in her red.
+        const straw = actorArt(this, 'strawberry');
+        this.rival = createSheetDancer(this, RIVAL_X, feetY(stageFloor, RIVAL_X), straw.texture, straw.layout === 'lite' ? 'lite' : 'berry', -1, { seed: chart.id, calm: settings.reduceMotion });
+        if (straw.tint !== undefined) this.rival.sprite.setTint(straw.tint);
+        this.rivalName = 'Strawberry';
+      } else {
+        this.rival = createRival(this, rivalKind, RIVAL_X, feetY(stageFloor, RIVAL_X), { seed: chart.id, calm: settings.reduceMotion });
+      }
       const rivalNotes = this.rivalEngine.notes;
       this.rival?.setSchedule(rivalNotes.map((n) => secToBeat(chart, n.t)), 60 / chart.bpm);
       const beats = (notes: readonly { t: number; end: number }[]): number[] => notes.flatMap((n) => (n.end > n.t ? [secToBeat(chart, n.t), secToBeat(chart, n.end)] : [secToBeat(chart, n.t)]));
@@ -423,6 +454,8 @@ export class PlayScene extends Phaser.Scene {
         hooks: { sfx: (name) => this.hypeModeSfx(name), flash: (color, alpha) => this.stage.flash(color, alpha), cheer: () => this.stage.cheer(), punch: () => this.stage.punch(0.075) },
       });
     }
+
+    if (scripted) this.startScripted(scripted);
 
     const pause = (this.pauseButton = this.add.image(14, 18, Tex.pauseButton)).setOrigin(0).setScale(4).setDepth(Depth.hud).setInteractive({ useHandCursor: true });
     pause.on(Phaser.Input.Events.POINTER_DOWN, (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => {
@@ -763,12 +796,21 @@ export class PlayScene extends Phaser.Scene {
 
   private quit(): void {
     music.stop(200);
+    if (this.playData.scripted) {
+      finishPrologue(this, this.playData.scripted.flow, 250);
+      return;
+    }
     // Leaving a crew round gives up the battle; the order is kept for the next try.
     if (this.crew) endSession();
     goTo(this, this.playData.returnTo.scene, this.playData.returnTo.data);
   }
 
   private finish(failed: boolean): void {
+    // The prologue never ends on a result: it freezes and cuts to static.
+    if (this.director) {
+      if (!this.frozen) this.freezeFrame();
+      return;
+    }
     if (this.state === 'ended') return;
     this.state = 'ended';
     this.touchLanes?.setGuideVisible(false);
@@ -1111,6 +1153,16 @@ export class PlayScene extends Phaser.Scene {
    * touches the song's clock or the timing of the next notes.
    */
   private reactToMiss(time: number, endedHype: boolean): void {
+    if (this.director) {
+      // The prologue: a miss flashes and makes its sound, and the routine carries on.
+      this.lastCombo = 0;
+      this.perfectRun = 0;
+      this.hud.showJudgement('miss', 0, 0, 0);
+      this.player.flash();
+      playSfx(this.game, 'miss');
+      if (this.engine.stats.health < START_HEALTH) this.engine.adjustHealth(START_HEALTH - this.engine.stats.health);
+      return;
+    }
     const lost = this.lastCombo;
     this.lastCombo = 0;
     this.perfectRun = 0;
@@ -1220,7 +1272,7 @@ export class PlayScene extends Phaser.Scene {
   private setTurn(turn: Exclude<Turn, 'rest'>): void {
     this.currentTurn = turn;
     const labels = TURN_LABELS[this.battle ? 'battle' : 'lesson'];
-    const label = turn === 'rival' && this.battle ? `${this.rivalName}${labels.rival}` : labels[turn];
+    const label = this.director ? SCRIPTED_TURNS[turn] : turn === 'rival' && this.battle ? `${this.rivalName}${labels.rival}` : labels[turn];
     this.hud.setTurn(label, turn === 'rival' ? this.rivalLook.css : TURN_COLORS[turn]);
     this.stage.setTurn(turn);
     this.camera?.setTurn(turn);
@@ -1264,6 +1316,13 @@ export class PlayScene extends Phaser.Scene {
   override update(_time: number, deltaMs: number): void {
     const conductor = this.conductor;
     const dt = deltaMs / 1000;
+    this.skipRing?.update(dt);
+    if (this.frozen) {
+      // The freeze frame: only the tape counter and the static move.
+      this.director?.update(0, 0, dt);
+      this.staticScreen?.update(dt);
+      return;
+    }
     if (!conductor || this.state === 'loading') {
       // No music yet: the dancers idle and the lights follow the conversation.
       this.idleClock += dt;
@@ -1286,6 +1345,8 @@ export class PlayScene extends Phaser.Scene {
       if (this.rivalDriver) this.handleRivalEvents(this.rivalDriver.step(time));
       this.hitLayer?.update(time);
       this.updateBattle(time);
+      this.director?.update(time, beat, dt);
+      if (this.frozen) return;
       this.duo?.update(beat);
       const drops = this.shape.drops;
       while (this.dropIndex < drops.length && beat >= drops[this.dropIndex]) {
@@ -1402,6 +1463,92 @@ export class PlayScene extends Phaser.Scene {
         else this.time.delayedCall(90, () => !this.autoHeld[lane] && this.playerField.setPressed(lane, false));
       }
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // The prologue's scripted battle
+  // ---------------------------------------------------------------------
+
+  private startScripted(scripted: ScriptedPlay): void {
+    const calm = getSettings().reduceMotion;
+    this.hype?.setScripted();
+    const fieldLeft = PLAYER_LANES[0] - 60;
+    const fieldWidth = PLAYER_LANES[3] - PLAYER_LANES[0] + 120;
+    this.director = new ScriptedDirector(this, scripted, this.chart, {
+      hype: (on) => this.hype?.force(on),
+      duel: (value) => this.hud.setScriptedDuel(value),
+      callout: (text, color) => this.hud.callout(text, color),
+      flash: (color, alpha) => this.stage.flash(color, alpha),
+      sfx: (name) => playSfx(this.game, name),
+      glow: (ids) => this.playerField.setGlow(ids),
+      notes: () => this.engine.notes,
+      fieldFlash: (seconds) => {
+        // Strawberry's flash: a glare over the top of Cranberry's field (Dragon Fruit's gimmick, gently).
+        const glare = this.add.rectangle(fieldLeft, 0, fieldWidth, RECEPTOR_Y * 0.55, calm ? COLORS.night : 0xfff2fa, 0).setOrigin(0).setDepth(Depth.effects + 2);
+        this.tweens.add({ targets: glare, fillAlpha: 0.95, duration: 80, hold: seconds * 1000, yoyo: true, onComplete: () => glare.destroy() });
+        playSfx(this.game, 'zap');
+      },
+      burst: () => {
+        for (let i = 0; i < 4; i++) this.time.delayedCall(i * 110, () => this.stage.flash(i % 2 ? 0xff9a2e : 0xffffff, 0.22));
+        this.rival?.special();
+      },
+      stomp: () => {
+        // Bog Stomp fires by itself: the HUD shows Space pressed, mud splashes up the lanes, the screen shakes once.
+        if (!calm) this.cameras.main.shake(260, 0.012);
+        this.player.special();
+        this.stage.flash(0x6b4a1e, 0.35);
+        playSfx(this.game, 'ability');
+        playSfx(this.game, 'boom');
+        const key = addText(this, PLAYER_FIELD_CENTER, RECEPTOR_Y - 150, '[ SPACE ]', 36, { color: CSS.yellow }).setDepth(Depth.hud + 2);
+        this.tweens.add({ targets: key, scale: 0.86, duration: 90, yoyo: true, repeat: 1 });
+        this.tweens.add({ targets: key, alpha: 0, delay: 900, duration: 300, onComplete: () => key.destroy() });
+        for (let i = 0; i < (calm ? 12 : 40); i++) {
+          const lane = PLAYER_LANES[i % 4];
+          const mud = this.add.rectangle(lane + Phaser.Math.Between(-30, 30), RECEPTOR_Y + 10, Phaser.Math.Between(8, 18), Phaser.Math.Between(8, 18), i % 3 ? 0x6b4a1e : 0x8a6a3a).setDepth(Depth.effects);
+          this.tweens.add({ targets: mud, y: RECEPTOR_Y - Phaser.Math.Between(120, 420), alpha: 0, angle: Phaser.Math.Between(-180, 180), duration: Phaser.Math.Between(500, 900), ease: 'Quad.easeOut', onComplete: () => mud.destroy() });
+        }
+      },
+      finisher: () => {
+        this.camera?.setTurn('both');
+        this.stage.setTurn('both');
+      },
+      freeze: () => this.freezeFrame(),
+    });
+    // Seen once already: hold Enter to skip the whole prologue.
+    if (scripted.flow.skippable) this.skipRing = new HoldToSkip(this, () => this.quit(), { keys: ['Enter', 'NumpadEnter'], pointer: false });
+  }
+
+  /**
+   * Bar 84, beat 3.5: everything stops on the frame where Cranberry's knee goes
+   * and Strawberry turns from her pose, reaching. One held note, then static.
+   */
+  private freezeFrame(): void {
+    if (this.frozen) return;
+    this.frozen = true;
+    this.state = 'ended';
+    if (this.laneInput) this.laneInput.enabled = false;
+    this.touchLanes?.setGuideVisible(false);
+    this.conductor?.pause();
+    this.hypeAudio?.silence();
+    this.tweens.pauseAll();
+    this.hud.setScoreVisible(false);
+    this.hud.endOfSong();
+    this.player.sprite.setFrame(28);
+    const rival = this.rival?.sprite;
+    if (rival) rival.setFlipX(!rival.flipX).setFrame(rival.texture.frameTotal > 20 ? 5 : 6);
+    const note = sustainedNote(this.game, 196);
+    const flow = this.playData.scripted?.flow;
+    this.time.delayedCall(1400, () => {
+      note.stop(30);
+      const hiss = staticSting(this.game);
+      this.staticScreen = new StaticScreen(this, Depth.overlay + 3);
+      this.staticScreen.show();
+      this.director?.vhs.setLabel('');
+      this.time.delayedCall(1000, () => {
+        this.tweens.resumeAll();
+        this.scene.start(SceneKeys.KidsGarden, { flow, hiss });
+      });
+    });
   }
 
   // ---------------------------------------------------------------------

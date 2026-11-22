@@ -51,6 +51,9 @@ export class HypeMode {
   /** Camera tilt, linear 0..1 before easing, and how fast it moves toward its target. */
   private tilt = 0;
   private tiltRate = 1 / TILT_IN;
+  /** Scripted hype (the prologue): the streak rules are off and only `force` switches it. */
+  private scripted = false;
+  private forced = false;
 
   constructor(scene: Phaser.Scene, setup: HypeSetup) {
     this.scene = scene;
@@ -70,11 +73,24 @@ export class HypeMode {
 
   /** True while hype is on (its score bonus and the dancers' hype frames). */
   get active(): boolean {
-    return this.tracker.active;
+    return this.scripted ? this.forced : this.tracker.active;
+  }
+
+  /** Hand hype over to a script: streaks no longer start or end it, `force` does. */
+  setScripted(): void {
+    this.scripted = true;
+  }
+
+  /** Scripted hype on or off, with the full show (banner, flash, camera tilt) or the spin-back. */
+  force(on: boolean): void {
+    if (!this.scripted || on === this.forced) return;
+    this.forced = on;
+    this.react(on ? 'start' : 'out');
   }
 
   /** Hype's time for the HUD card: share and beats still to run, and whether its clock is stopped for the rival's turn. */
   status(): { left: number; beats: number; frozen: boolean } {
+    if (this.scripted) return { left: 1, beats: 0, frozen: false };
     return { left: this.tracker.remaining(), beats: Math.ceil(this.tracker.secondsLeft() / (60 / this.setup.chart.bpm) - 1e-6), frozen: this.tracker.frozen };
   }
 
@@ -90,7 +106,7 @@ export class HypeMode {
 
   /** Feed one of the player's judgements. */
   record(event: JudgeEvent): void {
-    if (event.absorbed) return;
+    if (event.absorbed || this.scripted) return;
     const miss = event.judgement === 'miss';
     this.react(this.tracker.judge(this.time, miss, this.setup.engine.stats.combo, this.nextNote()));
   }
@@ -98,14 +114,18 @@ export class HypeMode {
   /** Every frame. `playing` is false once the song is over or before it starts. */
   update(time: number, dt: number, speed: number, playing: boolean): void {
     this.time = time;
-    if (playing) this.react(this.tracker.tick(time, this.setup.engine.stats.combo, this.nextNote(), this.holding()));
-    const target = this.tracker.active && this.view ? 1 : 0;
+    if (playing && !this.scripted) this.react(this.tracker.tick(time, this.setup.engine.stats.combo, this.nextNote(), this.holding()));
+    const target = this.active && this.view ? 1 : 0;
     this.tilt = target > this.tilt ? Math.min(target, this.tilt + dt * this.tiltRate) : Math.max(target, this.tilt - dt * this.tiltRate);
     this.view?.update(Phaser.Math.Easing.Sine.InOut(this.tilt), time, speed);
   }
 
   /** The song is over: hype winds down. */
   finish(): void {
+    if (this.scripted) {
+      this.force(false);
+      return;
+    }
     this.react(this.tracker.end(this.time, this.setup.engine.stats.combo));
   }
 

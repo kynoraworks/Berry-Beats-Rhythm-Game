@@ -1,0 +1,86 @@
+{
+  "about": "Loop points of the story v2 town and train loops (seconds and samples at 44.1 kHz, in the decoded MP3). Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loopStart/loopEnd, or Phaser sound markers. The file ends exactly at loopEnd, so where loopStart is 0 a plain whole-file loop is seamless too (when the decoder honours the MP3's gapless header, as Chrome and Firefox do). seam: three loops rendered back to back from the decoded MP3; click_ratio is the sample jump at each seam over the 99.9th percentile of jumps within 250 ms (under 1 means no click), hf_burst_ratio the energy above 6 kHz in 6 ms at the seam over the 90th percentile around it, phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",
+  "loops": {
+    "town_berry_town": {
+      "file": "assets/audio/story/town_berry_town.mp3",
+      "bpm": 84.0,
+      "bars": 23,
+      "loopStart": 2.7627,
+      "loopEnd": 68.478,
+      "loopStartSample": 121836,
+      "loopEndSample": 3019878,
+      "fileSamples": 3019878,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.73,
+          0.73
+        ],
+        "hf_burst_ratio": [
+          0.91,
+          0.91
+        ],
+        "phase_shift_ms": [
+          -0.8,
+          -0.8
+        ]
+      },
+      "drift_correction_ms": 1.7,
+      "end_similarity": 0.956
+    },
+    "town_grand_stage": {
+      "file": "assets/audio/story/town_grand_stage.mp3",
+      "bpm": 100.02,
+      "bars": 24,
+      "loopStart": 2.2348,
+      "loopEnd": 59.8337,
+      "loopStartSample": 98556,
+      "loopEndSample": 2638665,
+      "fileSamples": 2638665,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.24,
+          0.24
+        ],
+        "hf_burst_ratio": [
+          0.07,
+          0.07
+        ],
+        "phase_shift_ms": [
+          -1.6,
+          -1.4
+        ]
+      },
+      "drift_correction_ms": 8.8,
+      "end_similarity": 0.88
+    },
+    "train_between": {
+      "file": "assets/audio/story/train_between.mp3",
+      "bpm": 88.01,
+      "bars": 16,
+      "loopStart": 1.2424,
+      "loopEnd": 44.8739,
+      "loopStartSample": 54788,
+      "loopEndSample": 1978938,
+      "fileSamples": 1978938,
+      "decodeLag": 0,
+      "seam": {
+        "click_ratio": [
+          0.66,
+          0.66
+        ],
+        "hf_burst_ratio": [
+          0.7,
+          0.7
+        ],
+        "phase_shift_ms": [
+          -1.4,
+          -1.5
+        ]
+      },
+      "drift_correction_ms": 0.6,
+      "end_similarity": 0.979
+    }
+  }
+}

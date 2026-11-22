@@ -1,0 +1,554 @@
+{
+ "coach_b": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "6c81c9ea-9cfd-4432-a6bd-77ebe2da6c3b",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a wide lunge pointing RIGHT; 2 both arms thrown UP; 3 one arm pointing UP, up on her toes; 4 standing, pointing DOWN at the floor; 5 a deep squat, a hand near the floor; 6 a low lunge pointing DOWN-LEFT."
+ },
+ "coach_c": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "cbb23dae-791f-4f49-af4d-7fd96d7ac015",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a low lunge reaching LEFT and down; 2 pointing DOWN-RIGHT; 3 a low lunge reaching DOWN-RIGHT; 4 pointing UP-RIGHT; 5 a long stretch reaching UP-RIGHT; 6 both arms up and to the LEFT."
+ },
+ "coach_e": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "9b4f92ea-2ac7-46ea-8c2d-ac14dc48176b",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 spinning, seen from the side; 2 spinning, seen from behind (the back of her head); 3 spinning, side view the other way; 4 the spin's finish: a neat pose, both arms up; 5 a hold groove: bouncing with her elbows in; 6 the hold groove, other side."
+ },
+ "coach_f": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "670b46dc-7298-4767-b2c8-15d2fe0fb9dc",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 stumbling, a foot slipping, arms out; 2 catching her balance on one leg; 3 victory: a jump with fists up; 4 victory: arms flung wide; 5 defeat: sitting on the floor, slumped; 6 a happy hype hop."
+ },
+ "coach_g": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "e8d50688-9196-42c5-b1e8-628fd29012d3",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 pointing LEFT, stepping; 2 a lunge pointing LEFT; 3 a lunge pointing RIGHT; 4 pointing RIGHT, stepping; 5 both arms up; 6 a jump with both arms up."
+ },
+ "coach_h": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "40071b51-b6a8-42da-9ced-1f63dcb7c86d",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a squat pointing down at the floor; 2 a deep squat, hands low; 3 a dab; 4 both fists up, fierce; 5 a high kick; 6 a cartwheel handstand."
+ },
+ "coach_i": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "0f523130-fbcf-4821-b4de-a67ec28877d0",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 idle dance: knees bent low, centre; 2 swaying LEFT; 3 swaying LEFT with a shoulder accent; 4 centre, up on her toes; 5 swaying RIGHT; 6 swaying RIGHT with a shoulder accent."
+ },
+ "coach_d": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "96db1231-7378-4c7c-b358-5f2d2fabd03f",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the first THREE poses to copy (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a long stretch reaching UP-LEFT; 2 arms out wide pointing LEFT and RIGHT; 3 arms wide, a big ta-da to both sides; then three new poses: 4 holding out a round baking tin of muffins with both hands, smiling; 5 counting beats on her fingers, one hand raised; 6 laughing with her hands on her hips."
+ },
+ "coach_ma": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "e9a3fa2a-af72-4732-bdb5-4d3ed8ef1268",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 winding up; 2 a step-touch with a clap; 3 an accent, one arm punched up; 4 settling into a stand; 5 wobbling, off balance; 6 catching herself, steady."
+ },
+ "coach_mb": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "e34f4b0b-4040-47f0-9ebd-ef357bd1bfb0",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: her big finishing routine, copying the first reference pose by pose."
+ },
+ "coach_mc": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "be8b8af8-4940-42e7-9cd9-3dd28f34c4fa",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a shuffle step to the LEFT; 2 a shuffle step to the RIGHT; 3 a small hop; 4 the peak of a jump, arms up; 5 dropping low; 6 springing back up."
+ },
+ "coach_md": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "feb363d1-0fa7-4489-a301-5639aadadf44",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: an aerobics step-touch class demo, copying the first reference pose by pose."
+ },
+ "coach_me": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "a44eecd3-7e5a-44b7-88b6-cbcaec02c099",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 counting five-six-seven-eight on her fingers; 2 a jazz square step; 3 a ball change; 4 a pirouette on one foot; 5 the pirouette seen from behind; 6 jazz hands."
+ },
+ "coach_mf": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "61941f7e-1d40-40df-bb45-bd94df9d1f53",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: duo poses with a partner who stands to her LEFT, so every pose faces LEFT: 1 winding up for a high five; 2 the high five, palm out to the LEFT; 3 pointing at the partner on the LEFT (your turn); 4 a dance-off freeze; 5 arms crossed, turned away, a back-to-back pose; 6 a cheering hop."
+ },
+ "coach_sitwalk": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "50c2355a-0e8a-4425-bd16-03f01ded5fce",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows how the character sits and walks (an old design: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 sitting upright facing us as if on a train bench (the bench is NOT drawn), hands in her lap, feet on the floor; 2 the same seated pose, eyes closed, a gentle smile; 3 the same seated pose, head tilted; 4 standing, rubbing her knee brace, wincing a little; 5 standing, pointing at the viewer with a big grin; 6 standing, waving goodbye."
+ },
+ "coach_walk": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "50c2355a-0e8a-4425-bd16-03f01ded5fce",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows how the character sits and walks (an old design: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Coach, a warm, kind chibi woman of about 40 who is a CRANBERRY, drawn EXACTLY like the woman in the SECOND reference image (the same face, the short rounded bob of deep cranberry-red hair, the small green stalk with two leaves on top of her head, the small white flower clip, the red knitted jumper with pushed-up sleeves, the flour-dusted cream apron, mid-blue jeans, a chunky black knee brace on her left knee, white trainers with red laces, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: a walk cycle walking to the RIGHT, side view: 1 right foot forward; 2 down, weight on the right foot; 3 passing; 4 left foot forward; 5 down, weight on the left foot; 6 passing."
+ },
+ "ycoach_b": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "6c81c9ea-9cfd-4432-a6bd-77ebe2da6c3b",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a wide lunge pointing RIGHT; 2 both arms thrown UP; 3 one arm pointing UP, up on her toes; 4 standing, pointing DOWN at the floor; 5 a deep squat, a hand near the floor; 6 a low lunge pointing DOWN-LEFT."
+ },
+ "ycoach_c": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "cbb23dae-791f-4f49-af4d-7fd96d7ac015",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a low lunge reaching LEFT and down; 2 pointing DOWN-RIGHT; 3 a low lunge reaching DOWN-RIGHT; 4 pointing UP-RIGHT; 5 a long stretch reaching UP-RIGHT; 6 both arms up and to the LEFT."
+ },
+ "ycoach_e": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "9b4f92ea-2ac7-46ea-8c2d-ac14dc48176b",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 spinning, seen from the side; 2 spinning, seen from behind (the back of her head); 3 spinning, side view the other way; 4 the spin's finish: a neat pose, both arms up; 5 a hold groove: bouncing with her elbows in; 6 the hold groove, other side."
+ },
+ "ycoach_f": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "670b46dc-7298-4767-b2c8-15d2fe0fb9dc",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 stumbling, a foot slipping, arms out; 2 catching her balance on one leg; 3 victory: a jump with fists up; 4 victory: arms flung wide; 5 defeat: sitting on the floor, slumped; 6 a happy hype hop."
+ },
+ "ycoach_g": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "e8d50688-9196-42c5-b1e8-628fd29012d3",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 pointing LEFT, stepping; 2 a lunge pointing LEFT; 3 a lunge pointing RIGHT; 4 pointing RIGHT, stepping; 5 both arms up; 6 a jump with both arms up."
+ },
+ "ycoach_h": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "40071b51-b6a8-42da-9ced-1f63dcb7c86d",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a squat pointing down at the floor; 2 a deep squat, hands low; 3 a dab; 4 both fists up, fierce; 5 a high kick; 6 a cartwheel handstand."
+ },
+ "ycoach_i": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "0f523130-fbcf-4821-b4de-a67ec28877d0",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the poses to copy, in order (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 idle dance: knees bent low, centre; 2 swaying LEFT; 3 swaying LEFT with a shoulder accent; 4 centre, up on her toes; 5 swaying RIGHT; 6 swaying RIGHT with a shoulder accent."
+ },
+ "ycoach_d": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "96db1231-7378-4c7c-b358-5f2d2fabd03f",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the first THREE poses to copy (an old design of the same character: ignore its colours, face and clothes); the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 a long stretch reaching UP-LEFT; 2 arms out wide pointing LEFT and RIGHT; 3 arms wide, a big ta-da to both sides; then three new poses: 4 a friendly knuckle touch, fist held out to the RIGHT, smiling; 5 wiping her brow with the back of her hand, tired but grinning; 6 arms crossed, one boot stamped forward, a challenger's stare."
+ },
+ "ycoach_md": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the cast's art style; the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: her signature move, the Bog Stomp: 1 crouching, planting one muddy boot; 2 lifting one knee high; 3 STOMPING down, a flat splash of brown mud bursting up around her boot; 4 stomping the other boot, another brown mud splash; 5 rising with both fists clenched, roaring; 6 the crown pose: both hands framing her leaf crown, a fierce grin."
+ },
+ "ycoach_me": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the cast's art style; the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: her finisher: 1 a sharp step-slide to the RIGHT; 2 spinning, seen from the side; 3 spinning, seen from behind; 4 dropping into a low lunge freeze, arms out; 5 her boot slipping on a scrap of confetti, her knee buckling, arms flung out, shocked; 6 falling over backwards, arms flung up."
+ },
+ "ycoach_mf": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the cast's art style; the SECOND reference image shows the character's design. Draw Cranberry, the Bog Queen, a fierce champion dancer of about 32, drawn EXACTLY like the woman in the SECOND reference image (the same face with a cocky grin and a small chipped front tooth, the deep cranberry-red bob of hair with the small green stalk and two leaves, the crown of cranberry leaves and little red berries, the cropped red jacket with a bog-green lining and rolled sleeves, the dark green crop top, dark red leggings, muddy brown knee-high boots, the same palette, proportions and size; no apron, no knee brace). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: duo poses with a partner who stands to her RIGHT, so every pose faces RIGHT: 1 winding up for a high five; 2 the high five, palm out to the RIGHT; 3 pointing at the partner on the RIGHT (your turn); 4 a dance-off freeze; 5 arms crossed, turned away, a back-to-back pose; 6 a cheering hop."
+ },
+ "conductor_walk": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   },
+   {
+    "value": "5fb9be22-6c5e-4d8f-ac8a-c251d05fee96",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows). The FIRST reference image shows the cast's art style; the SECOND reference image shows the character's design. Draw The Conductor, drawn EXACTLY like the woman in the SECOND reference image (a dark red railway conductor's cap with a black peak pulled low so her eyes are hidden in shadow, pink hair tucked under it, a long dark-red railway coat with two rows of brass buttons, a silver ticket punch on a chain, white gloves dotted with tiny gold studs, black trousers, black boots, the same palette, proportions and size). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: a walk cycle walking to the RIGHT, side view: 1 right foot forward; 2 down, weight on the right foot; 3 passing; 4 left foot forward; 5 down, weight on the left foot; 6 passing."
+ },
+ "portraits_legends": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "d135854d-3a2a-4d80-b944-d412cb1166d3",
+    "role": "image_references"
+   },
+   {
+    "value": "43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c",
+    "role": "image_references"
+   },
+   {
+    "value": "f79db099-0ce2-44d5-9770-a5ac45f8aeee",
+    "role": "image_references"
+   },
+   {
+    "value": "72dcb4cb-df63-4958-b7a8-71fcd78f9757",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), in EXACTLY the style, size and crop of the portrait busts in the FIRST reference image: head and shoulders, a big chibi head filling most of the cell, the bust standing on the bottom edge of its cell, facing the viewer, chunky 1-pixel dark navy outline, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges. Transparent background, no text, no grid lines. The characters are drawn EXACTLY like the other references: Coach (second reference: a warm woman of 40 with a deep cranberry-red bob, a small green stalk with two leaves on top, a white flower clip, a red jumper and a cream apron), Cranberry the Bog Queen (third reference: the same woman eight years younger, a crown of cranberry leaves and berries, a cropped red jacket with a green lining), Strawberry the Summer Legend (fourth reference: a long bright pink high ponytail, a leafy green collar, a white and rose stage jacket). In reading order: 1 Coach, neutral: a soft smile, eyebrows up; 2 Coach, bold: a big grin showing a small chipped front tooth, pointing at the viewer; 3 Cranberry, neutral: a confident smirk; 4 Cranberry, bold: a fierce open grin with the chipped front tooth; 5 Strawberry, neutral: a smug half smile; 6 Strawberry, bold: a wink and a grin."
+ },
+ "portraits_conductor": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "d135854d-3a2a-4d80-b944-d412cb1166d3",
+    "role": "image_references"
+   },
+   {
+    "value": "5fb9be22-6c5e-4d8f-ac8a-c251d05fee96",
+    "role": "image_references"
+   },
+   {
+    "value": "72dcb4cb-df63-4958-b7a8-71fcd78f9757",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art: exactly 6 dialogue portrait busts arranged in a 3 by 2 grid (3 columns, 2 rows), in EXACTLY the style, size and crop of the portrait busts in the FIRST reference image: head and shoulders, a big chibi head filling most of the cell, the bust standing on the bottom edge of its cell, facing the viewer, chunky 1-pixel dark navy outline, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges. Transparent background, no text, no grid lines. The characters are drawn EXACTLY like the other references: the Conductor (second reference: a dark red conductor's cap with a black peak pulled low, eyes hidden in its shadow, a dark-red railway coat with brass buttons), the same woman with her cap off (third reference: Strawberry, long bright pink hair, eight years older), and Blueberry (the boy with light blue hair and a backwards blue cap in the first reference). In reading order: 1 the Conductor, neutral: cap low, a calm closed mouth; 2 the Conductor, bold: cap low, mouth firm; 3 the Conductor, a faint sad smile under the cap; 4 the Conductor with her cap OFF: pink hair flattened and messy from the cap, her eyes visible, tired and moved, about 42; 5 Blueberry, cracked: his usual face but eyes wet and shining, mouth pressed tight; 6 Blueberry, crying openly, trying to smile."
+ }
+}

@@ -1,0 +1,198 @@
+{
+ "lime_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Lime, a small deadpan skate courier who is a LIME: a round flat face that never changes expression, bored half-closed eyes, short lime-green hair, a green cycling cap worn backwards, a courier bag across his body with a small patch, a lime-green windbreaker, black knee pads, baggy dark shorts, grey skate shoes. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "peach_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Peach, a soft, dreamy graffiti artist who is a PEACH: soft fluffy peach-pink hair, a dusty-rose beret, a dust mask pushed up on her head, a paint-splattered cream smock over peach overalls, a belt of spray cans, a paint smudge on her nose, paint-flecked trainers, an art-snob half smile. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "cherries_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Bing and Morello, cherry twins drawn TOGETHER as one pair in every cell, joined at the tops of their heads by one long green cherry stem that arcs between them: Bing on the LEFT with bright red round hair, a beaming smile and a little black bow tie; Morello on the RIGHT with darker wine-red hair, half-lidded eyes and a grey scarf; both in white shirts, red shorts and black shoes, each pair about as wide as two small characters. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up (both of them)."
+ },
+ "grapefruit_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Grapefruit, a tired deadpan lab assistant who is a pink GRAPEFRUIT: a round mop of pink hair with a yellow streak, dark rings under her tired eyes, safety goggles pushed up on her forehead, a white lab coat far too long in the sleeves, a pink top, grey trousers, sensible shoes, a clipboard. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "lychee_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Lychee, a tiny shy girl who is a LYCHEE, much smaller than the reference characters (only about 34 art pixels tall): a bumpy rose-pink hood like a lychee skin around a pale round white face, small shy eyes, a quilted red jacket, little black shoes, holding a paper lantern on a stick taller than she is. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "passionfruit_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Passion Fruit, a big burly soft-hearted doorman who is a PASSION FRUIT: a round wrinkly dark purple head of hair, a gentle sad face, a black doorman's suit with a white shirt, an earpiece with a coiled wire, a little notebook poking out of his breast pocket, holding a lighting remote. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "mango_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Mango, a fast-talking kitchen hand who is a MANGO: orange-yellow hair under a red bandana, a white chef's jacket with rolled sleeves, black trousers, clogs, a frying pan in each hand, little sweat drops. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "fig_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Fig, an old purple busker who is a FIG: a wrinkled kind face, a short grey beard, a flat cap, a long striped scarf, fingerless gloves, a worn brown coat, an accordion strapped to his chest. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "quince_a": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "1:1",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 9 poses arranged in a 3 by 3 grid (3 columns, 3 rows). The reference image shows the cast's art style and size; draw ONE new character in exactly that style. Draw Quince, an ancient, very proper butler who is a QUINCE: thin pale-yellow hair slicked down, a knobbly face with tiny round glasses, a long black tailcoat, white gloves, perfect upright posture, holding a silver tray. Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 relaxed stand; 2 the same stand dipping slightly on the beat; 3 the stand with a little accent (a shoulder pop); 4 one arm pointing LEFT; 5 a wide lunge pointing LEFT; 6 one arm pointing RIGHT; 7 a wide lunge pointing RIGHT; 8 one arm pointing straight UP; 9 a hop with both arms up."
+ },
+ "res_1": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), three characters, one per column pair in reading order. The reference image shows the cast's art style and size; draw these new characters in exactly that style, two frames each (a gentle idle animation). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Postmaster Gooseberry, a hairy round man who is a green GOOSEBERRY: a fuzz of pale green hair and stubble, a navy post office cap and waistcoat, standing, standing, holding a rubber stamp; 2 the same character, stamping a letter with the rubber stamp; 3 Kumquat, a tiny round girl who is a KUMQUAT, only about 36 art pixels tall: round orange hair, a striped apron, standing, hugging an enormous blender; 4 the same character, peeking round the blender, smiling; 5 Clerk Date, an old brown wrinkled man who is a DATE: a grey cardigan, sleeve garters, a stern face, standing, holding a rubber stamp; 6 the same character, glaring, the stamp raised."
+ },
+ "res_2": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), three characters, one per column pair in reading order. The reference image shows the cast's art style and size; draw these new characters in exactly that style, two frames each (a gentle idle animation). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Officer Elderberry, a stern customs officer who is an ELDERBERRY: a cluster of small dark purple berries for hair, a navy customs uniform, a peaked cap, standing, holding a clipboard; 2 the same character, pointing sternly; 3 Seedless, one tiny green grape kid, only about 28 art pixels tall: a round green grape head, big teary eyes, a small green T-shirt, standing, sniffling; 4 the same character, giving a small brave smile; 5 Mrs. Damson, an elderly woman who is a DAMSON plum: grey-purple hair in a bun, glasses on a chain, a knitted cardigan, a long skirt, standing, knitting a very long scarf; 6 the same character, looking up from her knitting, smiling."
+ },
+ "res_3": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), three characters, one per column pair in reading order. The reference image shows the cast's art style and size; draw these new characters in exactly that style, two frames each (a gentle idle animation). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Little Currant, a small kid girl who is a REDCURRANT, about 36 art pixels tall: bright red bobbles of hair, a smudge of chalk on her nose, dungarees, standing, holding a tub of chalk; 2 the same character, waving a stick of chalk; 3 Orange as a skinny 17-year-old MC (the orange-haired boy of the reference, eight years younger): a tall quiff of leafy orange hair, giant headphones, a baggy orange T-shirt, holding a microphone on a cable, shouting into the microphone; 4 the same character, pointing at the crowd, mouth wide open; 5 Dragon Fruit seen from BEHIND (the pink-haired dragon fruit dancer of the reference): spiky pink and green hair, a long flame-print scarf trailing, standing still, seen from behind; 6 the same character, turning away, the long scarf whipping out behind."
+ },
+ "res_4": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), three characters, one per column pair in reading order. The reference image shows the cast's art style and size; draw these new characters in exactly that style, two frames each (a gentle idle animation). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Mr. Olive, an old man who is a green OLIVE: a round bald head with a little olive-green tuft, a brown cardigan, standing, holding a sleepy cat; 2 the same character, stroking the sleepy cat; 3 Mrs. Satsuma, a canteen lady who is a SATSUMA: orange hair in a hairnet, a blue tabard, standing, holding a ladle; 4 the same character, raising the ladle cheerfully; 5 Kiwi, a fuzzy teen who is a KIWI: fuzzy brown hair, a green jacket, chewing gum, standing, holding numbered coat-check tags; 6 the same character, blowing a small pink gum bubble."
+ },
+ "res_5": {
+  "model": "gpt_image_2_6",
+  "quality": "high",
+  "resolution": "1k",
+  "aspect_ratio": "3:2",
+  "background": "transparent",
+  "medias": [
+   {
+    "value": "71386c79-d06b-48da-8a56-b9045adca610",
+    "role": "image_references"
+   }
+  ],
+  "prompt": "Pixel art sprite sheet: exactly 6 poses arranged in a 3 by 2 grid (3 columns, 2 rows), three characters, one per column pair in reading order. The reference image shows the cast's art style and size; draw these new characters in exactly that style, two frames each (a gentle idle animation). Match the retro 16-bit pixel art style of the references EXACTLY: chibi proportions with a big head, chunky 1-pixel dark navy outline around everything, flat colours with simple two-tone shading, no gradients, no glow, no anti-aliasing, crisp hard pixel edges; each figure about 48 art pixels tall, full body, feet visible. Transparent background, each pose centred in its own equal cell with empty space around it, no overlap between cells, no text, no numbers, no grid lines, no floor shadow, no motion lines. Directions LEFT and RIGHT mean the left and right of the image. Poses in reading order: 1 Ms. Clementine, a brisk organiser who is a CLEMENTINE: neat orange hair, a lanyard, a navy fleece, standing, holding a clipboard and a fountain pen; 2 the same character, writing on the clipboard; 3 Gerald, a small garden gnome statue with a red pointed hat and a white beard, about 30 art pixels tall, missing one ear; 4 the same character, with a new ear stuck on with tape; 5 Foreman Chestnut, a tunnel worker who is a CHESTNUT: brown hair, a yellow hard hat, a hi-vis vest, standing, holding a thermos; 6 the same character, sipping from the thermos."
+ }
+}

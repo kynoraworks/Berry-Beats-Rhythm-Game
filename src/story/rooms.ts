@@ -1,18 +1,20 @@
 import type { MusicKey } from '../core/music';
+import type { BNode } from './bible';
+import { CHAPTERS, type LookSpot, type ResidentSpot } from './chapters';
 import type { Hotspot, PlaceDef } from './places';
 import type { StopId } from './stops';
-import type { FruitId, Line } from './types';
+import type { Line } from './types';
 
 /**
- * Rooms: doors along a street that lead inside. Each room is a small
- * side-scrolling place of its own (usually one screen) with things to look
- * at and people to talk to, and a way back out to the street at the same
- * door. Until a room is drawn it gets a tasteful placeholder interior
- * (src/explore/interiors.ts), clearly marked as one; a drawn background
- * replaces it by loading a texture under the room's `bg` key.
+ * Rooms: doors along a street (or inside another room) that lead inside. Each
+ * room is a small side-scrolling place of its own (one screen) with things to
+ * look at and people to talk to, and a way back out at the same door. Until a
+ * room is drawn it gets a placeholder interior (src/explore/interiors.ts),
+ * clearly marked as one; `public/assets/img/room_<id>.png` replaces it.
  *
- * PLACEHOLDER CONTENT: the rooms below prove the system on three streets.
- * The integration pass adds the rest from the story (docs/story_v2/).
+ * Every room, its people and its things come from the bible's chapters
+ * (story/chapters.ts): 27 rooms along the Line, plus Berry's own room, which
+ * is stop 1's arrival place (places.ts).
  */
 
 /** What keeps a door shut until it is met. */
@@ -26,32 +28,18 @@ export type RoomLock =
   /** A one-time story beat has been seen (progress `seen`). */
   | { kind: 'seen'; beat: string };
 
-/** A person standing in a room. */
-export interface RoomResident {
-  id: string;
-  /** Name tag when Berry is near. */
-  label: string;
-  /** Centre x in the room, art pixels. */
-  x: number;
-  lines: Line[];
-  /** Scarf colour of the stand-in NPC, or a loaded sheet to use instead. */
-  color?: number;
-  texture?: string;
-  /** A cast member drawn with their own sheet (a fruit who lives here). */
-  who?: FruitId;
-  flip?: boolean;
-}
-
 export interface RoomDef {
   id: string;
   stop: StopId;
-  /** The door's name in the street ("Peel & Co."), and the room's title inside. */
+  /** The door's name in the street ("Slip 'n' Sip"), and the room's title inside. */
   label: string;
-  /** Centre x of the door in the street, art pixels. */
+  /** Centre x of the door in the street (or in the room it opens from), art pixels. */
   doorX: number;
-  /** Door box height in the street (art pixels above the floor). Default 52. */
+  /** A room inside another room (the Studio upstairs in the bakery): the parent's id. */
+  in?: string;
+  /** Door box height (art pixels above the floor). Default 52. */
   doorH?: number;
-  /** Background texture key; a placeholder interior is painted until it is loaded. */
+  /** Background texture key, `room_<id>`; a placeholder interior is painted until it is loaded. */
   bg: string;
   /** Width in art pixels (256 is one screen). */
   width?: number;
@@ -63,126 +51,87 @@ export interface RoomDef {
   floorColor?: number;
   /** Where the way out stands inside, centre x. Default 22. */
   exitX?: number;
-  /** Things to look at inside (kind 'look', boxes in the room's art pixels). */
-  hotspots?: Hotspot[];
-  residents?: RoomResident[];
+  /** Things to look at inside. */
+  looks?: LookSpot[];
+  /** People inside. */
+  people?: ResidentSpot[];
   lock?: RoomLock;
   /** Said at the door while it is locked. */
   locked?: Line[];
-  /** Music inside, if not the stop's own song. */
+  /** Music inside, if not the town's own. */
   music?: MusicKey;
+  /** The Echo Room: dark (outlines only) until its task lights it. */
+  dark?: boolean;
+  /** A scene the first time Berry walks in (when its condition holds). */
+  onEnter?: { nodes: BNode[]; cond?: string; once?: boolean };
 }
 
 export const ROOM_W = 256;
 export const ROOM_FLOOR = 140;
 
-const say = (who: Line['who'], mood: Line['mood'], text: string, role?: string): Line => (role ? { who, mood, text, role } : { who, mood, text });
+export const ROOMS: readonly RoomDef[] = CHAPTERS.flatMap((chapter) => chapter.rooms);
 
-function look(id: string, label: string, box: [number, number, number, number], lines: Line[]): Hotspot {
-  const [x, y, w, h] = box;
-  return { id, kind: 'look', label, x, y, w, h, lines };
+/** The rooms whose doors are on a stop's street. */
+export function roomsFor(stopId: string): RoomDef[] {
+  return ROOMS.filter((room) => room.stop === stopId && !room.in);
 }
 
-export const ROOMS: readonly RoomDef[] = [
-  // Peel Street: the shop with the banana sign, and the hoodie shop.
-  {
-    id: 'peel_shop',
-    stop: 'stop02',
-    label: 'Peel & Co.',
-    doorX: 294,
-    bg: 'room_peel_shop',
-    wall: 0xe8b84a,
-    floorColor: 0x9a6a4a,
-    hotspots: [look('shelves', 'Shelves', [92, 72, 46, 44], [say('raspberry', 'neutral', 'Banana bread, banana jam, banana socks. They commit to the theme.')])],
-  },
-  {
-    id: 'peel_hoodies',
-    stop: 'stop02',
-    label: 'Hoodie shop',
-    doorX: 462,
-    bg: 'room_peel_hoodies',
-    wall: 0x8a7ad0,
-    floorColor: 0x5a4a7a,
-    hotspots: [look('rack', 'Hoodie rack', [110, 74, 50, 44], [say('raspberry', 'bold', 'Every hoodie here is purple. You are not buying another one.')])],
-    residents: [{ id: 'clerk', label: 'Shop clerk', x: 200, color: 0x8a7ad0, flip: true, lines: [say('npc', 'neutral', 'Hood up or hood down, we have a size for every mood.', 'CLERK')] }],
-  },
-  // Vine Crossing: the guard booth (open once the trainer's first battle is won) and the juice cellar.
-  {
-    id: 'vine_booth',
-    stop: 'stop04',
-    label: 'Guard booth',
-    doorX: 318,
-    bg: 'room_vine_booth',
-    wall: 0x7a5a8a,
-    floorColor: 0x4a3a52,
-    lock: { kind: 'battle', battle: 'a' },
-    locked: [say('npc', 'neutral', 'Booth is for dancers who proved themselves. Beat the trainer first.', 'GUARD')],
-    hotspots: [look('logbook', 'Logbook', [120, 84, 36, 30], [say('pear', 'neutral', '"Crossings today: one Blueberry, three grapes." Busy booth, man.')])],
-  },
-  {
-    id: 'vine_cellar',
-    stop: 'stop04',
-    label: 'Juice cellar',
-    doorX: 215,
-    bg: 'room_vine_cellar',
-    wall: 0x5a3a4a,
-    floorColor: 0x3a2a32,
-    hotspots: [look('barrels', 'Barrels', [140, 90, 70, 40], [say('raspberry', 'neutral', 'Grape juice. A lot of grape juice. This is their whole personality.')])],
-  },
-  // Orange Plaza: the two food trucks.
-  {
-    id: 'plaza_juice',
-    stop: 'stop10',
-    label: 'Juice truck',
-    doorX: 236,
-    bg: 'room_plaza_juice',
-    wall: 0xffb050,
-    floorColor: 0x8a5a3a,
-    hotspots: [look('blender', 'Blender', [150, 80, 30, 34], [say('lemon', 'bold', 'A blender at full speed. Approximately forty oranges per minute!')])],
-  },
-  {
-    id: 'plaza_icecream',
-    stop: 'stop10',
-    label: 'Ice cream van',
-    doorX: 340,
-    bg: 'room_plaza_icecream',
-    wall: 0xf0d8e8,
-    floorColor: 0x8a7a9a,
-    hotspots: [look('freezer', 'Freezer', [60, 92, 50, 36], [say('watermelon', 'bold', 'Watermelon sorbet?! I feel seen. And a little cold.')])],
-  },
-];
-
-export function roomsFor(stopId: string): RoomDef[] {
-  return ROOMS.filter((room) => room.stop === stopId);
+/** The rooms whose doors are inside a room. */
+export function roomsInside(roomId: string): RoomDef[] {
+  return ROOMS.filter((room) => room.in === roomId);
 }
 
 export function roomById(id: string | undefined): RoomDef | undefined {
   return ROOMS.find((room) => room.id === id);
 }
 
-/** The door's hotspot in the street, standing on the floor at `floorRow`. */
+/** The door's hotspot in the street (or in its parent room), standing on the floor at `floorRow`. */
 export function doorHotspot(room: RoomDef, floorRow: number): Hotspot {
   const h = room.doorH ?? 52;
   return { id: `door_${room.id}`, kind: 'door', label: room.label, x: room.doorX - 12, y: floorRow - h, w: 24, h, lines: [], room: room.id };
 }
 
-/** The room as a place Berry walks through: its things, its people, and the way out to the street. */
+/** A thing to look at as a hotspot, standing on the floor at `floorRow`. */
+export function lookHotspot(look: LookSpot, floorRow: number): Hotspot {
+  const h = look.h ?? 44;
+  const w = Math.max(20, Math.min(40, h));
+  return { id: look.id, kind: 'look', label: look.label, x: look.x - w / 2, y: floorRow - h - (h < 30 ? 0 : 6), w, h, lines: look.lines, look };
+}
+
+/** A person as a hotspot. */
+export function residentHotspot(person: ResidentSpot, floorRow: number): Hotspot {
+  return {
+    id: person.id,
+    kind: 'talk',
+    label: person.label,
+    x: person.x - 10,
+    y: floorRow - 40,
+    w: 20,
+    h: 40,
+    lines: person.lines,
+    resident: person,
+    person: { who: person.who === 'npc' ? undefined : person.who, flip: person.flip },
+  };
+}
+
+/** The room as a place Berry walks through: its things, its people, its inner doors, and the way out. */
 export function roomPlace(room: RoomDef): PlaceDef {
   const width = room.width ?? ROOM_W;
   const floor = room.floor ?? ROOM_FLOOR;
   const exitX = room.exitX ?? 22;
-  const out: Hotspot = { id: 'exit', kind: 'exit', label: 'Back outside', x: exitX - 14, y: floor - 60, w: 28, h: 60, lines: [], to: { place: 'street', at: room.doorX } };
-  const residents: Hotspot[] = (room.residents ?? []).map((resident) => ({
-    id: resident.id,
-    kind: 'talk',
-    label: resident.label,
-    x: resident.x - 10,
-    y: floor - 40,
-    w: 20,
-    h: 40,
-    lines: resident.lines,
-    person: { color: resident.color, texture: resident.texture, who: resident.who, flip: resident.flip },
-  }));
+  const parent = room.in ? roomById(room.in) : undefined;
+  const out: Hotspot = {
+    id: 'exit',
+    kind: 'exit',
+    label: parent ? parent.label : 'Back outside',
+    x: exitX - 14,
+    y: floor - 60,
+    w: 28,
+    h: 60,
+    lines: [],
+    to: parent ? { place: 'interior', room: parent.id, at: room.doorX } : { place: 'street', at: room.doorX },
+  };
+  const inner = roomsInside(room.id).map((child) => doorHotspot(child, floor));
   return {
     stop: room.stop,
     kind: 'interior',
@@ -190,7 +139,7 @@ export function roomPlace(room: RoomDef): PlaceDef {
     width,
     floor,
     startX: exitX + 18,
-    hotspots: [...(room.hotspots ?? []), ...residents, out],
+    hotspots: [...(room.looks ?? []).map((look) => lookHotspot(look, floor)), ...(room.people ?? []).map((p) => residentHotspot(p, floor)), ...inner, out],
     room: room.id,
   };
 }

@@ -61,7 +61,7 @@ export const KNOWN_SHEETS: readonly OptionalSheet[] = [
   // Hype Berry: the pack Berry swaps into while hype mode is on (36 frames, see HYPE_BERRY in src/play/characters.ts).
   { key: 'berry_hype', file: 'berry_hype.png', frameWidth: 64, frameHeight: 64 },
   // Real art for the moves Berry learns (src/story/moveBook.ts): one pair of sheets per stop, normal and Hype Berry,
-  // 9 cells of 64x64 a row, a row per battle (A, B, C). Not drawn yet: the moves dance on placeholder frames until then.
+  // 9 cells of 64x64 a row, a row per battle (A, B, C). A move dances its placeholder frames until its sheet is listed in PRESENT_SHEETS.
   ...LEARN_STOPS.flatMap((stop) => [false, true].map((hype) => ({ key: learnSheet(stop, hype), file: `${learnSheet(stop, hype)}.png`, frameWidth: 64, frameHeight: 64 }))),
   // The people baked into the scenery: one column per piece, at rest and nodding. See tools/build_life.py.
   ...LIFE_THEMES.map((theme) => ({ key: `life_${theme}`, file: `life_${theme}.png`, frameWidth: LIFE_SHEETS[theme].cellW, frameHeight: LIFE_SHEETS[theme].cellH })),
@@ -84,6 +84,8 @@ export const PRESENT_SHEETS: readonly string[] = [
   ...WALKERS.map((id) => `${id}_walk`),
   ...MOVERS_DRAWN.map((id) => `${id}_moves`),
   'berry_hype',
+  // Berry's learned moves, every stop drawn (tools/build_learn.py).
+  ...LEARN_STOPS.flatMap((stop) => [learnSheet(stop, false), learnSheet(stop, true)]),
   ...LIFE_THEMES.map((theme) => `life_${theme}`),
 ];
 

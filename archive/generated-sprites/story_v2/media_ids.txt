@@ -1,0 +1,21 @@
+# reference images uploaded to Higgsfield (refs/<name>.png -> media id)
+style_lineup 71386c79-d06b-48da-8a56-b9045adca610
+coach_old_a cc00a683-0891-46c8-973d-9c51dac25708
+kids_style e483302b-184b-4f2d-920c-b0f0c5a0dfb5
+lite_poses_a 575d3209-75e5-491c-bee5-9f163259d830
+coach_old_b 6c81c9ea-9cfd-4432-a6bd-77ebe2da6c3b
+coach_old_c cbb23dae-791f-4f49-af4d-7fd96d7ac015
+coach_old_d 96db1231-7378-4c7c-b358-5f2d2fabd03f
+coach_old_e 9b4f92ea-2ac7-46ea-8c2d-ac14dc48176b
+coach_old_f 670b46dc-7298-4767-b2c8-15d2fe0fb9dc
+coach_old_g e8d50688-9196-42c5-b1e8-628fd29012d3
+coach_old_h 40071b51-b6a8-42da-9ced-1f63dcb7c86d
+coach_old_i 0f523130-fbcf-4821-b4de-a67ec28877d0
+coach_oldmoves_a e9a3fa2a-af72-4732-bdb5-4d3ed8ef1268
+coach_oldmoves_b e34f4b0b-4040-47f0-9ebd-ef357bd1bfb0
+coach_oldmoves_c be8b8af8-4940-42e7-9cd9-3dd28f34c4fa
+coach_oldmoves_d feb363d1-0fa7-4489-a301-5639aadadf44
+coach_oldmoves_e a44eecd3-7e5a-44b7-88b6-cbcaec02c099
+coach_oldmoves_f 61941f7e-1d40-40df-bb45-bd94df9d1f53
+portrait_style d135854d-3a2a-4d80-b944-d412cb1166d3
+coach_old_sit_walk 50c2355a-0e8a-4425-bd16-03f01ded5fce

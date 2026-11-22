@@ -1207,6 +1207,14 @@ export function createPlayer(scene: Phaser.Scene, x: number, y: number, who: Fru
 const STYLES: Partial<Record<RivalKind, DanceStyle>> = { pear: PEAR_STYLE, lemon: LEMON_STYLE };
 
 /**
+ * A dancer from any sheet in one of the two layouts: the prologue's legends,
+ * who are not in the cast's sheets. `side` is 1 for the player, -1 for the rival.
+ */
+export function createSheetDancer(scene: Phaser.Scene, x: number, y: number, texture: string, layout: SheetLayout, side: 1 | -1, options: DancerOptions = {}): Dancer {
+  return new Dancer(scene, x, y, texture, LAYOUTS[layout], PX, 0.5, BERRY_ORIGIN_Y, undefined, { partner: side, ...options, seed: `${options.seed ?? ''}:${texture}` });
+}
+
+/**
  * The rival's dancer. A rival whose own sheet is not loaded dances in
  * Raspberry's, with her own style of movement.
  */

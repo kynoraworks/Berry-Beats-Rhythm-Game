@@ -27,6 +27,21 @@ export interface StoryProgress {
   tasks?: Record<string, TaskState>;
   /** The crew member who last walked the streets with Berry (story/follower.ts). */
   follower?: FruitId;
+  /**
+   * Story flags (bible 9.2): true, or a value for the ones with values
+   * (crewName=trio, firstLine=bad). Saves from before v2 have none: every flag unset.
+   */
+  flags?: Record<string, true | string>;
+  /** Stops (1 to 11) whose postcard Berry has written, in the order written. */
+  postcards?: number[];
+  /** Stops whose rumour has been heard (the WHO WON? notebook's pages), in order heard. */
+  rumours?: number[];
+  /** Rooms Berry has walked into (rooms.ts ids), for `visited:<room>` lines. */
+  visited?: string[];
+  /** Losses in a row per battle id, for the Coach's "drop to Easy" text after three. */
+  losses?: Record<string, number>;
+  /** Battles the player switched to Easy from the Coach's text. */
+  easy?: string[];
 }
 
 const KEY = 'berrybeats.story.v1';
@@ -56,6 +71,27 @@ function empty(): StoryProgress {
 
 function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+}
+
+function numbers(value: unknown): number[] {
+  return Array.isArray(value) ? value.filter((item): item is number => typeof item === 'number' && Number.isFinite(item)).map((n) => Math.floor(n)) : [];
+}
+
+function flagRecord(value: unknown): Record<string, true | string> {
+  const out: Record<string, true | string> = {};
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return out;
+  for (const [name, v] of Object.entries(value as Record<string, unknown>)) {
+    if (v === true) out[name] = true;
+    else if (typeof v === 'string' && v !== '') out[name] = v;
+  }
+  return out;
+}
+
+function counts(value: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return out;
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[key] = Math.floor(v);
+  return out;
 }
 
 /** Read the saved task states, keeping only well-formed fields (a damaged save loses a task, never the story). */
@@ -91,6 +127,12 @@ export function getProgress(): StoryProgress {
       seen: strings(record.seen),
       ...(record.tasks !== undefined ? { tasks: taskStates(record.tasks) } : {}),
       ...(typeof record.follower === 'string' ? { follower: record.follower as FruitId } : {}),
+      ...(record.flags !== undefined ? { flags: flagRecord(record.flags) } : {}),
+      ...(record.postcards !== undefined ? { postcards: numbers(record.postcards) } : {}),
+      ...(record.rumours !== undefined ? { rumours: numbers(record.rumours) } : {}),
+      ...(record.visited !== undefined ? { visited: strings(record.visited) } : {}),
+      ...(record.losses !== undefined ? { losses: counts(record.losses) } : {}),
+      ...(record.easy !== undefined ? { easy: strings(record.easy) } : {}),
     };
   } catch {
     return empty();
@@ -155,6 +197,7 @@ export function isBattleOpen(battle: BattleDef): boolean {
 export function markBattleWon(battle: BattleDef): boolean {
   const stop = stopOf(battle);
   if (!stop) return false;
+  clearLosses(battle.id);
   if (battle.index === 2) {
     const first = !isBattleWon(battle);
     markCleared(stop);
@@ -260,6 +303,128 @@ export function rememberFollower(fruit: FruitId): void {
 
 export function lastFollower(): FruitId | undefined {
   return getProgress().follower;
+}
+
+// ---------------------------------------------------------------------------
+// Story v2: flags, postcards, rumours, rooms walked into, losses
+// ---------------------------------------------------------------------------
+
+/** A flag's value: true, a string (crewName=trio), or undefined while unset. */
+export function getFlag(name: string): true | string | undefined {
+  return getProgress().flags?.[name];
+}
+
+export function hasFlag(name: string): boolean {
+  return getFlag(name) !== undefined;
+}
+
+/** Set a flag (true, or a value), or clear it with `undefined`. */
+export function setFlag(name: string, value: true | string | undefined = true): void {
+  const progress = getProgress();
+  const flags = { ...progress.flags };
+  if (value === undefined) delete flags[name];
+  else flags[name] = value;
+  progress.flags = flags;
+  save(progress);
+}
+
+/** Apply a choice's or a hotspot's `sets` ("sawPoster", "crewName=trio"). */
+export function applySets(sets: readonly string[] | undefined): void {
+  for (const entry of sets ?? []) {
+    const eq = entry.indexOf('=');
+    if (eq < 0) setFlag(entry);
+    else setFlag(entry.slice(0, eq), entry.slice(eq + 1));
+  }
+}
+
+/** Every flag, for conditions. */
+export function allFlags(): Record<string, true | string> {
+  return { ...getProgress().flags };
+}
+
+/** Write a stop's postcard. True the first time. */
+export function writePostcard(stop: number): boolean {
+  const progress = getProgress();
+  const cards = progress.postcards ?? [];
+  if (cards.includes(stop)) return false;
+  progress.postcards = [...cards, stop];
+  progress.flags = { ...progress.flags, hasPostcard: true };
+  save(progress);
+  return true;
+}
+
+export function postcardsWritten(): number[] {
+  return [...(getProgress().postcards ?? [])];
+}
+
+/** How many postcards Berry has written (0 to 11): the finale's `postcards` counter. */
+export function postcardCount(): number {
+  return postcardsWritten().length;
+}
+
+/** Hear a stop's rumour: its page in the notebook unlocks. True the first time. */
+export function unlockRumour(stop: number): boolean {
+  const progress = getProgress();
+  const heard = progress.rumours ?? [];
+  if (heard.includes(stop)) return false;
+  progress.rumours = [...heard, stop];
+  save(progress);
+  return true;
+}
+
+export function rumoursHeard(): number[] {
+  return [...(getProgress().rumours ?? [])];
+}
+
+/** Rumours heard on the Line (stops 1 to 11, 0 to 11): the `rumours` counter. */
+export function rumourCount(): number {
+  return rumoursHeard().filter((stop) => stop >= 1 && stop <= 11).length;
+}
+
+export function markVisited(room: string): void {
+  const progress = getProgress();
+  if (progress.visited?.includes(room)) return;
+  progress.visited = [...(progress.visited ?? []), room];
+  save(progress);
+}
+
+export function hasVisited(room: string): boolean {
+  return getProgress().visited?.includes(room) ?? false;
+}
+
+/** A lost battle: returns how many times in a row it has been lost now. */
+export function recordLoss(battleId: string): number {
+  const progress = getProgress();
+  const n = (progress.losses?.[battleId] ?? 0) + 1;
+  progress.losses = { ...progress.losses, [battleId]: n };
+  save(progress);
+  return n;
+}
+
+export function lossCount(battleId: string): number {
+  return getProgress().losses?.[battleId] ?? 0;
+}
+
+/** A won battle starts its count again. */
+export function clearLosses(battleId: string): void {
+  const progress = getProgress();
+  if (!progress.losses?.[battleId]) return;
+  const losses = { ...progress.losses };
+  delete losses[battleId];
+  progress.losses = losses;
+  save(progress);
+}
+
+/** The Coach's offer taken: this battle is danced on Easy from now on. */
+export function setEasy(battleId: string, easy = true): void {
+  const progress = getProgress();
+  const list = (progress.easy ?? []).filter((id) => id !== battleId);
+  progress.easy = easy ? [...list, battleId] : list;
+  save(progress);
+}
+
+export function isEasy(battleId: string): boolean {
+  return getProgress().easy?.includes(battleId) ?? false;
 }
 
 /** True once the crew battle at the Grand Stage has been won. */
