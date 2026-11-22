@@ -20,9 +20,9 @@ SECTIONS = [
     ("instructor_walk.png", 64, 64, "Coach walk 6"),
     ("coach_sit.png", 75, 75, "Coach seated 5 (75x75)"),
     ("coach_poses.png", 64, 64, "Coach extra poses 6"),
-    ("coach_young.png", 64, 64, "Cranberry, the Bog Queen, berry layout 51"),
-    ("coach_young_moves.png", 64, 64, "Bog Queen moves 36 (24-29 Bog Stomp, 30-35 finisher and slip)"),
-    ("coach_young_poses.png", 64, 64, "Bog Queen extra poses 3"),
+    ("cranberry.png", 64, 64, "Cranberry, the Bog Queen, berry layout 51"),
+    ("cranberry_moves.png", 64, 64, "Bog Queen moves 36 (24-29 Bog Stomp, 30-35 finisher and slip)"),
+    ("cranberry_poses.png", 64, 64, "Bog Queen extra poses 3"),
     ("strawberry.png", 64, 64, "Strawberry prime, lite 18"),
     ("strawberry_moves.png", 64, 64, "Strawberry moves 36"),
     ("strawberry_poses.png", 64, 64, "Strawberry cutscene poses 6"),
@@ -34,8 +34,8 @@ SECTIONS = [
     ("kid_blueberry.png", 64, 64, "Kid Blueberry 9"),
     ("berry_poses.png", 64, 64, "Berry extra poses 9"),
     ("blueberry_poses.png", 64, 64, "Blueberry extra poses 6"),
-    *[(f"{n}{s}.png", 64, 64, f"{n}{s}") for n in ("lime", "peach", "cherries", "grapefruit", "lychee", "passionfruit", "mango", "fig", "quince") for s in ("", "_moves")],
-    ("residents.png", 64, 64, "Residents 17 x 2 frames"),
+    *[(f"{n}{s}.png", 64, 64, f"{n}{s}") for n in ("lime", "peach", "cherries", "grapefruit", "lychee", "passion_fruit", "mango", "fig", "quince") for s in ("", "_moves")],
+    *[(f"{n}.png", 64, 64, "resident, 2 frames") for n in ("npc_gooseberry", "npc_kumquat", "npc_clerkDate", "npc_elderberry", "npc_seedless", "npc_mrsDamson", "npc_currant", "orange_young", "npc_olive", "npc_satsuma", "npc_kiwi", "npc_clementine", "gerald", "npc_chestnut", "scarf_glimpse", "banana_cap", "grape_seedless")],
     ("portraits_v2.png", 64, 64, "Portraits v2, 54"),
 ]
 

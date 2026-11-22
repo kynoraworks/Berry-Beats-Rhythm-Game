@@ -105,6 +105,7 @@ STINGS = {
 STING_LUFS = -18.0
 STING_PEAK = -3.0
 XFADE = 0.030  # loop seam crossfade, seconds
+TAIL = 0.5  # seconds of the song kept past loopEnd in a loop's file
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +325,7 @@ def choose_loop(x: np.ndarray, bpm_guess: float) -> dict:
             # The loop ends at the downbeat of bar e (its first bar after the loop); the
             # crossfade needs a little audio after it.
             end_t = starts[e] if e < nbars else first + e * bar
-            if end_t + XFADE + 0.15 > duration:
+            if end_t + TAIL + 0.05 > duration:
                 continue
             sim = float(feats[e] @ feats[s]) if e < nbars else 0.0
             sim_before = float(feats[e - 1] @ feats[s - 1]) if s > 0 else sim
@@ -380,9 +381,14 @@ def make_loop(x: np.ndarray, info: dict) -> np.ndarray:
     ls, le = int(round(info["loopStart"] * SR)), int(round(info["loopEnd"] * SR))
     n = int(XFADE * SR)
     ramp = np.linspace(0, np.pi / 2, n)[:, None]
-    y = x[:le].copy()
+    # The file runs TAIL seconds past loopEnd (the song's own continuation, faded out), so the
+    # MP3's end-of-file edge is never next to the seam.
+    end = min(len(x), le + int(TAIL * SR))
+    y = x[:end].copy()
     # Equal power: the loop's first 30 ms fade in while what follows loopEnd fades out.
     y[ls : ls + n] = x[ls : ls + n] * np.sin(ramp) + x[le : le + n] * np.cos(ramp)
+    f = end - le
+    y[le:end] *= np.linspace(1, 0, f)[:, None]
     return y
 
 
@@ -541,7 +547,7 @@ def ship_music(key: str, loops: dict) -> dict:
         y = level_encode(y, target, dest)
         dec = decode(dest)
         shift = lag(y, dec)
-        ls, le = int(round(lp["loopStart"] * SR)), len(y)
+        ls, le = int(round(lp["loopStart"] * SR)), int(round(lp["loopEnd"] * SR))
         test = seam_test(dec, ls, le, 60 / lp["bpm"])
         loops[key] = {
             "file": f"assets/audio/story/{key}.mp3",
@@ -606,9 +612,10 @@ def main() -> int:
         return 0
     loops_path.write_text(json.dumps({
         "about": "Loop points of the story v2 town and train loops (seconds and samples at 44.1 kHz, in the decoded MP3). "
-        "Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loopStart/loopEnd, or Phaser "
-        "sound markers. The file ends exactly at loopEnd, so where loopStart is 0 a plain whole-file loop is seamless too "
-        "(when the decoder honours the MP3's gapless header, as Chrome and Firefox do). seam: three loops rendered back to "
+        "Play the file once from 0, then loop [loopStart, loopEnd): WebAudio AudioBufferSourceNode.loop with loopStart/loopEnd. "
+        "The file runs 0.5 s past loopEnd (the song's own continuation, faded out) so the MP3's end-of-file edge never touches "
+        "the seam: use the loop points, not a whole-file loop. Times assume the decoder honours the MP3's gapless header "
+        "(Chrome and Firefox do; decodeLag 0 is ffmpeg's decode against the pre-encode audio). seam: three loops rendered back to "
         "back from the decoded MP3; click_ratio is the sample jump at each seam over the 99.9th percentile of jumps within "
         "250 ms (under 1 means no click), hf_spike_ratio the largest high-passed (above 6 kHz) sample within 0.5 ms of the seam "
         "over the 99th percentile within 50 ms around it (about 1 or under means no spike), phase_shift_ms the onset grid phase after the seam minus before (tempo hitch).",

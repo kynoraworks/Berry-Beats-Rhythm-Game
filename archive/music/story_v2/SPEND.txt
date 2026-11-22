@@ -37,3 +37,10 @@ town_pineapple_hall | elevenlabs_music_v2_5 | 60 | 5f5dba1b-4bae-450b-ac81-7b4f2
 sting_rumour | mirelo_text_to_audio | 3 | 9c03321a-9c18-4e5c-aac9-12e5e5309392 | about 0.75 | P2 batch 2
 sting_postcard | elevenlabs_music_v2_5 | 3 | 673ce78a-52c0-4c45-9296-1c7b2a3c5b0d | 0.44 (quote) | P2 batch 2 (asked 3 s, the model minimum; trimmed to about 2.5 s)
 sting_juicefm | elevenlabs_music_v2_5 | 4 | f3c539fb-6542-4a2f-aa87-e166bf8a9c9d | 0.58 (quote) | P2, alone
+
+Summary (2026-11-22)
+  P1 (9 music tracks incl. both prologue takes, 7 stings): 126.44
+  P2 (10 town loops at 60 s, 3 stings): 52.32 + 34.88 + 0.75 + 0.44 + 0.58 = 88.97
+  Total for this work: about 215.4 credits (cap 220). sting_mixtape_card (P3) not generated.
+  Stem separation (Higgsfield separate_stems, htdemucs, two runs on the shipped prologue) is free.
+  Balance at the end: 1238.70 (other agents spent on the same account in parallel; the drop from 1809.87 is not all music).

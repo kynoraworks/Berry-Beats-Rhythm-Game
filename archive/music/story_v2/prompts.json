@@ -12,8 +12,26 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "Explosive, crazy high-energy dance battle anthem at 172 BPM for the greatest final in a pixel-art fruit dance tournament, eight years in the past, a packed arena. Drum and bass energy fused with big-band funk and electro: rolling breakbeats, a huge sub bass, live-sounding brass stabs, slap bass, a swaggering wah guitar, cowbell, crowd-stomp percussion and a soaring, instantly hummable four-bar lead hook on a bright detuned synth that answers itself like two rivals trading lines. Structure, clearly separated: bars 1 to 4 stomp-and-clap intro with sub hits; bars 5 to 12 call and response between a punchy brass riff (the challenger) and a sparkling bell-like synth (the champion); bars 13 to 16 the full hook with everything in; bars 17 to 20 sparse break with only drums and chant-like crowd claps; bars 21 to 28 heavy groove with long held synth notes; bars 29 to 32 a massive drop with a sub boom; bars 33 to 44 both melodies together in harmony, then a darker minor turn; bars 45 to 48 a half-time slow-motion breakdown with a held pad; bars 49 to 56 a long snare-roll build with rising sixteenth notes; bars 57 to 64 the biggest drop of the song, everything at full stack; bars 65 to 72 two-bar trades between brass and bell synth; bars 73 to 80 everything at once, frantic; bars 81 to 83 three huge single hits, one per bar, step, spin, drop; bar 84 the hook's last phrase starts and stops dead on beat three, cut off mid-note with silence after. Euphoric, sweaty, legendary, a little bit unhinged. Instrumental, no sung words, no vocal chops with words. Tight and quantized, a clear backbeat from the first second. Bright, punchy, modern mix with many layers.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "5df8af63-61b3-4ee1-9b38-f6ca11297109",
+      "cost": 34.88,
+      "takes": [
+        {
+          "take": 1,
+          "higgsfield_job": "54ff2017-e73b-4a6b-81ee-a000f7be6c6e",
+          "cost": 17.44,
+          "raw": "raw/prologue_last_final.take1.mp3",
+          "prompt": "(the prompt above)",
+          "verdict": "tempo locked at 172 but bars 33 to 76 one flat section: regenerated"
+        },
+        {
+          "take": 2,
+          "higgsfield_job": "5df8af63-61b3-4ee1-9b38-f6ca11297109",
+          "cost": 17.44,
+          "raw": "raw/prologue_last_final.mp3",
+          "prompt": "Crazy, explosive drum and bass meets big-band funk battle anthem at a locked 172 BPM for the greatest final of a fruit dance tournament in a packed arena. Rolling breakbeats, huge sub bass, brass stabs, slap bass, wah guitar, cowbell, crowd stomps and claps, and one soaring, hummable four-bar hook on a bright detuned synth lead. Big dynamic contrast between sections, every change sudden and obvious. 0:00 stomp-and-clap intro with sub hits, no lead. 0:06 a brass riff and a bell-like synth trade short call-and-response phrases over the beat. 0:17 the full hook with everything in, loud. 0:22 sudden break: only drums and crowd claps. 0:28 heavy groove with long held synth notes. 0:39 massive drop with a sub boom, full power. 0:45 both melodies in harmony, then a darker minor turn at 0:56. 1:01 half-time breakdown, kick and pad only, slow and quiet. 1:07 snare-roll build, rising sixteenth notes, a riser getting louder and more intense. 1:18 the biggest drop of the song, everything at full stack, euphoric. 1:29 two-bar trades between brass and bell synth. 1:40 everything at once, frantic, maximum. 1:52 three huge single hits, one per bar, with silence between. 1:56 the hook's last phrase starts and stops dead, cut off mid-note, then silence to the end. Euphoric, sweaty, legendary, a little unhinged. Instrumental, no sung words, no vocal chops. Tight and quantized, never changes tempo. Bright, punchy, modern mix with many layers.",
+          "verdict": "shipped: intro 1 to 6, lead in at 7, drop at 9, stop at 33, breakdown 43 to 48, riser 49 to 50, drop at 51, ends at bar 83 to 84"
+        }
+      ]
     },
     {
       "key": "kids_garden",
@@ -25,8 +43,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "Warm, magical summer-night theme at 92 BPM for three small kids inventing a dance in a moonlit back garden after watching a big final on a tiny television. Plucked ukulele and glockenspiel, soft brushed drums, a bouncing upright bass, fairy-light shimmer of celesta, crickets-like shaker, and a simple, childlike version of a bright four-bar hook played on toy piano, a little wobbly. Starts hushed and curious, grows playful and silly, ends on a sweet held chord as if a camera flash freezes the moment. Nostalgic, tender, funny. Instrumental, no sung words. Gentle, clear mix.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "8acc011f-3865-4b5c-b323-d709a17fc7f3",
+      "cost": 6.54
     },
     {
       "key": "sky_the_line",
@@ -38,8 +56,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "Uplifting cinematic overture at 96 BPM for a camera falling through dawn clouds and following a small purple-and-cream train across a whole map of towns. Begins with airy strings and a soft synth pad above the clouds, then a steady train rhythm enters on brushed snare and shaker in a chugging pattern, then short two-bar musical postcards pass by in sequence: funky slap bass, a boom-bap break, a fiddle, a chiptune arpeggio, a plucked zither, a deep house thump, sparse jazz piano, a dub echo, a samba percussion burst, a harpsichord flourish. Over the top, a warm horn plays a slower, hopeful version of a bright four-bar hook. Ends gently in a small autumn town on a held major chord with a single music-box note. Hopeful, wide, a little bittersweet. Instrumental, no sung words. Rich, clean mix.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "33fc7c1c-330b-4aa9-aa84-0cf0cb75a8dc",
+      "cost": 7.27
     },
     {
       "key": "town_berry_town",
@@ -51,8 +69,8 @@
       "loop": true,
       "force_instrumental": true,
       "prompt": "Cosy lo-fi acoustic hip hop loop at 84 BPM for walking down a small home-town street on a November afternoon, leaves falling, a bakery on the corner. Dusty soft boom-bap drums with brushes, warm nylon-string guitar picking, a round mellow bass, Rhodes chords, a little kitchen-sounds percussion like a spoon on a mug, soft vinyl crackle, a gentle whistled-style synth melody. Quiet, sleepy, warm, a little sad but hopeful, like someone opening the curtains for the first time in months. Instrumental, no sung words. Seamless loop: the last bar leads straight back into the first, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "8f23bc66-f3d6-46f3-8e1b-361b7fd4397e",
+      "cost": 10.9
     },
     {
       "key": "town_peel_street",
@@ -60,12 +78,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 100,
       "duration_s": 70,
-      "generate_s": 70,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Goofy, bouncy street-market funk loop at 100 BPM for walking down a bright yellow market street where everyone keeps slipping on banana peels. Rubbery slap bass, tight funk drums with a cheeky swing, clavinet, short muted trumpet stabs, slide whistle accents, cowbell and a xylophone melody that keeps sliding off the note and catching itself. Sunny, slapstick, busy. Instrumental, no sung words. Lighter and calmer than a battle song, made for walking and talking. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "c03cfd40-849c-476e-a303-ac7f04ca5276",
+      "cost": 8.72
     },
     {
       "key": "town_graffiti_corner",
@@ -73,12 +91,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 90,
       "duration_s": 75,
-      "generate_s": 75,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Laid-back boom-bap hip hop loop at 90 BPM for a graffiti-covered street corner with a huge half-finished mural. A dusty chopped drum break, a deep warm bass, scratchy record cuts, a jazzy vibraphone sample, a muted horn line, spray-can hiss as a shaker, a boombox that sounds a bit tinny. Slow start feel, relaxed, creative, late afternoon, a crew sitting on a fence. Instrumental, no sung words. Calmer than a battle song. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "cbe123a8-5983-4ddf-bd3c-add3458c6c21",
+      "cost": 8.72
     },
     {
       "key": "town_vine_crossing",
@@ -86,12 +104,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 96,
       "duration_s": 70,
-      "generate_s": 70,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Quirky country-folk and bossa loop at 96 BPM for a rainy, vine-tangled border checkpoint guarded by a gang of grapes. Pizzicato fiddle and plucked banjo in pairs, a walking upright bass, brushed snare, a little accordion, rain-like shaker, a marching pattern that feels official and a bit silly, melodies that always come in twos. Grey afternoon drizzle, bureaucratic, funny, slightly suspicious. Instrumental, no sung words. Calm enough to walk and talk. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "6cb14f4b-44d7-4579-9c50-3a338fe91285",
+      "cost": 8.72
     },
     {
       "key": "town_citrus_labs",
@@ -99,12 +117,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 110,
       "duration_s": 70,
-      "generate_s": 70,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Bubbly chiptune and synth-pop loop at 110 BPM for a gleaming citrus science lab at dusk with humming machines and the odd small explosion. Bright square-wave arpeggios, a gurgling bass synth, clean electronic drums with a ticking hi-hat, blippy computer sounds, a theremin-like lead, a glass-beaker clink as percussion, a nervous jittery motif that resolves into a happy one. Clean, curious, a little chaotic. Instrumental, no sung words. Lighter than a battle song. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "c4ada965-37e1-43a2-9235-f90dcc548517",
+      "cost": 8.72
     },
     {
       "key": "town_lantern_market",
@@ -112,12 +130,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 80,
       "duration_s": 90,
-      "generate_s": 90,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Gentle lo-fi loop with East Asian colours at 80 BPM for a quiet evening market of unlit paper lanterns, tea stalls and dumpling steam. Plucked guzheng and pipa, soft erhu melody, warm Rhodes, a slow soft drum groove with lots of space and long rests, wooden block and small bells, steam-like noise swells. Patient, calm, lots of silence between phrases, as if waiting for the lanterns to light. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "65746907-f0e9-4225-bfe1-c0f857572e52",
+      "cost": 8.72
     },
     {
       "key": "town_the_club",
@@ -125,12 +143,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 120,
       "duration_s": 64,
-      "generate_s": 64,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Deep house loop at 120 BPM heard from outside a neon nightclub, in the queue and the corridors: a thumping kick and bass muffled as if through a wall, filtered chords, a distant shimmering synth, glittery hi-hats, the occasional burst when a door opens. Cool, glamorous, a little lonely, pink and green neon, a crowd you can't see. Instrumental, no sung words, no vocal samples. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "a30bc141-4700-4f2d-9f87-e79af457c19e",
+      "cost": 8.72
     },
     {
       "key": "town_rooftop_alone",
@@ -142,8 +160,8 @@
       "loop": true,
       "force_instrumental": true,
       "prompt": "Sparse, lonely jazz-hop loop at 76 BPM for a boy alone at a rooftop food court at night after his friends walked out. Soft brushed drums with lots of space, a slow upright bass, a single muted trumpet playing a few lonely notes, gentle Rhodes chords, distant city hum, wind, a quiet sizzle like a grill far away. Cold air, string lights, tender and sad but not hopeless. Instrumental, no sung words. Must share its chords, key, tempo and bar structure with a fuller version for layering. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "95cee03b-462b-4fea-9ce4-b8ae12e9103f",
+      "cost": 11.05
     },
     {
       "key": "town_rooftop_full",
@@ -151,12 +169,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 76,
       "duration_s": 76,
-      "generate_s": 76,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Warm, full jazz-hop loop at 76 BPM for a rooftop food court at night when a group of friends has just made up: the same chords and melody as a sparse lonely version, now with a full band, a fat swung boom-bap beat, upright bass, the muted trumpet joined by a warm saxophone harmony, Rhodes and a bouncy organ, finger snaps and a happy grill sizzle. Big feelings, cosy, celebratory but still cool. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "a34f1adb-818c-4738-b5b0-7e33fbd75560",
+      "cost": 8.72
     },
     {
       "key": "town_the_tunnel",
@@ -164,12 +182,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 70,
       "duration_s": 82,
-      "generate_s": 82,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Deep dub loop at 70 BPM, half-time feel, for a dark, dripping railway tunnel with one flickering lamp and an old busker. A heavy round bass line, rim-shot and snare drenched in tape echo and spring reverb, water-drip percussion, a wheezy accordion melody that answers itself in the echo, distant train rumble passing underneath. Dark, cavernous, a bit spooky but kind. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "0d8219ac-8413-4385-9b50-d51a1b8afdab",
+      "cost": 8.72
     },
     {
       "key": "town_orange_plaza",
@@ -177,12 +195,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 124,
       "duration_s": 62,
-      "generate_s": 62,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Bright festival samba-pop loop at 124 BPM for a night-time plaza where a huge dance contest's qualifiers are about to start: surdo and repinique drums, shakers, a funky bass, sunny brass riffs, a cheesy game-show synth, crowd-roar swells and confetti-cannon whooshes, quick bursts of notes followed by short rests. Loud, excited, cheeky, a big screen and spotlights. Instrumental, no sung words, no whistles. Lighter than a battle song. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "28dc23d3-b76d-4585-b92a-ab48cf2d2724",
+      "cost": 8.72
     },
     {
       "key": "town_pineapple_hall",
@@ -190,12 +208,12 @@
       "model": "elevenlabs_music_v2_5",
       "bpm": 92,
       "duration_s": 84,
-      "generate_s": 84,
+      "generate_s": 60.0,
       "loop": true,
       "force_instrumental": true,
       "prompt": "Baroque-meets-trap loop at 92 BPM for a gilded, strict and mirrored grand hall: a crisp harpsichord playing a stately, prickly melody, pizzicato strings, a slow tight trap beat with sharp hi-hat rolls, a deep 808, a string quartet answering in short stabs, a little tinkle of a chandelier. Posh, precise, a bit snobby, secretly nervous. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "5f5dba1b-4bae-450b-ac81-7b4f21770ff3",
+      "cost": 8.72
     },
     {
       "key": "town_grand_stage",
@@ -207,8 +225,8 @@
       "loop": true,
       "force_instrumental": true,
       "prompt": "Tense, electric synthwave loop at 100 BPM for the backstage corridor of the biggest dance stage in the city, fifteen minutes before the final. A pulsing arpeggio, a heartbeat kick, a low warm pad, a distant crowd roar through the walls, stage-hum, and a slow, music-box-and-synth lullaby version of a bright four-bar hook from an old final, half-time, hopeful. Nervous, huge, a little tearful, building but never releasing. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "6a07515d-70a8-41e1-88bb-d25b86ea01be",
+      "cost": 10.47
     },
     {
       "key": "train_between",
@@ -220,8 +238,8 @@
       "loop": true,
       "force_instrumental": true,
       "prompt": "Gentle travelling lo-fi loop at 88 BPM for a small train between stops: a rhythmic chugging pattern on brushed snare and shaker like wheels on rails, a soft bass, warm guitar and Rhodes, a light melodica melody, an occasional soft bell like a level crossing far away. Cosy, reflective, friends on benches, autumn fields in the window. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "73496599-1dbd-4cae-ac6d-aee8bdd24b99",
+      "cost": 9.45
     },
     {
       "key": "train_between_alone",
@@ -233,8 +251,8 @@
       "loop": true,
       "force_instrumental": true,
       "prompt": "The same travelling lo-fi train loop at 88 BPM with the drums and wheel rhythm removed: only a soft bass, slow Rhodes chords and a single quiet melodica line with long gaps, the faint sound of rails underneath. A boy alone in a carriage at night. Sad, still, empty, with a tiny warmth at the end of each phrase. Instrumental, no sung words. Seamless loop, no intro, no outro, no fade.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "8b9ceb64-9241-43a3-b5b5-12224c57003d",
+      "cost": 9.45
     },
     {
       "key": "credits_same_garden",
@@ -246,8 +264,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "Joyful, heartfelt end-credits song at 96 BPM for a fruit dance game that ends with friends back together in a sunny garden. Starts with a lone toy piano playing a bright four-bar hook from the opening battle, slow and tender; then warm acoustic guitar, upright bass and brushed drums join; then a full feel-good funk and soul band arrives: slap bass, horns, Rhodes, hand claps, tambourine, a soaring synth lead on the hook. A middle section quotes, in turn, a market funk riff, a boom-bap break, a guzheng phrase, a dub echo and a harpsichord flourish, like friends waving one by one. A big final chorus of the hook with everything in, then a soft ending back on the toy piano, one last chord, and a small cut to silence. Grateful, sunny, a little tearful, very warm. Instrumental, no sung words.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "ae72b164-a17c-4464-a22b-652b5e46f7a0",
+      "cost": 21.8
     },
     {
       "key": "sting_static",
@@ -259,8 +277,8 @@
       "loop": false,
       "force_instrumental": false,
       "prompt": "A sudden hard cut from a huge cheering arena to television static: a split second of a sustained synth note snapping off, then loud white-noise TV static that dips to a low hiss. No melody. Sound design, instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "327a5eb0-98c5-41d7-b750-997703c97405",
+      "cost": 0.38
     },
     {
       "key": "sting_conductor",
@@ -272,8 +290,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A delicate music-box melody, four notes of a bright four-bar hook slowed down and played a little sadly, with a soft ticking like a pocket watch and a faint train whistle very far away. Mysterious, tender. Instrumental, no sung words.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "63334569-7d94-411e-8b7b-89aec9899a38",
+      "cost": 0.88
     },
     {
       "key": "sting_rumour",
@@ -285,7 +303,7 @@
       "loop": false,
       "force_instrumental": false,
       "prompt": "A short VHS tape sting: a cassette clunk, a tape motor whir, a warbly, wobbly detuned synth chord that bends up into place, a little crackle. Curious, playful. Instrumental.",
-      "higgsfield_job": null,
+      "higgsfield_job": "9c03321a-9c18-4e5c-aac9-12e5e5309392",
       "cost": null
     },
     {
@@ -298,8 +316,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A short, triumphant dance-game reward sting at 120 BPM: a punchy drum fill, a bright brass stab, a sparkly synth arpeggio rising, ending on a confident chord hit. Fun, celebratory. Instrumental, no sung words.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "938f6cc9-f560-4277-8b1b-0f9b74b8e573",
+      "cost": 0.44
     },
     {
       "key": "sting_postcard",
@@ -311,8 +329,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A tiny, soft sting for writing a postcard: pencil scratch, a warm two-note Rhodes chord, a gentle celesta twinkle. Quiet, private, a little sad. Instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "673ce78a-52c0-4c45-9296-1c7b2a3c5b0d",
+      "cost": 0.44
     },
     {
       "key": "sting_unlock",
@@ -324,8 +342,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A short unlock sting for a padlock opening in a pixel-art game: a crisp mechanical click, a rising chiptune arpeggio, a bass drop and a bright chord. Satisfying, upbeat. Instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "2d361b6f-fa99-46f8-899b-4d2202abe023",
+      "cost": 0.44
     },
     {
       "key": "sting_juicefm",
@@ -337,8 +355,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A cheesy, energetic radio station jingle bed at 140 BPM: a fast funky drum fill, a slap bass run, a brass fanfare and a laser zap, ending on a big station-ident chord. Loud, fun. Instrumental, no sung words, no voice.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "f3c539fb-6542-4a2f-aa87-e166bf8a9c9d",
+      "cost": 0.58
     },
     {
       "key": "sting_low_point",
@@ -350,8 +368,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A heartbreaking moment in a nightclub as a dancer's friends walk out: club music filtering away into nothing, leaving a single held soft synth note and a faint, distant crowd murmur that also fades. Empty, lonely, cold. Instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "4e4457d3-5282-46f1-8d61-b5a63c24164f",
+      "cost": 0.88
     },
     {
       "key": "sting_broadcast",
@@ -363,8 +381,8 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A public-address speaker crackling on over a rooftop at night, a soft feedback whine, then a warm rising string swell and a gentle major chord blooming, the feeling of someone being heard for the first time. Hopeful, tender. Instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "bdf59b6d-93ec-46cd-8603-354a614461a5",
+      "cost": 0.73
     },
     {
       "key": "sting_envelope",
@@ -376,8 +394,14 @@
       "loop": false,
       "force_instrumental": true,
       "prompt": "A breathless reveal: a wax seal cracking, a held silence with a faint heartbeat, then a huge orchestral and synth swell with a stadium crowd roar bursting in on the final chord. Triumphant, emotional. Instrumental.",
-      "higgsfield_job": null,
-      "cost": null
+      "higgsfield_job": "48eea1fb-bf02-4d89-b643-eed447750ebd",
+      "cost": 0.88
+    },
+    {
+      "key": "sting_mixtape_card",
+      "priority": "P3",
+      "skipped": "not generated: the existing tape_insert SFX stands in (MUSIC_LIST says so)"
     }
-  ]
+  ],
+  "total_credits": 214.66
 }
