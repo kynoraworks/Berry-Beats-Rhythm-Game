@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { Anim, CSS, GAME_H, GAME_W, PX, SceneKeys, Tex } from '../../core/config';
 import { music } from '../../core/music';
-import { addBody, addText, goTo } from '../../core/ui';
+import { addText, goTo } from '../../core/ui';
 import { addActor, pose } from '../../cutscene/actors';
 import { envelopeKey } from '../../cutscene/art';
 import { Cutscene, type CutShot } from '../../cutscene/Cutscene';
@@ -143,6 +143,5 @@ export class PostCreditsScene extends Phaser.Scene {
     this.tweens.add({ targets: logo, alpha: 1, duration: 600 });
     const side = addText(this, GAME_W - 40, GAME_H - 40, 'SIDE C?', 28, { color: CSS.lilac, origin: [1, 1] }).setDepth(CutDepth.caption).setAlpha(0).setAngle(-4);
     this.tweens.add({ targets: side, alpha: 1, delay: 2600, duration: 500 });
-    addBody(this, GAME_W / 2, GAME_H - 90, '', 20);
   }
 }

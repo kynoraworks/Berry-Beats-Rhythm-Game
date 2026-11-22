@@ -212,7 +212,7 @@ export class FinaleScene extends Phaser.Scene {
         duration: 0.1,
         steps: [
           at(0, { do: 'letterbox', on: false, ms: 400 }),
-          at(0, { do: 'camera', x: GAME_W / 2, y: 420, zoom: 0.92, ms: 600 }),
+          at(0, { do: 'camera', x: GAME_W / 2, y: GAME_H / 2, zoom: 1, ms: 600 }),
           at(0.05, { do: 'call', fn: () => this.showChoice() }),
         ],
       },

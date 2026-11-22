@@ -326,7 +326,7 @@ describe('cutscene script', () => {
   });
 
   it('never uses an em dash', () => {
-    for (const line of all) expect(line.text).not.toContain('—');
+    for (const line of all) expect(line.text).not.toContain('\u2014');
   });
 
   it('keeps the kids and legends apart from the cast, by role', () => {

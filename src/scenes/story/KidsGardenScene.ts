@@ -182,7 +182,7 @@ export class KidsGardenScene extends Phaser.Scene {
   private toGarden(): void {
     const cut = this.cut;
     cut.get<Phaser.GameObjects.Image>('shed').setVisible(false);
-    for (const name of ['tv', 'tvGlow', 'wire', ...Array.from({ length: 18 }, (_, i) => `bulb${i}`)]) cut.get<Phaser.GameObjects.Image>(name).setVisible(false);
+    for (const name of ['tv', 'tvGlow', 'wire', ...Array.from({ length: 18 }, (_, i) => `bulb${i}`)]) if (cut.has(name)) cut.get<Phaser.GameObjects.Image>(name).setVisible(false);
     cut.get<Phaser.GameObjects.Image>('garden').setVisible(true);
     cut.look(700, FEET - 10, 1.3);
     const kids = this.kids;

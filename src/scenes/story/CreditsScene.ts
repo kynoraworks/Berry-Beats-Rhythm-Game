@@ -39,7 +39,7 @@ export class CreditsScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor(0x120a24);
     // The garden behind, faint: the credits are in the same garden.
-    const garden = this.add.image(GAME_W / 2, GAME_H / 2, this.textures.exists('room_garden_restored') ? 'room_garden_restored' : gardenKey(this, 'june')).setScale(PX).setAlpha(0.22);
+    const garden = this.add.image(GAME_W / 2, GAME_H / 2, this.textures.exists('room_garden_restored') ? 'room_garden_restored' : gardenKey(this, 'june')).setScale(PX).setAlpha(0.16);
     void garden;
     this.cut = new Cutscene(this, { shots: this.shots(), onEnd: () => this.next(), skippable: endingFlag('creditsSeen') || !!this.data_.replay });
     this.rollNames();
@@ -54,7 +54,7 @@ export class CreditsScene extends Phaser.Scene {
     const lines: Phaser.GameObjects.Text[] = [];
     let y = 0;
     for (const [title, names] of CREDIT_NAMES) {
-      lines.push(addText(this, 0, y, title, title === 'Berry Beats' ? 64 : 34, { color: title === 'Berry Beats' ? CSS.yellow : CSS.lilac }));
+      lines.push(addText(this, 0, y, title, title === 'Berry Beats' ? 48 : 30, { color: title === 'Berry Beats' ? CSS.yellow : CSS.lilac }));
       y += title === 'Berry Beats' ? 90 : 52;
       for (const name of names) {
         lines.push(this.add.text(0, y, name, { fontFamily: `"${FONT_BODY}"`, fontSize: '26px', color: CSS.cream }).setOrigin(0.5));
@@ -90,13 +90,13 @@ export class CreditsScene extends Phaser.Scene {
   /** One postcard: the still on the left or the right, with Berry's line under it. */
   private postcard(card: CreditCard, index: number): void {
     const left = index % 2 === 0;
-    const x = left ? 300 : GAME_W - 300;
+    const x = left ? 260 : GAME_W - 260;
     const parts: Phaser.GameObjects.GameObject[] = [];
     const w = 440;
     const h = 330;
-    parts.push(this.add.rectangle(6, 8, w + 24, h + 120, 0x000000, 0.35));
-    parts.push(this.add.rectangle(0, 0, w + 24, h + 120, 0xfff8ea).setStrokeStyle(3, 0xd8c8b0));
-    const stillY = -50;
+    parts.push(this.add.rectangle(6, 8, w + 24, h + 170, 0x000000, 0.35));
+    parts.push(this.add.rectangle(0, 0, w + 24, h + 170, 0xfff8ea).setStrokeStyle(3, 0xd8c8b0));
+    const stillY = -70;
     if (this.textures.exists(card.art)) {
       parts.push(this.add.image(0, stillY, card.art).setDisplaySize(w, h - 40));
     } else if (card.still) {
@@ -112,8 +112,8 @@ export class CreditsScene extends Phaser.Scene {
     } else {
       parts.push(this.add.rectangle(0, stillY, w, h - 40, 0xf4ead8));
     }
-    parts.push(addText(this, 0, h / 2 - 30, card.title, 30, { color: '#2b1a33', stroke: false }));
-    parts.push(this.add.text(0, h / 2 + 4, card.line, { fontFamily: `"${FONT_BODY}"`, fontSize: '21px', fontStyle: 'italic', color: '#4a2a5a', align: 'center', wordWrap: { width: w } }).setOrigin(0.5, 0));
+    parts.push(addText(this, 0, h / 2 - 34, card.title, 30, { color: '#2b1a33', stroke: false }));
+    parts.push(this.add.text(0, h / 2 - 8, card.line, { fontFamily: `"${FONT_BODY}"`, fontSize: '21px', fontStyle: 'italic', color: '#4a2a5a', align: 'center', wordWrap: { width: w } }).setOrigin(0.5, 0));
     const container = this.add.container(left ? -400 : GAME_W + 400, GAME_H / 2 + 10, parts).setDepth(CutDepth.caption).setAngle(left ? -3 : 3);
     this.tweens.add({ targets: container, x, duration: 700, ease: 'Back.easeOut' });
     this.tweens.add({ targets: container, x: left ? -400 : GAME_W + 400, delay: (CARD_SECONDS - 0.7) * 1000, duration: 600, ease: 'Quad.easeIn', onComplete: () => container.destroy() });

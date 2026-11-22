@@ -276,6 +276,8 @@ export class SkyIntroScene extends Phaser.Scene {
           at(0, { do: 'sfx', name: 'whoosh' }),
           at(1.8, { do: 'camera', x: STRIP_W / 2, y: LINE_Y - 100, zoom: GAME_W / (STRIP_W + 400), ms: 0 }),
           at(1.8, { do: 'flash', color: 0xffffff, ms: 700, alpha: 0.9 }),
+          // Through the clouds: the sky layers are behind us now.
+          ...['sky', 'clouds0', 'clouds1', 'clouds2', 'bird'].map((target) => at(1.8, { do: 'hide' as const, target })),
           at(2.2, { do: 'camera', x: STRIP_W / 2, y: LINE_Y - 60, zoom: (GAME_W / (STRIP_W + 400)) * 1.15, ms: 2600 }),
         ],
       },
