@@ -93,7 +93,7 @@ export const ROOMS: readonly RoomDef[] = [
     bg: 'room_peel_shop',
     wall: 0xe8b84a,
     floorColor: 0x9a6a4a,
-    hotspots: [look('shelves', 'Shelves', [150, 70, 60, 46], [say('raspberry', 'neutral', 'Banana bread, banana jam, banana socks. They commit to the theme.')])],
+    hotspots: [look('shelves', 'Shelves', [92, 72, 46, 44], [say('raspberry', 'neutral', 'Banana bread, banana jam, banana socks. They commit to the theme.')])],
   },
   {
     id: 'peel_hoodies',

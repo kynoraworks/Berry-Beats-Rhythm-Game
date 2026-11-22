@@ -47,7 +47,9 @@ export class ChoiceBox {
     const top = Math.round(GAME_H - 250 - height);
     const dim = scene.add.rectangle(0, 0, GAME_W, GAME_H, COLORS.night, 0.35).setOrigin(0).setInteractive();
     const box = addBox(scene, (GAME_W - width) / 2, top, width, height, 'panel');
+    // Measured before the box was made, so lift it back over the box.
     promptText.setY(top + 40 + promptText.height / 2);
+    scene.children.bringToTop(promptText);
     this.buttons = options.choices.map((choice, i) =>
       addUiButton(scene, GAME_W / 2, top + 56 + promptText.height + 24 + buttonH / 2 + i * (buttonH + gap), `${isTouch() ? '' : `${i + 1}  `}${choice}`, () => this.pick(i), {
         width: width - 120,

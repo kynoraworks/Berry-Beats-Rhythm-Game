@@ -149,3 +149,27 @@ with the beat too.
 12 stations, 6 streets, 1 stage, the NPC sheet, the photo and the walk
 cycle: 21 pieces. At one generation per background and a retry for a few,
 roughly 22 to 28 generations.
+
+## Ambience (no art needed)
+
+Stations and streets come alive in code: `src/explore/ambience.ts` lists each
+background's mix (particles, lights, shafts of light, twinkles, swaying
+banners cut from the art, a far sky with clouds and birds, foreground props,
+a vignette and a breathing wash of the time of day). `src/explore/ambienceFx.ts`
+draws it; the explore scene starts it with one `addAmbience(...)` call.
+
+- Lights are placed by eye and snap to the brightest pixels within a few art
+  pixels, so a redrawn background with its lamps nudged still lines up.
+- Swaying pieces use the same cut and wall patch as the stage loops: give a
+  rectangle with a margin of plain wall around the banner (`mask: 'key'`).
+- Foreground props are procedural silhouettes for now (`PROP_PAINTERS` in
+  `src/explore/ambienceArt.ts`: planter, plant, lampPost, bollard, railing,
+  vinePost, lanternPost, crate, pipe, cone, barrier, rope, column, speaker).
+  **Prop art:** draw `public/assets/img/prop_<key>.png` at 1 art pixel per
+  pixel, its base on the bottom row, and add `prop_<key>` to
+  `PRESENT_IMAGES` in `src/core/assets.ts`. It replaces the silhouette of the
+  same key everywhere. New props: `addProp(background, key, x, y, layer, parallax)`
+  (front props stand at y 164, so their feet are just off screen; parallax
+  1.3 slides them past faster than the street).
+- Settings: Reduce motion keeps only the still light; `effects: 'low'`
+  (and touch devices) halve the particles and twinkles.

@@ -303,7 +303,8 @@ export class ExploreScene extends Phaser.Scene {
     walker.face(-1);
     if (getSettings().reduceMotion) return;
     const look = () => {
-      if (!walker.sprite.active) return;
+      // Stops once they are no longer waiting (swapped in as the follower).
+      if (!walker.sprite.active || !this.waiting.some((entry) => entry.walker === walker)) return;
       if (!walker.walking) walker.face(Math.random() < 0.6 ? -1 : 1);
       this.tweens.add({ targets: walker.sprite, scaleY: walker.scale * 1.04, duration: 140, yoyo: true, ease: 'Sine.easeOut' });
       this.time.delayedCall(1600 + Math.random() * 2400, look);

@@ -108,9 +108,9 @@ export function interiorBackground(scene: Phaser.Scene, room: RoomDef, time: Tim
   }
   rect(ctx, css(shade(boards, 0.2)), width * 0.3, floor + 4, width * 0.4, 6);
   // The plate: this is a stand-in.
-  rect(ctx, INK, width - 47, 19, 44, 9);
-  rect(ctx, '#ffe14a', width - 46, 20, 42, 7);
-  word(ctx, 'PLACEHOLDER', width - 45, 21, INK);
+  rect(ctx, INK, width - 52, 19, 48, 9);
+  rect(ctx, '#ffe14a', width - 51, 20, 46, 7);
+  word(ctx, 'PLACEHOLDER', width - 50, 21, INK);
   const texture = scene.textures.addCanvas(room.bg, canvas);
   texture?.setFilter(Phaser.Textures.FilterMode.NEAREST);
   return room.bg;

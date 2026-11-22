@@ -284,7 +284,7 @@ export function punctuationPause(char: string, next: string | undefined, prev?: 
   }
   if (char === '!' || char === '?') return next === '!' || next === '?' ? 0 : ends ? 240 : 0;
   if (char === ',' || char === ';' || char === ':') return ends ? 110 : 0;
-  if (char === '—' || char === '-') return next === ' ' && prev === ' ' ? 110 : 0;
+  if (char === '\u2014' || char === '-') return next === ' ' && prev === ' ' ? 110 : 0;
   return 0;
 }
 
