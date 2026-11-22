@@ -115,7 +115,7 @@ export interface SwayDef {
 
 /**
  * A prop drawn over or under the scene. `key` names a procedural painter
- * (see PROP_PAINTERS in ambienceFx.ts) or, once an art agent supplies one, a
+ * (see PROP_PAINTERS in ambienceArt.ts) or, once an art agent supplies one, a
  * loaded image `prop_<key>` that is used instead. Foreground props scroll
  * faster than the street (`parallax` above 1) and stand on the bottom edge.
  */

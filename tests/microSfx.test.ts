@@ -65,7 +65,8 @@ describe('micro sounds', () => {
   it('is wired where the player touches things', () => {
     const uses: [string, SfxName[]][] = [
       ['src/core/ui.ts', ['move', 'locked']],
-      ['src/play/Dialogue.ts', ['talkBlip', 'dialogNext']],
+      // Letters are voiced per speaker by core/voice.ts (the Voicer), not the shared talkBlip.
+      ['src/play/Dialogue.ts', ['dialogNext']],
       ['src/scenes/ExploreScene.ts', ['step', 'lookAt', 'npcHey', 'unlock', 'locked', 'brakeSqueal']],
       ['src/explore/doors.ts', ['doorChime', 'doorHiss', 'doorThunk', 'doorSlide', 'trainRoll']],
       ['src/scenes/LevelSelectScene.ts', ['mapPin', 'backupCycle', 'locked', 'confirm']],
@@ -75,6 +76,7 @@ describe('micro sounds', () => {
       ['src/scenes/BeatMapsScene.ts', ['listScroll']],
       ['src/scenes/PlayScene.ts', ['pauseOpen', 'pauseClose']],
     ];
+    expect(readFileSync('src/play/Dialogue.ts', 'utf8')).toMatch(/voicer\.letter\(/);
     for (const [file, names] of uses) {
       const source = readFileSync(file, 'utf8');
       for (const name of names) expect(source, `${file} plays ${name}`).toMatch(new RegExp(`'${name}'`));
