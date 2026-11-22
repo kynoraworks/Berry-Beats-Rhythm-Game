@@ -1,0 +1,12 @@
+credits so far: 8.75
+batch 2 submitted (8 accepted): hype_c hype_d hype_e hype_f raspberry_d raspberry_e raspberry_f blueberry_f = 10.0
+batch 3: hype_b blueberry_d blueberry_e = 3.75 (total 22.5)
+batch 4: pear d e f, lemon d e f, banana d e = 10.0 (total 32.5)
+batch 5 submitted: banana_f grape d e f plum d e f dragonfruit_d = 10.0 (total 42.5)
+batch 6 submitted: dragonfruit e f, watermelon d e f, coconut d e f = 10.0 (total 52.5)
+batch 7 submitted: orange d e f, pineapple d e f, instructor d e = 10.0 (total 62.5)
+batch 8: instructor_f = 1.25 (total 63.75)
+hype redo (new look: normal Berry, hood down, smile; refs concept b9aa2328 + blackberry_ref, 1k = 1.25 each):
+  hype_a = 1.25
+  hype_b hype_c hype_d hype_e hype_f = 6.25 (redo total 7.5)
+  hype_f reroll (point pose came out as fists) = 1.25 (redo total 8.75, total 72.5)

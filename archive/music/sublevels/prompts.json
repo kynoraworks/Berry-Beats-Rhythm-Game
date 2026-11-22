@@ -1,0 +1,213 @@
+{
+  "about": "Prompts for the short songs of battles A and B (one request per song, no variations). Raw results are in raw/<key>.mp3; tools/sublevel_songs.py ships them. Stops 1 to 6 were generated first, stops 7 to 12 the same day: 60 s each (about 8.7 Higgsfield credits), the Grand Stage's two set songs 75 s (about 10.9) so each holds two crew rounds.",
+  "generated": "2026-11-21",
+  "model": "elevenlabs_music_v2_5",
+  "duration_s": 60,
+  "songs": [
+    {
+      "key": "berry_town_a",
+      "stop": 1,
+      "battle": "A",
+      "bpm": 114,
+      "prompt": "Upbeat lo-fi hip hop at 114 BPM for a dance battle in a cozy hometown bedroom on a November afternoon. Punchy dusty boom-bap drums with crisp straight hi-hats and ghost-note snares, a bouncy round bass line, warm Rhodes chords, a catchy plucked electric guitar hook, soft vinyl crackle, short wordless vocal chops and hand claps on two and four. Playful, hopeful, a little nostalgic. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "a133f61f-6855-4600-9b41-33ce0e60e849"
+    },
+    {
+      "key": "berry_town_b",
+      "stop": 1,
+      "battle": "B",
+      "bpm": 118,
+      "prompt": "Energetic lo-fi hip hop at 118 BPM for a rematch dance battle in a small hometown on a November afternoon. Hard-hitting boom-bap drums with tight snares, shuffling hats and tambourine, a driving bass line with slides, layered Rhodes and warm synth pad chords, a bright whistled-style synth lead answering a plucked guitar riff, scratchy record fills and wordless vocal chops. Cheeky, determined, warm. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "bc257591-ded6-404a-aa75-70df421527f1"
+    },
+    {
+      "key": "peel_street_a",
+      "stop": 2,
+      "battle": "A",
+      "bpm": 120,
+      "prompt": "Funky slap-bass street funk at 120 BPM for a slapstick dance battle at a busy fruit market station. Popping and slapping bass riff up front, tight funk drums with snappy snare and open hats, choppy wah guitar, short brass stabs, a clavinet hook, cowbell and shaker. Goofy, bouncy, full of slips and slides, sunny afternoon. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "ff44566d-6f56-4631-8793-8a03ca3ef577"
+    },
+    {
+      "key": "peel_street_b",
+      "stop": 2,
+      "battle": "B",
+      "bpm": 124,
+      "prompt": "High-energy slap-bass funk at 124 BPM for a dance battle on a market street. A big slapped bass groove, punchy funk drums with fills, a horn section playing a catchy riff, chicken-scratch guitar, clavinet and organ stabs, cowbell, claps and a quick synth lead. Silly, fast and confident, sunny afternoon. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "3902fafa-96d2-4fe5-8d0d-f8327887b65c"
+    },
+    {
+      "key": "graffiti_corner_a",
+      "stop": 3,
+      "battle": "A",
+      "bpm": 126,
+      "prompt": "Breakbeat b-boy hip hop at 126 BPM for a street dance cypher at a graffiti-covered corner. A chopped funk breakbeat with crisp snares, a deep bass line, record scratches, a laid-back horn riff, Rhodes stabs and a catchy synth hook. Starts cool and relaxed and gets stronger section by section, afternoon on the street. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "f0282449-ce78-42bc-a45a-dc5caec7bc7b"
+    },
+    {
+      "key": "graffiti_corner_b",
+      "stop": 3,
+      "battle": "B",
+      "bpm": 130,
+      "prompt": "Hard-hitting breakbeat hip hop at 130 BPM for a b-boy dance battle at a graffiti wall. Chopped drum breaks with rolls, booming bass, turntable scratches, punchy brass hits, a funky guitar loop and a bold synth lead. Starts slow and laid back, then finishes strong and loud, afternoon street energy. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "325e2244-f49f-43d7-be71-fd2214f0b780"
+    },
+    {
+      "key": "vine_crossing_a",
+      "stop": 4,
+      "battle": "A",
+      "bpm": 124,
+      "prompt": "Stomping chant-driven hip hop at 124 BPM for a dance battle against a gang of guards at a vineyard railway crossing. Big stomps and claps, marching snare, a deep bass line, wordless group shouts and hey chants answering each other in call and response, a plucked mandolin riff and brass stabs. Bold, playful, a little menacing, afternoon. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "efaab076-4bd7-4e84-ae40-af1d2eaa6d8c"
+    },
+    {
+      "key": "vine_crossing_b",
+      "stop": 4,
+      "battle": "B",
+      "bpm": 128,
+      "prompt": "Powerful chant-driven dance track at 128 BPM for a battle against a crew of guards at a vineyard crossing. Layered stomps and claps in pairs, a driving drum groove, wordless hey chants and group shouts in call and response, a gritty bass synth, plucked strings and big brass hits. Confident and loud, afternoon. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "4e364a6a-fc94-4257-901e-5f76c390d871"
+    },
+    {
+      "key": "citrus_labs_a",
+      "stop": 5,
+      "battle": "A",
+      "bpm": 134,
+      "prompt": "Glitch hop electro at 134 BPM for a dance battle in a mad scientist's laboratory. Crunchy glitchy drums with stutter edits, a wobbling bass, bubbling arpeggiated synths, beeps and laser zaps, a catchy squeaky synth lead and quick tape-stop effects. Zany, jittery, energetic, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "7bd9a267-fb01-43e7-803d-d9b4171cc7a4"
+    },
+    {
+      "key": "citrus_labs_b",
+      "stop": 5,
+      "battle": "B",
+      "bpm": 138,
+      "prompt": "High-energy glitch hop electro at 138 BPM for an experimental dance battle in a science lab. Hard glitchy drum breaks with stutters and rolls, a growling bass, bright arpeggios, bleeps and zaps, a zany lead synth hook that keeps changing, sudden breaks and drops. Frantic, playful and loud, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "84e9ed07-a803-4cf2-8342-193a7694f01b"
+    },
+    {
+      "key": "lantern_market_a",
+      "stop": 6,
+      "battle": "A",
+      "bpm": 114,
+      "prompt": "Warm chillhop dance groove at 114 BPM for a lantern-lit night market. Punchy hip hop drums with soft shakers and wood blocks, a smooth bass line, plucked zither and marimba melodies, warm Rhodes chords, gentle flute hook, and phrases that leave short breathing spaces. Cozy, patient, glowing, evening. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "cebb59fb-c573-47f4-9147-1cbc4cfcc22b"
+    },
+    {
+      "key": "lantern_market_b",
+      "stop": 6,
+      "battle": "B",
+      "bpm": 118,
+      "prompt": "Lively chillhop dance groove at 118 BPM for the best night at a lantern-lit market. Crisp hip hop drums with hand percussion and claps, a bouncing bass line, layered plucked zither, marimba and kalimba melodies, a bright flute lead, warm pads, short pauses between phrases and a joyful final section. Festive, warm, evening. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "87542da8-d997-4a91-94ff-f9d83c9fefa9"
+    },
+    {
+      "key": "the_club_a",
+      "stop": 7,
+      "battle": "A",
+      "bpm": 138,
+      "prompt": "Flashy nightclub house at 138 BPM for a dance battle at the door of a glamorous club. Pumping four-on-the-floor kick, crisp claps, open hats, a rubbery bass line, shimmering disco strings, stabbing synth brass and a fiery synth lead with risers and short drops. Theatrical, bold, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "5c3025ab-95f0-4fe3-9c5f-e55f4db0789d",
+      "duration_s": 60
+    },
+    {
+      "key": "the_club_b",
+      "stop": 7,
+      "battle": "B",
+      "bpm": 142,
+      "prompt": "Hard-hitting club dance track at 142 BPM for a solo spotlight battle on a dark club floor. Driving kick and clap, rolling bass, cold glassy synth chords, a sharp lead hook, big risers, strobing stutter effects and sudden drops. Dramatic, lonely and loud, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "8a26acfc-ad5a-4fc4-b298-d7c0da14c2b3",
+      "duration_s": 60
+    },
+    {
+      "key": "rooftop_a",
+      "stop": 8,
+      "battle": "A",
+      "bpm": 124,
+      "prompt": "Warm sunset funk at 124 BPM for a dance battle at a rooftop food court. Groovy live drums, a round bass line, bright horn section riffs, Rhodes and organ chords, sizzling grill-like shakers, a big friendly trumpet hook. Generous, booming, feel-good, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "a06b626c-6320-4c39-9f83-1b2c78ed2e95",
+      "duration_s": 60
+    },
+    {
+      "key": "rooftop_b",
+      "stop": 8,
+      "battle": "B",
+      "bpm": 128,
+      "prompt": "Big-hearted rooftop funk at 128 BPM for an emotional dance battle at sunset. Punchy drums with fills, a bouncing bass, soaring horn section, gospel organ swells, hand claps, a bold brass melody that builds to a joyful climax. Warm, big feelings, dusk. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "1ba64e5c-7d98-4ee0-9178-e6fae2981732",
+      "duration_s": 60
+    },
+    {
+      "key": "the_tunnel_a",
+      "stop": 9,
+      "battle": "A",
+      "bpm": 146,
+      "prompt": "Dark driving drum and bass at 146 BPM for a dance battle at a train tunnel gate. Tight breakbeat drums, a heavy rolling sub bass that carries the tune, metallic echoing hits, distant train rumble and a low pad. Steady, stern, unrelenting, night. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "fe51555c-34f5-4b28-8f8e-ee7340c47304",
+      "duration_s": 60,
+      "measured_bpm": 145
+    },
+    {
+      "key": "the_tunnel_b",
+      "stop": 9,
+      "battle": "B",
+      "bpm": 150,
+      "prompt": "Relentless tunnel drum and bass at 150 BPM for a battle at a second gate deep in a train tunnel. Fast breakbeats, a gritty growling bass riff, echoing metal clanks, sirens in the distance and a stern minimal synth motif. Hard, cold, night. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "a54cd290-b94d-42b4-a845-c50038aed3a8",
+      "duration_s": 60
+    },
+    {
+      "key": "orange_plaza_a",
+      "stop": 10,
+      "battle": "A",
+      "bpm": 150,
+      "prompt": "Festival big-beat dance track at 150 BPM for a qualifier battle in a crowded plaza. Punchy drums, slap bass, bright brass fanfares, crowd cheers, cowbell, a catchy whistle lead and an MC-style air horn. Loud, sunny, celebratory, night festival. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "f6c7ab76-8ead-4f3c-b91f-5c32e45a8751",
+      "duration_s": 60
+    },
+    {
+      "key": "orange_plaza_b",
+      "stop": 10,
+      "battle": "B",
+      "bpm": 154,
+      "prompt": "Fast festival dance track at 154 BPM for a second qualifier on a lantern-lit stage in a city plaza. Driving drums, a bouncing bass, plucked strings and marimba, festive brass stabs, crowd claps and a bright flute and synth lead. Joyful, quick, night festival. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "dc735d7d-f370-43ad-bfc5-365c538028e3",
+      "duration_s": 60
+    },
+    {
+      "key": "pineapple_hall_a",
+      "stop": 11,
+      "battle": "A",
+      "bpm": 154,
+      "prompt": "Sharp baroque electro at 154 BPM for an etiquette dance battle in a grand hall. Crisp tight drums, a walking synth bass, staccato strings, harpsichord stabs, a precise brass hook and clipped vocal-less choir hits. Prickly, elegant, exact, night. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "1af35cab-7ee2-4756-bdfa-10abd63a63b9",
+      "duration_s": 60
+    },
+    {
+      "key": "pineapple_hall_b",
+      "stop": 11,
+      "battle": "B",
+      "bpm": 158,
+      "prompt": "Tense hall-of-mirrors electro at 158 BPM for a battle in a rehearsal room full of mirrors. Precise drums, a pulsing bass, glassy arpeggios, mirrored echo effects, staccato strings and a sharp lead that answers itself. Nervous, sparkling, exact, night. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "267ac912-d9ff-47de-a4f4-b17aa04b107d",
+      "duration_s": 60
+    },
+    {
+      "key": "grand_stage_a",
+      "stop": 12,
+      "battle": "A",
+      "bpm": 144,
+      "prompt": "Huge arena pop-dance anthem at 144 BPM for the first set of a crew battle on a grand stage. Massive drums, a driving bass, stadium synth chords, brass hits, crowd chants without words and a soaring lead hook. Epic, bright, night finale. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "a88384ed-0acb-4b90-adcc-64f9cdaef119",
+      "duration_s": 75
+    },
+    {
+      "key": "grand_stage_b",
+      "stop": 12,
+      "battle": "B",
+      "bpm": 148,
+      "prompt": "Arena dance anthem at 148 BPM for the second set of a crew battle on a grand stage. Pounding drums with fills, a gritty bass, stacked synth brass, crowd claps, a fiery lead hook and a big build into the final drop. Epic, fierce, night finale. Instrumental, no sung words. A clear, steady backbeat pulse, tight and quantized, from the first second with a short two-bar intro, then a full groove, a short breakdown and a bigger, busier final section that ends cleanly on the beat. Bright, punchy, modern mix with many layers.",
+      "higgsfield_job": "018dcbac-30b1-4d2e-95c1-05ad7abf36dc",
+      "duration_s": 75
+    }
+  ]
+}

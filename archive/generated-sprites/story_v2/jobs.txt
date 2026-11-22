@@ -1,0 +1,107 @@
+# tag job_id grid aspect (all gpt_image_2_6, high, 1k, transparent, 1.25 credits each)
+coach_a0 afce2d66-6608-4822-b55b-d030a8fc460a 3x2
+strawberry_a 72dcb4cb-df63-4958-b7a8-71fcd78f9757 3x3
+kidberry_a 4a8400f4-bff6-4a77-996a-96229b8f5294 3x3
+kidrasp_a 106d19c6-c820-44a9-b9a9-8c29e62328d8 3x3
+kidblue_a 7c61f1d2-7413-4e91-a87b-696b7e4e6c5e 3x3
+coach_a2 43cb6e5d-8a47-43a6-89c4-be6ab5df9d5c 3x2
+ycoach_a f79db099-0ce2-44d5-9770-a5ac45f8aeee 3x2
+strawberry_b 87b34d19-c738-4463-9e29-c1fe3c4f24fb 3x3
+strawberry_md 3147a5ca-3904-476d-8e13-d0a4692502ec 3x2
+strawberry_mf fd756135-e306-4794-a975-17351899d7d3 3x2
+conductor_a 5fb9be22-6c5e-4d8f-ac8a-c251d05fee96 3x2
+strawberry_me a23565bb-474c-4e07-9705-ba6c72716d6d 3x2
+strawberry_mg 2fb4053f-db83-496d-aa97-0920d5640c71 3x2
+bluex_a 709f58a7-bf23-4da5-9e6a-a5f5d21cb1e9 3x2
+berryx_a 22b885fa-1091-4ec4-82a3-2f1ddd2d12bb 3x3
+portraits_kids 16007acd-ca39-4ed1-9cfa-a8ad04937bcd 3x2
+coach_b 56e8bdb6-19b6-4920-ae25-a8c06b3367f3 3x2
+coach_d 4ccb2914-359a-4c3b-b79c-f56432288d30 3x2
+coach_g cdf6ec36-9e57-43c0-b3c1-a21ecd27d1c3 3x2
+coach_h becddf34-bc1a-43d7-8e8d-6d342d63c661 3x2
+coach_c 3f3756d0-f9e5-4780-acac-4a211d5102d1 3x2
+coach_e c857f752-4020-40e0-9313-a03de94cc3d8 3x2
+coach_f 71dab861-86fb-49ec-a55b-0756701e7f48 3x2
+ycoach_b 42994e53-a61c-4c9d-96ed-691c03d2d9d0 3x2
+coach_i 948d2d97-edab-46de-8924-d6597de82328
+ycoach_c 86de4534-e6a1-4054-8db7-284209cd47e0
+ycoach_d 2c2f1f42-149b-4bd8-ae7d-80177dcb278e
+ycoach_e c8c1869a-0e70-4ec0-a751-e38ad6e2216c
+ycoach_f 06d1e4d4-1fee-4f94-af17-5d0b3a1cf69f
+ycoach_g 7f44c739-61d3-4ca7-9896-97d3e6474b64
+ycoach_h ce95beee-ad63-4a47-966e-6e14c5ce35ee
+ycoach_i 2d4da353-4684-4d55-8a8d-2a9f3daa9bec
+ycoach_md fb4c3d0f-6aaa-4fdb-aeef-394f96f7beae
+ycoach_me 17d43d79-b344-4aaa-9cfc-87c3a706bced
+ycoach_mf 9d27f7c5-d6bf-4666-b2ee-edac2d0ece15
+lime_a 56e71779-0dad-4fce-aa4c-74781a2c3581
+peach_a ab20ab07-76eb-47eb-bb03-2ad21ff339dd
+cherries_a 53d4c647-c27d-4935-b303-9d4af033a86f
+grapefruit_a 1908769c-0c05-4aa2-9640-553fbf3de873
+lychee_a 03529cfa-5297-4835-88bd-ebc84006459a
+passionfruit_a 92016dbc-eaa4-447c-9a6d-d57e1de99fca
+mango_a 55e623ab-07e3-4d6e-a380-f84f6dd724e8
+fig_a 74492e5a-1a47-416d-82ba-8b43f09bde20
+quince_a 67f9c6e1-9e9a-4ae6-9040-f82a69f524c3
+portraits_legends f980978f-ff21-49e4-b73f-ab0eda806451
+portraits_conductor a552cb5c-2744-49b3-a7ac-907e2cd9ad16
+coach_ma c97295d7-f777-453b-aa1d-4cba27a68e34
+coach_mb a6485e2b-476e-48f7-a66a-4ec5acd49484
+coach_mc 29066fdf-c879-4692-9866-304a86e62d99
+coach_md 36b9371a-2567-4edd-9b69-f4231a3c411e
+coach_me fcbadda9-bbb9-4bcb-b7dc-80fee8383113
+coach_mf da2a2233-8815-4f73-a2ab-6f96cf082a3c
+coach_sitwalk d0042fcf-1b3c-4e1b-be4c-0ebe1fdee20d
+coach_walk 71853afa-4220-45fd-ba87-59bb8bfdf8be
+conductor_walk 0cf32294-9412-4480-b4a2-2dd4f8e0699f
+res_1 e03b046c-c680-4ea3-996c-3914933e4352
+res_2 fceb2f79-0fa6-4804-9f01-4deea9b74f1a
+res_3 62350a8a-4fe3-45d2-9f98-e3e63a4d38b2
+res_4 fdb68aa0-3148-42f2-a664-eeaaba9fcf68
+res_5 cad722aa-8f75-4838-bfa7-0832e63fe7ce
+lime_b 8879c4dc-c8d2-469d-9724-0ce96e50af61
+lime_md 655cceaf-08e3-435a-a646-fa05dd5e2772
+lime_me d04420f0-e60d-47b4-b46c-3d56b2e39d39
+lime_mf 8ac2bbe6-a438-4d21-8ef6-9ee8311516ee
+peach_b f8005fd1-519e-434f-b34d-eeea3d9bbe37
+peach_md 04fcfe2d-b7c7-4924-8a50-fa81b9368e2b
+peach_me db714ef1-34ed-49a1-97e0-365fb7df315d
+peach_mf 3bef7091-e10d-4657-9311-fa4544094dd3
+cherries_b c51f23bf-b3d2-43da-b5c6-d6d1f8c9a3fe
+cherries_md 636a33a1-fc67-4b86-805e-231d22389bfe
+cherries_me 20229dc1-140b-493d-8ef8-fe5321d9e890
+cherries_mf 2f362c67-c88f-4ee5-86b1-24758563b81c
+grapefruit_b 9b6ecfaf-ab18-4929-8eb9-84364b6423c8
+grapefruit_md 0024c63a-00ea-4171-9826-a138b08c0556
+grapefruit_me f3ade8f8-a106-4b6a-b6de-33069b615c9c
+grapefruit_mf e02c9f50-3af2-406c-9c8a-5917fc2b30b5
+lychee_b ffdc8230-8de8-422f-abab-faa163e68867
+lychee_md fe75cc09-1bfc-42cc-aa66-c944f3494b4c
+lychee_me cc6331b8-aa00-461b-ab73-e112f9fbaf32
+lychee_mf 33e4f14b-31a9-48b3-99f9-bf8d1d0f7cb6
+portraits_t1 a415db6a-52fb-41bf-b8d3-bb7095ca4538
+portraits_t2 2229028f-cd5e-4339-9414-636635ecf87e
+passionfruit_b 924685e2-d03f-42c5-ac27-3e7c2d5d2743
+passionfruit_md d1c037f5-0187-4f20-95bf-a9b9a1959bb6
+passionfruit_me 43284f31-a4bd-428a-a04e-5370012ca82d
+passionfruit_mf 3ccf1f2d-4a30-40a3-9cd3-802ca06a0351
+mango_b 336b1b28-bca1-4653-b4f7-990bd2121daa
+mango_md 4dcd4b21-bfc9-4d01-80c6-6ebd9754018d
+mango_me 7a86d5f8-4d0c-4eef-83f3-1d2bb921ee61
+mango_mf dcb467a7-daaf-4196-9f75-4adb46ed1006
+fig_b a81c4634-898f-45c2-994b-57a91481cfb4
+fig_md f285e494-c990-4b03-91fa-c78e0496bd44
+fig_me ac0338c1-e652-4d5c-89c4-936076dcc96a
+fig_mf 491f1a7d-0550-43d8-935e-9939bd4abcb5
+quince_b cb40de18-082e-4d26-8740-d72243bede5f
+quince_md 874780a6-4a81-4365-bfc6-c7f72031c7f1
+quince_me a4e31f84-efa6-49b7-a68d-99fb1c8f20dc
+quince_mf 979dd320-6ba8-4306-a2a4-d76cba2f4225
+portraits_t3 92adaeb3-1b22-4e06-b142-4226c082f726
+portraits_r1 de2dae71-767d-4098-9cfb-4cbc399efeed
+portraits_r2 0005f713-b208-4bdb-8974-4591b00c8568
+portraits_r3 2a40cc73-fbda-465e-9e3b-a0ac2466b0f8
+res_6 2a43d312-2a19-4e9f-b303-39236b4cb832
+strawberry_ma ec1e473d-23ba-4e26-8c5f-60a11ed4f92f
+strawberry_mb 24f7167a-6a58-4c97-80f4-7b5128732403
+strawberry_mc 67313430-3864-4d3c-bcac-10cb323ef726
