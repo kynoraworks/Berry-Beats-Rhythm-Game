@@ -301,7 +301,7 @@ describe('the loop data', () => {
         expect(Object.keys(CAST), where).toContain(l.who);
         expect(allowed.has(l.who), where).toBe(true);
         expect(l.text.length, where).toBeLessThanOrEqual(MAX_LINE_LENGTH);
-        expect(l.text, where).not.toMatch(/—/);
+        expect(l.text, where).not.toMatch(/\u2014/);
         if (l.who === 'npc') expect(l.role, where).toBeTruthy();
         if (l.who === 'berry' && stop.number < 8) expect(l.text, where).toBe('...');
       }

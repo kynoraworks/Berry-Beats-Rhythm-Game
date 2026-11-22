@@ -13,6 +13,13 @@ All art is 1:1 pixel art at the stages' scale: art pixel = 5 screen pixels,
 characters about 48 to 56 px tall, a dark outline, no semi-transparent
 pixels.
 
+On foot (stations, streets and rooms) people are drawn a little smaller than
+the backgrounds: 4 screen pixels per sprite pixel (`CHAR_SCALE` in
+`src/explore/Walker.ts`) against the backgrounds' 5, so a 48 px character
+stands about 39 background pixels tall, a little under a street door (the
+drawn doors are 52 to 56 background pixels). Draw new doors, counters and
+benches for that size. Battles keep everyone at 5.
+
 ## Floors
 
 Each background has its own floor line: the art-pixel row a standing
@@ -137,6 +144,19 @@ glows off pieces that swing (the glow would stay at rest). The setting's
 people (`battleLife` in `src/explore/ambient.ts`) nod on top of the loop;
 `pump: true` on a life spot makes a speaker or boombox someone sits on pump
 with the beat too.
+
+## Rooms: 256x160 each
+
+Doors along a street lead into rooms (`ROOMS` in `src/story/rooms.ts`): each
+has an id, its street, the door's x in the street, a background key
+(`room_<id>`), a width (256 is one screen), a feet row (default 140), things to
+look at, people, an optional lock and an optional music override. Until
+`room_<id>.png` is drawn a placeholder interior is painted
+(`src/explore/interiors.ts`: wall colour, floor boards, a window, the door
+back out on the left and a block of furniture behind each thing to look at,
+with a yellow PLACEHOLDER plate). To replace one, draw the room with its way
+out at x 8 to 36 and the furniture where the room's look boxes are, put it in
+`public/assets/img/` and list it in `PRESENT_IMAGES`.
 
 ## Other pieces
 
