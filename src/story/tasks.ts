@@ -50,7 +50,7 @@ interface TaskBase {
 export interface TalkChainTask extends TaskBase {
   kind: 'talkChain';
   steps: { spot: TaskSpot; lines: Line[] }[];
-  /** Said by someone talked to too early. `{next}` is replaced by the label of whom to ask. */
+  /** Said by someone talked to too early. `{next}` is replaced by whom to ask, in lower case ("stamp clerk"). */
   early: Line[];
   /** Said by someone already talked to (their own lines are said again when this is empty). */
   again?: Line[];
@@ -147,7 +147,7 @@ export function talkChain(task: TalkChainTask, state: TaskState, spotId: string)
     return { state, lines, outcome: 'again' };
   }
   if (index > step) {
-    const next = task.steps[step].spot.label;
+    const next = task.steps[step].spot.label.toLowerCase();
     return { state, lines: task.early.map((line) => ({ ...line, text: line.text.replace('{next}', next) })), outcome: 'early' };
   }
   const advanced = step + 1;

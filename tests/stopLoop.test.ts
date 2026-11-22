@@ -113,14 +113,14 @@ describe('talk chain', () => {
     let state: TaskState = {};
     let result = talkChain(chain, state, 'b');
     expect(result.outcome).toBe('early');
-    expect(result.lines[0].text).toBe('Try the Stamp office.');
+    expect(result.lines[0].text).toBe('Try the stamp office.');
     expect(result.state).toBe(state);
     result = talkChain(chain, state, 'a');
     expect(result.outcome).toBe('advance');
     state = result.state;
     expect(state.step).toBe(1);
     expect(talkChain(chain, state, 'a').outcome).toBe('again');
-    expect(talkChain(chain, state, 'c').lines[0].text).toBe('Try the Kiosk.');
+    expect(talkChain(chain, state, 'c').lines[0].text).toBe('Try the kiosk.');
     state = talkChain(chain, state, 'b').state;
     result = talkChain(chain, state, 'c');
     expect(result.outcome).toBe('done');
